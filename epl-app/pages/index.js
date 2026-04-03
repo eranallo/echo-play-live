@@ -583,58 +583,82 @@ function MasterCalendar({ data, resolve, resolveField, onShowClick, onBack }) {
               const isPast = dt < today
               const isBooked = shows.length > 0
               const isBlackedOut = blackouts.length > 0 && !isBooked
-              const isAvailable = !isBooked && !isBlackedOut && !isPast
+              const isExpanded = expandedBlackout === ds
               const dayName = dt.toLocaleDateString('en-US', { weekday:'short' })
               const dayNum = dt.getDate()
 
-              let bg = '#111118'
-              let border = '0.5px solid #2a2a3a'
-              let statusColor = '#6b7280'
-              let statusText = 'Available'
+              let bg = '#111118', border = '0.5px solid #2a2a3a', statusColor = '#6b7280'
+              if (isPast) { bg = '#0a0a0a'; border = '0.5px solid #1a1a1a'; statusColor = '#3a3a3a' }
+              else if (isBooked) { bg = '#0f1f0f'; border = '0.5px solid #2a4a2a'; statusColor = '#6bcb77' }
+              else if (isBlackedOut) { bg = '#160e0e'; border = '0.5px solid #3a2020'; statusColor = '#ff9f7f' }
+              else { bg = '#0d0d1f'; border = '0.5px solid #2a2a4a'; statusColor = '#5a5a8a' }
 
-              if (isPast) { bg = '#0a0a0a'; border = '0.5px solid #1a1a1a'; statusColor = '#3a3a3a'; statusText = 'Past' }
-              else if (isBooked) { bg = '#0f1f0f'; border = '0.5px solid #2a4a2a'; statusColor = '#6bcb77'; statusText = `${shows.length} show${shows.length>1?'s':''}` }
-              else if (isBlackedOut) { bg = '#160e0e'; border = '0.5px solid #3a2020'; statusColor = '#ff9f7f'; statusText = 'conflict' }
-              else { bg = '#0d0d1f'; border = '0.5px solid #2a2a4a'; statusColor = '#5a5a8a'; statusText = 'Open' }
-
-              const dateRow = (
-                <div key={ds} onClick={() => {
-                  if (isBooked && shows.length === 1) onShowClick(shows[0])
-                  else if (isBlackedOut) setExpandedBlackout(expandedBlackout === ds ? null : ds)
-                }} style={{ display:'flex', alignItems:'center', gap:12, padding:'11px 14px', background:bg, border: expandedBlackout === ds ? '1px solid #ff9f7f' : border, borderRadius:10, marginBottom: expandedBlackout === ds ? 0 : 6, cursor: isBooked || isBlackedOut ? 'pointer' : 'default', borderBottomLeftRadius: expandedBlackout === ds ? 0 : 10, borderBottomRightRadius: expandedBlackout === ds ? 0 : 10 }}>
-                  <div style={{ width:36, textAlign:'center', flexShrink:0 }}>
-                    <div style={{ fontSize:16, fontWeight:700, color: isPast ? '#3a3a3a' : isBooked ? '#6bcb77' : isBlackedOut ? '#ff9f7f' : '#a78bfa' }}>{dayNum}</div>
-                    <div style={{ fontSize:10, color:'#6b7280' }}>{dayName}</div>
-                  </div>
-                  <div style={{ width:'0.5px', height:30, background:'#2a2a3a', flexShrink:0 }} />
-                  <div style={{ flex:1, minWidth:0 }}>
-                    {isBooked ? shows.map((s, i) => {
-                      const venueRecs = resolve(s.fields['Venue'], 'VENUES')
-                      const vf = venueRecs[0] ? venueRecs[0].fields : {}
-                      const bands = resolveField(s.fields['Band'], 'BANDS', 'Band Name')
-                      const c = BAND_COLORS[bands[0]] || { color:'#a78bfa' }
-                      return (
-                        <div key={i} style={{ marginBottom: i < shows.length-1 ? 6 : 0 }}>
-                          <div style={{ fontSize:13, fontWeight:600, color:'#ffffff', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{vf['Venue Name'] || '—'}</div>
-                          <div style={{ display:'flex', gap:4, marginTop:2, alignItems:'center' }}>
-                            {bands.map((b, bi) => <span key={bi} style={{ fontSize:10, padding:'1px 6px', borderRadius:20, background:BAND_COLORS[b]?.bg||'#1a1a2e', color:BAND_COLORS[b]?.color||'#a78bfa', fontWeight:600 }}>{b}</span>)}
-                            {s.fields['Set Time'] && <span style={{ fontSize:10, color:'#6b7280' }}>{s.fields['Set Time']}</span>}
+              return (
+                <div key={ds} style={{ marginBottom:6 }}>
+                  <div onClick={() => {
+                    if (isBooked && shows.length === 1) onShowClick(shows[0])
+                    else if (isBlackedOut) setExpandedBlackout(isExpanded ? null : ds)
+                  }} style={{ display:'flex', alignItems:'center', gap:12, padding:'11px 14px', background:bg, border: isExpanded ? '1px solid #ff9f7f' : border, borderRadius: isExpanded ? '10px 10px 0 0' : 10, cursor: isBooked || isBlackedOut ? 'pointer' : 'default' }}>
+                    <div style={{ width:36, textAlign:'center', flexShrink:0 }}>
+                      <div style={{ fontSize:16, fontWeight:700, color: isPast ? '#3a3a3a' : isBooked ? '#6bcb77' : isBlackedOut ? '#ff9f7f' : '#a78bfa' }}>{dayNum}</div>
+                      <div style={{ fontSize:10, color:'#6b7280' }}>{dayName}</div>
+                    </div>
+                    <div style={{ width:'0.5px', height:30, background:'#2a2a3a', flexShrink:0 }} />
+                    <div style={{ flex:1, minWidth:0 }}>
+                      {isBooked ? shows.map((s, i) => {
+                        const venueRecs = resolve(s.fields['Venue'], 'VENUES')
+                        const vf = venueRecs[0] ? venueRecs[0].fields : {}
+                        const bands = resolveField(s.fields['Band'], 'BANDS', 'Band Name')
+                        return (
+                          <div key={i} style={{ marginBottom: i < shows.length-1 ? 6 : 0 }}>
+                            <div style={{ fontSize:13, fontWeight:600, color:'#ffffff', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{vf['Venue Name'] || '—'}</div>
+                            <div style={{ display:'flex', gap:4, marginTop:2, alignItems:'center', flexWrap:'wrap' }}>
+                              {bands.map((b, bi) => <span key={bi} style={{ fontSize:10, padding:'1px 6px', borderRadius:20, background:BAND_COLORS[b]?.bg||'#1a1a2e', color:BAND_COLORS[b]?.color||'#a78bfa', fontWeight:600 }}>{b}</span>)}
+                              {s.fields['Set Time'] && <span style={{ fontSize:10, color:'#6b7280' }}>{s.fields['Set Time']}</span>}
+                            </div>
                           </div>
+                        )
+                      }) : isBlackedOut ? (
+                        <div style={{ fontSize:13, color:'#ff9f7f' }}>
+                          {blackouts.reduce((a, b) => a + (Array.isArray(b.fields['Member']) ? b.fields['Member'].length : 1), 0)} member conflict{blackouts.length > 1 ? 's' : ''} — tap for details
                         </div>
-                      )
-                    }) : isBlackedOut ? (
-                      <div style={{ fontSize:13, color:'#ff9f7f' }}>
-                        {blackouts.length} member{blackouts.length>1?'s':''} blacked out
+                      ) : isPast ? (
+                        <div style={{ fontSize:13, color:'#3a3a3a' }}>Past date</div>
+                      ) : (
+                        <div style={{ fontSize:13, color:'#5a5a8a' }}>Open — available to book</div>
+                      )}
+                    </div>
+                    <div style={{ fontSize:14, color:statusColor, flexShrink:0 }}>
+                      {isBooked ? '›' : isBlackedOut ? (isExpanded ? '▲' : '▼') : ''}
+                    </div>
+                  </div>
+
+                  {isExpanded && isBlackedOut && (
+                    <div style={{ background:'#1a0a0a', border:'1px solid #ff9f7f', borderTop:'none', borderRadius:'0 0 10px 10px', padding:'12px 16px' }}>
+                      <div style={{ fontSize:11, fontWeight:600, color:'#ff9f7f', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:10 }}>Member conflicts</div>
+                      {blackouts.map((b, bi) => {
+                        const mids = b.fields['Member'] || []
+                        const names = (Array.isArray(mids) ? mids : [mids]).map(id => memberById[id] || '?').filter(Boolean)
+                        return names.map((n, ni) => (
+                          <div key={bi + '-' + ni} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'8px 0', borderBottom:'0.5px solid #2a1a1a' }}>
+                            <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                              <div style={{ width:28, height:28, borderRadius:'50%', background:'#2e1a1a', display:'flex', alignItems:'center', justifyContent:'center', fontSize:10, fontWeight:700, color:'#ff9f7f' }}>
+                                {n.split(' ').map(x => x[0]).join('').toUpperCase().slice(0,2)}
+                              </div>
+                              <div>
+                                <div style={{ fontSize:13, fontWeight:600, color:'#ffffff' }}>{n}</div>
+                                {b.fields['Reason'] && <div style={{ fontSize:11, color:'#6b7280' }}>{b.fields['Reason']}</div>}
+                              </div>
+                            </div>
+                            <div style={{ fontSize:11, color:'#ff9f7f', fontWeight:500 }}>Unavailable</div>
+                          </div>
+                        ))
+                      })}
+                      <div style={{ marginTop:10, fontSize:12, color:'#6b7280', fontStyle:'italic' }}>
+                        Date may still be bookable with available members.
                       </div>
-                    ) : isPast ? (
-                      <div style={{ fontSize:13, color:'#3a3a3a' }}>Past date</div>
-                    ) : (
-                      <div style={{ fontSize:13, color:'#5a5a8a' }}>Open — available to book</div>
-                    )}
-                  </div>
-                  <div style={{ fontSize:12, fontWeight:600, color:statusColor, flexShrink:0 }}>
-                    {isBooked ? '›' : ''}
-                  </div>
+                    </div>
+                  )}
                 </div>
               )
             })}
