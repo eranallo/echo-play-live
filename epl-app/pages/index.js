@@ -667,8 +667,9 @@ function FullSchedule({ data, member, resolve, resolveField, onShowClick, onBack
 
 function Blackouts({ data, member, resolve, onBack }) {
   const [showForm, setShowForm] = useState(false)
-  const [date, setDate] = useState('')
-  const [reason, setReason] = useState('')
+  const [currentDate, setCurrentDate] = useState('')
+  const [currentReason, setCurrentReason] = useState('Personal')
+  const [pendingDates, setPendingDates] = useState([])
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [localBlackouts, setLocalBlackouts] = useState([])
@@ -680,19 +681,37 @@ function Blackouts({ data, member, resolve, onBack }) {
 
   const REASONS = ['Personal', 'Other Gig', 'Vacation', 'Illness', 'Family', 'Other']
 
-  async function submitBlackout() {
-    if (!date) return
+  function addToPending() {
+    if (!currentDate) return
+    if (pendingDates.find(p => p.date === currentDate)) return
+    setPendingDates(prev => [...prev, { date: currentDate, reason: currentReason }])
+    setCurrentDate('')
+    setCurrentReason('Personal')
+  }
+
+  function removePending(date) {
+    setPendingDates(prev => prev.filter(p => p.date !== date))
+  }
+
+  async function submitAll() {
+    if (pendingDates.length === 0) return
     setSubmitting(true)
     try {
-      const res = await fetch('/api/blackout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 'Member': [member.id], 'Date': date, 'Reason': reason || 'Personal' })
-      })
-      const json = await res.json()
-      if (json.error) throw new Error(json.error)
-      setLocalBlackouts(prev => [...prev, { id: json.id, fields: { Date: date, Reason: reason || 'Personal', Member: [member.id] } }])
-      setDate(''); setReason(''); setShowForm(false); setSubmitted(true)
+      const results = []
+      for (const p of pendingDates) {
+        const res = await fetch('/api/blackout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 'Member': [member.id], 'Date': p.date, 'Reason': p.reason })
+        })
+        const json = await res.json()
+        if (json.error) throw new Error(json.error)
+        results.push({ id: json.id, fields: { Date: p.date, Reason: p.reason, Member: [member.id] } })
+      }
+      setLocalBlackouts(prev => [...prev, ...results])
+      setPendingDates([])
+      setShowForm(false)
+      setSubmitted(true)
       setTimeout(() => setSubmitted(false), 3000)
     } catch(e) { alert('Error: ' + e.message) }
     setSubmitting(false)
@@ -706,39 +725,69 @@ function Blackouts({ data, member, resolve, onBack }) {
           <button onClick={onBack} style={{ background:'none', border:'none', color:'#a78bfa', fontSize:22, cursor:'pointer', padding:0 }}>{String.fromCharCode(8249)}</button>
           <div style={{ fontSize:15, fontWeight:600 }}>My blackout dates</div>
         </div>
-        <button onClick={() => setShowForm(f => !f)} style={{ fontSize:13, padding:'6px 14px', borderRadius:20, background: showForm ? '#2a2a3a' : '#1a1a2e', border:'none', color:'#a78bfa', cursor:'pointer', fontFamily:'inherit', fontWeight:600 }}>
-          {showForm ? 'Cancel' : '+ Add date'}
+        <button onClick={() => { setShowForm(f => !f); setPendingDates([]); setCurrentDate(''); setCurrentReason('Personal') }} style={{ fontSize:13, padding:'6px 14px', borderRadius:20, background: showForm ? '#2a2a3a' : '#1a1a2e', border:'none', color:'#a78bfa', cursor:'pointer', fontFamily:'inherit', fontWeight:600 }}>
+          {showForm ? 'Cancel' : '+ Add dates'}
         </button>
       </div>
+
       <div style={{ padding:'16px 20px 80px' }}>
         {submitted && (
           <div style={{ background:'#0f2a0f', border:'0.5px solid #2a4a2a', borderRadius:10, padding:'12px 16px', marginBottom:14, fontSize:13, color:'#6bcb77' }}>
-            Blackout date submitted!
+            Blackout {localBlackouts.length === 1 ? 'date' : 'dates'} submitted successfully!
           </div>
         )}
+
         {showForm && (
-          <div style={{ background:'#111118', border:'0.5px solid #2a2a3a', borderRadius:14, padding:18, marginBottom:20 }}>
-            <div style={{ fontSize:14, fontWeight:600, marginBottom:14 }}>Submit a blackout date</div>
-            <div style={{ marginBottom:12 }}>
+          <div style={{ background:'#111118', border:'0.5px solid #2a2a3a', borderRadius:14, padding:16, marginBottom:20 }}>
+            <div style={{ fontSize:14, fontWeight:600, marginBottom:14 }}>Add blackout dates</div>
+
+            <div style={{ marginBottom:10 }}>
               <div style={{ fontSize:12, color:'#6b7280', marginBottom:6 }}>Date you cannot play</div>
-              <input type="date" value={date} onChange={e => setDate(e.target.value)} style={{ width:'100%', padding:'11px 14px', background:'#1a1a2a', border:'0.5px solid #3a3a4a', borderRadius:10, color:'#ffffff', fontSize:14, fontFamily:'inherit' }} />
+              <input
+                type="date"
+                value={currentDate}
+                onChange={e => setCurrentDate(e.target.value)}
+                style={{ width:'100%', padding:'10px 12px', background:'#1a1a2a', border:'0.5px solid #3a3a4a', borderRadius:10, color:'#ffffff', fontSize:15, fontFamily:'inherit', boxSizing:'border-box', display:'block' }}
+              />
             </div>
-            <div style={{ marginBottom:16 }}>
+
+            <div style={{ marginBottom:12 }}>
               <div style={{ fontSize:12, color:'#6b7280', marginBottom:8 }}>Reason</div>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6 }}>
                 {REASONS.map(r => (
-                  <button key={r} onClick={() => setReason(r)} style={{ padding:'9px 12px', background: reason===r ? '#1a1a2e' : '#0a0a1a', border: reason===r ? '0.5px solid #a78bfa' : '0.5px solid #2a2a3a', borderRadius:10, color: reason===r ? '#a78bfa' : '#6b7280', fontSize:13, cursor:'pointer', fontFamily:'inherit', fontWeight: reason===r ? 600 : 400 }}>{r}</button>
+                  <button key={r} onClick={() => setCurrentReason(r)} style={{ padding:'8px 6px', background: currentReason===r ? '#1a1a2e' : '#0a0a1a', border: currentReason===r ? '0.5px solid #a78bfa' : '0.5px solid #2a2a3a', borderRadius:8, color: currentReason===r ? '#a78bfa' : '#6b7280', fontSize:12, cursor:'pointer', fontFamily:'inherit', fontWeight: currentReason===r ? 600 : 400 }}>{r}</button>
                 ))}
               </div>
             </div>
-            <button onClick={submitBlackout} disabled={!date || submitting} style={{ width:'100%', padding:'13px', background: date ? '#1a1a2e' : '#0a0a1a', border:'none', borderRadius:12, color: date ? '#a78bfa' : '#3a3a4a', fontSize:14, fontWeight:700, cursor: date ? 'pointer' : 'default', fontFamily:'inherit' }}>
-              {submitting ? 'Submitting...' : 'Submit blackout date'}
+
+            <button onClick={addToPending} disabled={!currentDate} style={{ width:'100%', padding:'11px', background: currentDate ? '#0f2a0f' : '#0a0a0a', border: currentDate ? '0.5px solid #2a4a2a' : '0.5px solid #1a1a1a', borderRadius:10, color: currentDate ? '#6bcb77' : '#3a3a3a', fontSize:13, fontWeight:600, cursor: currentDate ? 'pointer' : 'default', fontFamily:'inherit', marginBottom: pendingDates.length > 0 ? 12 : 0 }}>
+              + Add to list
             </button>
+
+            {pendingDates.length > 0 && (
+              <div>
+                <div style={{ fontSize:11, color:'#6b7280', marginBottom:8, marginTop:4 }}>Dates to submit ({pendingDates.length})</div>
+                {pendingDates.map((p, i) => (
+                  <div key={i} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'8px 12px', background:'#0a0a1a', borderRadius:8, marginBottom:6 }}>
+                    <div>
+                      <span style={{ fontSize:13, fontWeight:600, color:'#ffffff' }}>{fmt(p.date)}</span>
+                      <span style={{ fontSize:12, color:'#6b7280', marginLeft:8 }}>{p.reason}</span>
+                    </div>
+                    <button onClick={() => removePending(p.date)} style={{ background:'none', border:'none', color:'#ff9f7f', fontSize:16, cursor:'pointer', padding:'0 4px', fontFamily:'inherit' }}>×</button>
+                  </div>
+                ))}
+                <button onClick={submitAll} disabled={submitting} style={{ width:'100%', padding:'13px', background:'#1a1a2e', border:'none', borderRadius:12, color:'#a78bfa', fontSize:14, fontWeight:700, cursor:'pointer', fontFamily:'inherit', marginTop:6 }}>
+                  {submitting ? 'Submitting...' : `Submit ${pendingDates.length} blackout date${pendingDates.length > 1 ? 's' : ''}`}
+                </button>
+              </div>
+            )}
           </div>
         )}
+
         <div style={{ fontSize:11, fontWeight:600, color:'#6b7280', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:12 }}>
           {myBlackouts.length} date{myBlackouts.length !== 1 ? 's' : ''} on record
         </div>
+
         {myBlackouts.length ? myBlackouts.map((b, i) => (
           <div key={i} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'14px 0', borderBottom:'0.5px solid #1a1a2a' }}>
             <div>
