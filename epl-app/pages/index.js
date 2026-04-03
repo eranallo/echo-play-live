@@ -130,11 +130,19 @@ function MemberSelect({ data, onSelect, onBooking, onCalendar }) {
     <div style={{ minHeight:'100vh', background:'#0a0a0f', display:'flex', flexDirection:'column', alignItems:'center', padding:'2.5rem 1.5rem 2rem' }}>
       <Head><title>Echo Play Live</title></Head>
       <div style={{ marginBottom:'1.75rem', textAlign:'center' }}>
-        <img src="/logo.png" alt="Echo Play Live" style={{ width:120, height:120, objectFit:'contain', marginBottom:14 }} />
+        <img src="/logo.png" alt="Echo Play Live" style={{ width:120, height:120, objectFit:'contain', marginBottom:14, mixBlendMode:'screen' }} />
         <div style={{ fontSize:13, color:'#6b7280' }}>Select your name to continue</div>
       </div>
       <div style={{ width:'100%', maxWidth:420 }}>
-        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:10 }}>
+        <button onClick={onCalendar} style={{ width:'100%', padding:'16px', background:'#0f1f0f', border:'1px solid #2a4a2a', borderRadius:14, cursor:'pointer', fontFamily:'inherit', textAlign:'center', marginBottom:12, display:'flex', alignItems:'center', justifyContent:'center', gap:12 }}>
+          <span style={{ fontSize:22 }}>📅</span>
+          <div style={{ textAlign:'left' }}>
+            <div style={{ fontSize:15, fontWeight:700, color:'#6bcb77' }}>Show Availability Calendar</div>
+            <div style={{ fontSize:12, color:'#4a7a4a', marginTop:2 }}>{totalShows} booked · view all Fridays & Saturdays</div>
+          </div>
+        </button>
+        <div style={{ fontSize:11, fontWeight:600, color:'#6b7280', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:10 }}>Band members</div>
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
           {members.map(m => {
             const f = m.fields
             const name = f['Member Name'] || '—'
@@ -149,19 +157,6 @@ function MemberSelect({ data, onSelect, onBooking, onCalendar }) {
               </button>
             )
           })}
-        </div>
-        <div style={{ height:'0.5px', background:'#1a1a2a', margin:'8px 0' }} />
-        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginTop:8 }}>
-          <button onClick={onCalendar} style={{ padding:'14px 12px', background:'#111118', border:'0.5px solid #2a2a3a', borderRadius:14, cursor:'pointer', fontFamily:'inherit', textAlign:'center' }}>
-            <div style={{ fontSize:20, marginBottom:4 }}>📅</div>
-            <div style={{ fontSize:13, fontWeight:600, color:'#6bcb77' }}>All Shows</div>
-            <div style={{ fontSize:11, color:'#6b7280', marginTop:2 }}>{totalShows} upcoming</div>
-          </button>
-          <button onClick={onBooking} style={{ padding:'14px 12px', background:'#111118', border:'0.5px solid #2a2a3a', borderRadius:14, cursor:'pointer', fontFamily:'inherit', textAlign:'center' }}>
-            <div style={{ fontSize:20, marginBottom:4 }}>📩</div>
-            <div style={{ fontSize:13, fontWeight:600, color:'#a78bfa' }}>Book a Show</div>
-            <div style={{ fontSize:11, color:'#6b7280', marginTop:2 }}>Send inquiry</div>
-          </button>
         </div>
       </div>
     </div>
@@ -451,70 +446,162 @@ function ShowDetail({ data, member, show, resolve, resolveField, onBack }) {
 }
 
 function MasterCalendar({ data, resolve, resolveField, onShowClick, onBack }) {
-  const today = new Date()
-  const allShows = (data['SHOWS'] || [])
-    .filter(s => s.fields['Date'] && new Date(s.fields['Date']) >= today)
-    .sort((a, b) => a.fields['Date'] > b.fields['Date'] ? 1 : -1)
+  const year = new Date().getFullYear()
 
-  const grouped = {}
-  allShows.forEach(s => {
-    const d = new Date(s.fields['Date'] + 'T00:00:00')
-    const key = `${d.getFullYear()}-${d.getMonth()}`
-    if (!grouped[key]) grouped[key] = { label: `${MONTH_NAMES[d.getMonth()]} ${d.getFullYear()}`, shows: [] }
-    grouped[key].shows.push(s)
+  // Generate all Fridays (5) and Saturdays (6) for the year
+  const weekendDates = []
+  const d = new Date(year, 0, 1)
+  while (d.getFullYear() === year) {
+    if (d.getDay() === 5 || d.getDay() === 6) {
+      weekendDates.push(new Date(d))
+    }
+    d.setDate(d.getDate() + 1)
+  }
+
+  const showsByDate = {}
+  ;(data['SHOWS'] || []).forEach(s => {
+    const dt = s.fields['Date']
+    if (dt) {
+      if (!showsByDate[dt]) showsByDate[dt] = []
+      showsByDate[dt].push(s)
+    }
   })
+
+  const blackoutsByDate = {}
+  ;(data['BLACKOUT DATES'] || []).forEach(b => {
+    const dt = b.fields['Date']
+    if (dt) {
+      if (!blackoutsByDate[dt]) blackoutsByDate[dt] = []
+      blackoutsByDate[dt].push(b)
+    }
+  })
+
+  // Group by month
+  const grouped = {}
+  weekendDates.forEach(dt => {
+    const key = dt.getMonth()
+    if (!grouped[key]) grouped[key] = { label: MONTH_NAMES[dt.getMonth()], dates: [] }
+    grouped[key].dates.push(dt)
+  })
+
+  const today = new Date()
+  today.setHours(0,0,0,0)
+
+  function toDateStr(dt) {
+    return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`
+  }
+
+  const bookedCount = Object.keys(showsByDate).length
+  const totalWeekends = weekendDates.length
+  const availableCount = weekendDates.filter(dt => {
+    const ds = toDateStr(dt)
+    return !showsByDate[ds] && !blackoutsByDate[ds] && dt >= today
+  }).length
 
   return (
     <div style={{ minHeight:'100vh', background:'#0a0a0f', color:'#ffffff', fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif' }}>
-      <Head><title>EPL — All Shows</title></Head>
+      <Head><title>EPL — Show Calendar {year}</title></Head>
       <div style={{ background:'#111118', borderBottom:'0.5px solid #1e1e2e', padding:'12px 20px', display:'flex', alignItems:'center', gap:14, position:'sticky', top:0, zIndex:50 }}>
         <button onClick={onBack} style={{ background:'none', border:'none', color:'#a78bfa', fontSize:22, cursor:'pointer', padding:0 }}>‹</button>
         <div>
-          <div style={{ fontSize:15, fontWeight:600 }}>All shows</div>
-          <div style={{ fontSize:12, color:'#6b7280' }}>{allShows.length} upcoming across all bands</div>
+          <div style={{ fontSize:15, fontWeight:600 }}>Show Calendar {year}</div>
+          <div style={{ fontSize:12, color:'#6b7280' }}>All Fridays & Saturdays</div>
         </div>
       </div>
-      <div style={{ padding:'20px 20px 60px' }}>
+
+      <div style={{ padding:'16px 20px 8px' }}>
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8, marginBottom:16 }}>
+          <div style={{ background:'#0f1f0f', border:'0.5px solid #2a4a2a', borderRadius:10, padding:'10px 12px', textAlign:'center' }}>
+            <div style={{ fontSize:18, fontWeight:700, color:'#6bcb77' }}>{bookedCount}</div>
+            <div style={{ fontSize:10, color:'#4a7a4a', marginTop:2 }}>Booked</div>
+          </div>
+          <div style={{ background:'#0a0a1f', border:'0.5px solid #2a2a4a', borderRadius:10, padding:'10px 12px', textAlign:'center' }}>
+            <div style={{ fontSize:18, fontWeight:700, color:'#ff9f7f' }}>{totalWeekends - availableCount - bookedCount < 0 ? 0 : totalWeekends - availableCount - bookedCount}</div>
+            <div style={{ fontSize:10, color:'#6b7280', marginTop:2 }}>Blacked Out</div>
+          </div>
+          <div style={{ background:'#111118', border:'0.5px solid #2a2a3a', borderRadius:10, padding:'10px 12px', textAlign:'center' }}>
+            <div style={{ fontSize:18, fontWeight:700, color:'#a78bfa' }}>{availableCount}</div>
+            <div style={{ fontSize:10, color:'#6b7280', marginTop:2 }}>Available</div>
+          </div>
+        </div>
+
+        <div style={{ display:'flex', gap:16, marginBottom:16, flexWrap:'wrap' }}>
+          <div style={{ display:'flex', alignItems:'center', gap:6, fontSize:11, color:'#6b7280' }}><div style={{ width:10, height:10, borderRadius:2, background:'#1a2e1a' }} />Booked</div>
+          <div style={{ display:'flex', alignItems:'center', gap:6, fontSize:11, color:'#6b7280' }}><div style={{ width:10, height:10, borderRadius:2, background:'#2e1a1a' }} />Blacked out</div>
+          <div style={{ display:'flex', alignItems:'center', gap:6, fontSize:11, color:'#6b7280' }}><div style={{ width:10, height:10, borderRadius:2, background:'#1a1a2e', border:'0.5px solid #3a3a5a' }} />Available</div>
+          <div style={{ display:'flex', alignItems:'center', gap:6, fontSize:11, color:'#6b7280' }}><div style={{ width:10, height:10, borderRadius:2, background:'#1a1a1a', border:'0.5px solid #222' }} />Past</div>
+        </div>
+      </div>
+
+      <div style={{ padding:'0 20px 80px' }}>
         {Object.values(grouped).map(group => (
-          <div key={group.label} style={{ marginBottom:28 }}>
-            <div style={{ fontSize:13, fontWeight:700, color:'#a78bfa', textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:12, display:'flex', alignItems:'center', gap:10 }}>
+          <div key={group.label} style={{ marginBottom:24 }}>
+            <div style={{ fontSize:12, fontWeight:700, color:'#a78bfa', textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:10, display:'flex', alignItems:'center', gap:10 }}>
               <div style={{ flex:1, height:'0.5px', background:'#1a1a2e' }} />
               {group.label}
               <div style={{ flex:1, height:'0.5px', background:'#1a1a2e' }} />
             </div>
-            {group.shows.map(s => {
-              const f = s.fields
-              const bands = resolveField(f['Band'], 'BANDS', 'Band Name')
-              const venueRecs = resolve(f['Venue'], 'VENUES')
-              const vf = venueRecs[0] ? venueRecs[0].fields : {}
-              const d = new Date(f['Date'] + 'T00:00:00')
-              const dayNum = d.getDate()
-              const dayName = d.toLocaleDateString('en-US', { weekday:'short' })
-              const c = BAND_COLORS[bands[0]] || { color:'#a78bfa' }
+            {group.dates.map(dt => {
+              const ds = toDateStr(dt)
+              const shows = showsByDate[ds] || []
+              const blackouts = blackoutsByDate[ds] || []
+              const isPast = dt < today
+              const isBooked = shows.length > 0
+              const isBlackedOut = blackouts.length > 0 && !isBooked
+              const isAvailable = !isBooked && !isBlackedOut && !isPast
+              const dayName = dt.toLocaleDateString('en-US', { weekday:'short' })
+              const dayNum = dt.getDate()
+
+              let bg = '#111118'
+              let border = '0.5px solid #2a2a3a'
+              let statusColor = '#6b7280'
+              let statusText = 'Available'
+
+              if (isPast) { bg = '#0a0a0a'; border = '0.5px solid #1a1a1a'; statusColor = '#3a3a3a'; statusText = 'Past' }
+              else if (isBooked) { bg = '#0f1f0f'; border = '0.5px solid #2a4a2a'; statusColor = '#6bcb77'; statusText = `${shows.length} show${shows.length>1?'s':''}` }
+              else if (isBlackedOut) { bg = '#1f0f0f'; border = '0.5px solid #4a2a2a'; statusColor = '#ff9f7f'; statusText = `${blackouts.length} blacked out` }
+              else { bg = '#0d0d1f'; border = '0.5px solid #2a2a4a'; statusColor = '#5a5a8a'; statusText = 'Open' }
+
               return (
-                <div key={s.id} onClick={() => onShowClick(s)} style={{ display:'flex', alignItems:'center', gap:14, padding:'13px 16px', background:'#111118', border:'0.5px solid #2a2a3a', borderRadius:12, marginBottom:8, cursor:'pointer' }}>
-                  <div style={{ width:40, textAlign:'center', flexShrink:0 }}>
-                    <div style={{ fontSize:18, fontWeight:700, color:c.color }}>{dayNum}</div>
+                <div key={ds} onClick={() => { if (isBooked && shows.length === 1) onShowClick(shows[0]) }} style={{ display:'flex', alignItems:'center', gap:12, padding:'11px 14px', background:bg, border:border, borderRadius:10, marginBottom:6, cursor: isBooked ? 'pointer' : 'default' }}>
+                  <div style={{ width:36, textAlign:'center', flexShrink:0 }}>
+                    <div style={{ fontSize:16, fontWeight:700, color: isPast ? '#3a3a3a' : isBooked ? '#6bcb77' : isBlackedOut ? '#ff9f7f' : '#a78bfa' }}>{dayNum}</div>
                     <div style={{ fontSize:10, color:'#6b7280' }}>{dayName}</div>
                   </div>
-                  <div style={{ width:'0.5px', height:36, background:'#2a2a3a', flexShrink:0 }} />
+                  <div style={{ width:'0.5px', height:30, background:'#2a2a3a', flexShrink:0 }} />
                   <div style={{ flex:1, minWidth:0 }}>
-                    <div style={{ fontSize:14, fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{vf['Venue Name'] || '—'}</div>
-                    <div style={{ display:'flex', gap:4, marginTop:4, flexWrap:'wrap' }}>{bands.map((b, i) => <BandTag key={i} name={b} />)}</div>
+                    {isBooked ? shows.map((s, i) => {
+                      const venueRecs = resolve(s.fields['Venue'], 'VENUES')
+                      const vf = venueRecs[0] ? venueRecs[0].fields : {}
+                      const bands = resolveField(s.fields['Band'], 'BANDS', 'Band Name')
+                      const c = BAND_COLORS[bands[0]] || { color:'#a78bfa' }
+                      return (
+                        <div key={i} style={{ marginBottom: i < shows.length-1 ? 6 : 0 }}>
+                          <div style={{ fontSize:13, fontWeight:600, color:'#ffffff', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{vf['Venue Name'] || '—'}</div>
+                          <div style={{ display:'flex', gap:4, marginTop:2, alignItems:'center' }}>
+                            {bands.map((b, bi) => <span key={bi} style={{ fontSize:10, padding:'1px 6px', borderRadius:20, background:BAND_COLORS[b]?.bg||'#1a1a2e', color:BAND_COLORS[b]?.color||'#a78bfa', fontWeight:600 }}>{b}</span>)}
+                            {s.fields['Set Time'] && <span style={{ fontSize:10, color:'#6b7280' }}>{s.fields['Set Time']}</span>}
+                          </div>
+                        </div>
+                      )
+                    }) : isBlackedOut ? (
+                      <div style={{ fontSize:13, color:'#ff9f7f' }}>
+                        {blackouts.length} member{blackouts.length>1?'s':''} blacked out
+                      </div>
+                    ) : isPast ? (
+                      <div style={{ fontSize:13, color:'#3a3a3a' }}>Past date</div>
+                    ) : (
+                      <div style={{ fontSize:13, color:'#5a5a8a' }}>Open — available to book</div>
+                    )}
                   </div>
-                  <div style={{ textAlign:'right', flexShrink:0 }}>
-                    <div style={{ fontSize:13, fontWeight:500 }}>{f['Set Time'] || '—'}</div>
-                    <div style={{ fontSize:10, color:'#6b7280' }}>set time</div>
+                  <div style={{ fontSize:12, fontWeight:600, color:statusColor, flexShrink:0 }}>
+                    {isBooked ? '›' : ''}
                   </div>
-                  <div style={{ color:'#2a2a3a', fontSize:18 }}>›</div>
                 </div>
               )
             })}
           </div>
         ))}
-        {allShows.length === 0 && (
-          <div style={{ textAlign:'center', color:'#6b7280', fontSize:14, paddingTop:'2rem' }}>No upcoming shows found.</div>
-        )}
       </div>
     </div>
   )
