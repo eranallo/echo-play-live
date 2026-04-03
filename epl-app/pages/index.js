@@ -452,6 +452,7 @@ function ShowDetail({ data, member, show, resolve, resolveField, onBack }) {
 function MasterCalendar({ data, resolve, resolveField, onShowClick, onBack }) {
   const year = new Date().getFullYear()
   const currentMonth = new Date().getMonth()
+  const today = new Date(new Date().toDateString())
 
   useEffect(() => {
     try {
@@ -517,7 +518,6 @@ function MasterCalendar({ data, resolve, resolveField, onShowClick, onBack }) {
     return !!blackoutsByDate[ds] && !showsByDate[ds] && dt >= today
   }).length
 
-  const today = new Date(new Date().toDateString())
   const [filter, setFilter] = useState('all')
   const [expandedBlackout, setExpandedBlackout] = useState(null)
 
