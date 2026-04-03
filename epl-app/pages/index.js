@@ -626,7 +626,7 @@ function MasterCalendar({ data, resolve, resolveField, onShowClick, onBack }) {
               )
             })}
           </div>
-        )}.filter(Boolean))}
+        )})}
       </div>
     </div>
   )
