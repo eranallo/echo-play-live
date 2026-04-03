@@ -179,8 +179,6 @@ function MemberHome({ data, member, resolve, resolveField, onShowClick, onBack, 
     return Array.isArray(bm) ? bm.includes(member.id) : bm === member.id
   })
 
-  const allShows = (data['SHOWS'] || []).filter(s => s.fields['Date'] && new Date(s.fields['Date']) >= today)
-
   return (
     <div style={{ minHeight:'100vh', background:'#0a0a0f', color:'#ffffff', fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif' }}>
       <Head><title>EPL — {name}</title></Head>
@@ -214,9 +212,7 @@ function MemberHome({ data, member, resolve, resolveField, onShowClick, onBack, 
 
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:16 }}>
           <QuickCard label="My schedule" value={myShows.length} sub="upcoming shows" onClick={() => onNav('schedule')} color="#a78bfa" icon="🎸" />
-          <QuickCard label="All shows" value={allShows.length} sub="master calendar" onClick={() => onNav('master-calendar')} color="#6bcb77" icon="📅" />
           <QuickCard label="Blackout dates" value={myBlackouts.length} sub="on record" onClick={() => onNav('blackouts')} color="#ff9f7f" icon="🚫" />
-          <QuickCard label="Book a show" value="→" sub="send inquiry" onClick={() => onNav('booking')} color="#7ecbcb" icon="📩" />
         </div>
 
         {myShows.length > 0 && (
