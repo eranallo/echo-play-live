@@ -556,7 +556,7 @@ function MasterCalendar({ data, resolve, resolveField, onShowClick, onBack }) {
         </div>
       </div>
 
-      <div style={{ padding:'0 20px 80px' }}>
+      <div style={{ padding:'16px 20px 80px' }}>
         {Object.values(grouped).map(group => {
           const filteredDates = group.dates.filter(dt => {
             const ds = toDateStr(dt)
@@ -571,7 +571,7 @@ function MasterCalendar({ data, resolve, resolveField, onShowClick, onBack }) {
           if (filteredDates.length === 0) return null
           return (
           <div key={group.label} style={{ marginBottom:24 }}>
-            <div id={'month-' + group.monthIdx} style={{ fontSize:12, fontWeight:700, color:'#a78bfa', textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:10, display:'flex', alignItems:'center', gap:10 }}>
+            <div id={'month-' + group.monthIdx} style={{ fontSize:12, fontWeight:700, color:'#a78bfa', textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:10, marginTop:8, display:'flex', alignItems:'center', gap:10 }}>
               <div style={{ flex:1, height:'0.5px', background:'#1a1a2e' }} />
               {group.label}
               <div style={{ flex:1, height:'0.5px', background:'#1a1a2e' }} />
@@ -610,7 +610,7 @@ function MasterCalendar({ data, resolve, resolveField, onShowClick, onBack }) {
                         const vf = venueRecs[0] ? venueRecs[0].fields : {}
                         const bands = resolveField(s.fields['Band'], 'BANDS', 'Band Name')
                         return (
-                          <div key={i} style={{ marginBottom: i < shows.length-1 ? 6 : 0 }}>
+                          <div key={i} style={{ marginBottom: i < shows.length-1 ? 8 : 0, paddingBottom: i < shows.length-1 ? 8 : 0, borderBottom: i < shows.length-1 ? '0.5px solid rgba(255,255,255,0.08)' : 'none' }}>
                             <div style={{ fontSize:13, fontWeight:600, color:'#ffffff', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{vf['Venue Name'] || '—'}</div>
                             <div style={{ display:'flex', gap:4, marginTop:2, alignItems:'center', flexWrap:'wrap' }}>
                               {bands.map((b, bi) => <span key={bi} style={{ fontSize:10, padding:'1px 6px', borderRadius:20, background:BAND_COLORS[b]?.bg||'#1a1a2e', color:BAND_COLORS[b]?.color||'#a78bfa', fontWeight:600 }}>{b}</span>)}
