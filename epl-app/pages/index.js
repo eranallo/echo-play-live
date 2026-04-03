@@ -174,10 +174,10 @@ function MemberSelect({ data, onSelect, onBooking, onCalendar }) {
 function MemberHome({ data, member, resolve, resolveField, onShowClick, onBack, onNav }) {
   const f = member.fields
   const name = f['Member Name'] || '—'
-  const today = new Date()
+  const today = new Date(new Date().toDateString())
   const myShows = (data['SHOWS'] || []).filter(s => {
     const mp = s.fields['Members Playing'] || []
-    return Array.isArray(mp) && mp.includes(member.id) && new Date(s.fields['Date'] || '') >= today
+    return Array.isArray(mp) && mp.includes(member.id) && new Date((s.fields['Date'] || '') + 'T00:00:00') >= today
   }).sort((a, b) => a.fields['Date'] > b.fields['Date'] ? 1 : -1)
 
   const nextShow = myShows[0]
@@ -500,8 +500,7 @@ function MasterCalendar({ data, resolve, resolveField, onShowClick, onBack }) {
     grouped[key].dates.push(dt)
   })
 
-  const today = new Date()
-  today.setHours(0,0,0,0)
+
 
   function toDateStr(dt) {
     return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`
@@ -515,9 +514,10 @@ function MasterCalendar({ data, resolve, resolveField, onShowClick, onBack }) {
   }).length
   const blackedOutCount = weekendDates.filter(dt => {
     const ds = toDateStr(dt)
-    return blackoutsByDate[ds] && !showsByDate[ds] && dt >= today
+    return !!blackoutsByDate[ds] && !showsByDate[ds] && dt >= today
   }).length
 
+  const today = new Date(new Date().toDateString())
   const [filter, setFilter] = useState('all')
   const [expandedBlackout, setExpandedBlackout] = useState(null)
 
@@ -672,10 +672,10 @@ function MasterCalendar({ data, resolve, resolveField, onShowClick, onBack }) {
 }
 
 function FullSchedule({ data, member, resolve, resolveField, onShowClick, onBack }) {
-  const today = new Date()
+  const today = new Date(new Date().toDateString())
   const myShows = (data['SHOWS'] || []).filter(s => {
     const mp = s.fields['Members Playing'] || []
-    return Array.isArray(mp) && mp.includes(member.id) && new Date(s.fields['Date'] || '') >= today
+    return Array.isArray(mp) && mp.includes(member.id) && new Date((s.fields['Date'] || '') + 'T00:00:00') >= today
   }).sort((a, b) => a.fields['Date'] > b.fields['Date'] ? 1 : -1)
 
   return (
