@@ -91,6 +91,12 @@ export default function Home() {
     setSelectedShow(null)
   }
 
+  function goToSelect() {
+    setPage('select')
+    // Don't null member immediately - let page change render first
+    setTimeout(() => setMember(null), 100)
+  }
+
   function openShow(show) {
     setSelectedShow(show)
     setPage('show-detail')
@@ -113,7 +119,7 @@ export default function Home() {
   )
 
   if (page === 'select') return <MemberSelect data={data} onSelect={selectMember} onBooking={() => setPage('booking')} onCalendar={() => setPage('master-calendar')} />
-  if (page === 'home') return <MemberHome data={data} member={member} resolve={resolve} resolveField={resolveField} onShowClick={openShow} onBack={() => { setMember(null); setPage('select') }} onNav={setPage} />
+  if (page === 'home') return <MemberHome data={data} member={member} resolve={resolve} resolveField={resolveField} onShowClick={openShow} onBack={goToSelect} onNav={setPage} />
   if (page === 'show-detail') return <ShowDetail data={data} member={member} show={selectedShow} resolve={resolve} resolveField={resolveField} onBack={() => setPage('home')} />
   if (page === 'schedule') return <FullSchedule data={data} member={member} resolve={resolve} resolveField={resolveField} onShowClick={openShow} onBack={() => setPage('home')} />
   if (page === 'blackouts') return <Blackouts data={data} member={member} resolve={resolve} onBack={() => setPage('home')} />
@@ -511,6 +517,7 @@ function MasterCalendar({ data, resolve, resolveField, onShowClick, onBack }) {
   }).length
 
   const [filter, setFilter] = useState('all')
+  const [expandedBlackout, setExpandedBlackout] = useState(null)
 
   function toggleFilter(f) {
     setFilter(prev => prev === f ? 'all' : f)
@@ -532,8 +539,8 @@ function MasterCalendar({ data, resolve, resolveField, onShowClick, onBack }) {
         )}
       </div>
 
-      <div style={{ padding:'16px 20px 8px' }}>
-        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8, marginBottom:12 }}>
+      <div style={{ background:'#0a0a0f', padding:'12px 20px 10px', borderBottom:'0.5px solid #1e1e2e', position:'sticky', top:52, zIndex:40 }}>
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8 }}>
           <button onClick={() => toggleFilter('booked')} style={{ background: filter==='booked' ? '#1a3a1a' : '#0f1f0f', border: filter==='booked' ? '1.5px solid #6bcb77' : '0.5px solid #2a4a2a', borderRadius:10, padding:'10px 12px', textAlign:'center', cursor:'pointer', fontFamily:'inherit' }}>
             <div style={{ fontSize:18, fontWeight:700, color:'#6bcb77' }}>{bookedCount}</div>
             <div style={{ fontSize:10, color: filter==='booked' ? '#6bcb77' : '#4a7a4a', marginTop:2, fontWeight: filter==='booked' ? 700 : 400 }}>Booked</div>
@@ -547,11 +554,6 @@ function MasterCalendar({ data, resolve, resolveField, onShowClick, onBack }) {
             <div style={{ fontSize:10, color: filter==='available' ? '#a78bfa' : '#6b7280', marginTop:2, fontWeight: filter==='available' ? 700 : 400 }}>Available</div>
           </button>
         </div>
-        {filter !== 'all' && (
-          <div style={{ fontSize:12, color:'#6b7280', marginBottom:8, textAlign:'center' }}>
-            Showing <span style={{ color:'#ffffff', fontWeight:600 }}>{filter === 'booked' ? 'booked' : filter === 'blackout' ? 'blacked out' : 'available'}</span> dates only — tap again or Reset to clear
-          </div>
-        )}
       </div>
 
       <div style={{ padding:'0 20px 80px' }}>
@@ -595,8 +597,11 @@ function MasterCalendar({ data, resolve, resolveField, onShowClick, onBack }) {
               else if (isBlackedOut) { bg = '#160e0e'; border = '0.5px solid #3a2020'; statusColor = '#ff9f7f'; statusText = 'conflict' }
               else { bg = '#0d0d1f'; border = '0.5px solid #2a2a4a'; statusColor = '#5a5a8a'; statusText = 'Open' }
 
-              return (
-                <div key={ds} onClick={() => { if (isBooked && shows.length === 1) onShowClick(shows[0]) }} style={{ display:'flex', alignItems:'center', gap:12, padding:'11px 14px', background:bg, border:border, borderRadius:10, marginBottom:6, cursor: isBooked ? 'pointer' : 'default' }}>
+              const dateRow = (
+                <div key={ds} onClick={() => {
+                  if (isBooked && shows.length === 1) onShowClick(shows[0])
+                  else if (isBlackedOut) setExpandedBlackout(expandedBlackout === ds ? null : ds)
+                }} style={{ display:'flex', alignItems:'center', gap:12, padding:'11px 14px', background:bg, border: expandedBlackout === ds ? '1px solid #ff9f7f' : border, borderRadius:10, marginBottom: expandedBlackout === ds ? 0 : 6, cursor: isBooked || isBlackedOut ? 'pointer' : 'default', borderBottomLeftRadius: expandedBlackout === ds ? 0 : 10, borderBottomRightRadius: expandedBlackout === ds ? 0 : 10 }}>
                   <div style={{ width:36, textAlign:'center', flexShrink:0 }}>
                     <div style={{ fontSize:16, fontWeight:700, color: isPast ? '#3a3a3a' : isBooked ? '#6bcb77' : isBlackedOut ? '#ff9f7f' : '#a78bfa' }}>{dayNum}</div>
                     <div style={{ fontSize:10, color:'#6b7280' }}>{dayName}</div>
