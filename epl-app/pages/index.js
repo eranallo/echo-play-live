@@ -443,6 +443,14 @@ function ShowDetail({ data, member, show, resolve, resolveField, onBack }) {
 
 function MasterCalendar({ data, resolve, resolveField, onShowClick, onBack }) {
   const year = new Date().getFullYear()
+  const currentMonth = new Date().getMonth()
+  const currentMonthRef = useState(null)
+  const monthRefs = {}
+
+  useEffect(() => {
+    const el = document.getElementById('month-' + currentMonth)
+    if (el) el.scrollIntoView({ behavior:'instant', block:'start' })
+  }, [])
 
   // Generate all Fridays (5) and Saturdays (6) for the year
   const weekendDates = []
@@ -472,11 +480,15 @@ function MasterCalendar({ data, resolve, resolveField, onShowClick, onBack }) {
     }
   })
 
+  // Build member lookup
+  const memberById = {}
+  ;(data['MEMBERS'] || []).forEach(m => { memberById[m.id] = m.fields['Member Name'] || '?' })
+
   // Group by month
   const grouped = {}
   weekendDates.forEach(dt => {
     const key = dt.getMonth()
-    if (!grouped[key]) grouped[key] = { label: MONTH_NAMES[dt.getMonth()], dates: [] }
+    if (!grouped[key]) grouped[key] = { label: MONTH_NAMES[dt.getMonth()], monthIdx: key, dates: [] }
     grouped[key].dates.push(dt)
   })
 
@@ -557,7 +569,7 @@ function MasterCalendar({ data, resolve, resolveField, onShowClick, onBack }) {
           if (filteredDates.length === 0) return null
           return (
           <div key={group.label} style={{ marginBottom:24 }}>
-            <div style={{ fontSize:12, fontWeight:700, color:'#a78bfa', textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:10, display:'flex', alignItems:'center', gap:10 }}>
+            <div id={'month-' + group.monthIdx} style={{ fontSize:12, fontWeight:700, color:'#a78bfa', textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:10, display:'flex', alignItems:'center', gap:10 }}>
               <div style={{ flex:1, height:'0.5px', background:'#1a1a2e' }} />
               {group.label}
               <div style={{ flex:1, height:'0.5px', background:'#1a1a2e' }} />
@@ -580,7 +592,7 @@ function MasterCalendar({ data, resolve, resolveField, onShowClick, onBack }) {
 
               if (isPast) { bg = '#0a0a0a'; border = '0.5px solid #1a1a1a'; statusColor = '#3a3a3a'; statusText = 'Past' }
               else if (isBooked) { bg = '#0f1f0f'; border = '0.5px solid #2a4a2a'; statusColor = '#6bcb77'; statusText = `${shows.length} show${shows.length>1?'s':''}` }
-              else if (isBlackedOut) { bg = '#1f0f0f'; border = '0.5px solid #4a2a2a'; statusColor = '#ff9f7f'; statusText = `${blackouts.length} blacked out` }
+              else if (isBlackedOut) { bg = '#160e0e'; border = '0.5px solid #3a2020'; statusColor = '#ff9f7f'; statusText = 'conflict' }
               else { bg = '#0d0d1f'; border = '0.5px solid #2a2a4a'; statusColor = '#5a5a8a'; statusText = 'Open' }
 
               return (
@@ -654,30 +666,94 @@ function FullSchedule({ data, member, resolve, resolveField, onShowClick, onBack
 }
 
 function Blackouts({ data, member, resolve, onBack }) {
-  const myBlackouts = (data['BLACKOUT DATES'] || []).filter(b => {
+  const [showForm, setShowForm] = useState(false)
+  const [date, setDate] = useState('')
+  const [reason, setReason] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [submitted, setSubmitted] = useState(false)
+  const [localBlackouts, setLocalBlackouts] = useState([])
+
+  const myBlackouts = [...(data['BLACKOUT DATES'] || []).filter(b => {
     const bm = b.fields['Member'] || []
     return Array.isArray(bm) ? bm.includes(member.id) : bm === member.id
-  }).sort((a, b) => a.fields['Date'] > b.fields['Date'] ? 1 : -1)
+  }), ...localBlackouts].sort((a, b) => a.fields['Date'] > b.fields['Date'] ? 1 : -1)
+
+  const REASONS = ['Personal', 'Other Gig', 'Vacation', 'Illness', 'Family', 'Other']
+
+  async function submitBlackout() {
+    if (!date) return
+    setSubmitting(true)
+    try {
+      const res = await fetch('/api/blackout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 'Member': [member.id], 'Date': date, 'Reason': reason || 'Personal' })
+      })
+      const json = await res.json()
+      if (json.error) throw new Error(json.error)
+      setLocalBlackouts(prev => [...prev, { id: json.id, fields: { Date: date, Reason: reason || 'Personal', Member: [member.id] } }])
+      setDate(''); setReason(''); setShowForm(false); setSubmitted(true)
+      setTimeout(() => setSubmitted(false), 3000)
+    } catch(e) { alert('Error: ' + e.message) }
+    setSubmitting(false)
+  }
 
   return (
     <div style={{ minHeight:'100vh', background:'#0a0a0f', color:'#ffffff', fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif' }}>
-      <Head><title>EPL — Blackout Dates</title></Head>
-      <div style={{ background:'#111118', borderBottom:'0.5px solid #1e1e2e', padding:'12px 20px', display:'flex', alignItems:'center', gap:14, position:'sticky', top:0, zIndex:50 }}>
-        <button onClick={onBack} style={{ background:'none', border:'none', color:'#a78bfa', fontSize:22, cursor:'pointer', padding:0 }}>‹</button>
-        <div style={{ fontSize:15, fontWeight:600 }}>My blackout dates</div>
+      <Head><title>EPL - Blackout Dates</title></Head>
+      <div style={{ background:'#111118', borderBottom:'0.5px solid #1e1e2e', padding:'12px 20px', display:'flex', alignItems:'center', justifyContent:'space-between', position:'sticky', top:0, zIndex:50 }}>
+        <div style={{ display:'flex', alignItems:'center', gap:14 }}>
+          <button onClick={onBack} style={{ background:'none', border:'none', color:'#a78bfa', fontSize:22, cursor:'pointer', padding:0 }}>{String.fromCharCode(8249)}</button>
+          <div style={{ fontSize:15, fontWeight:600 }}>My blackout dates</div>
+        </div>
+        <button onClick={() => setShowForm(f => !f)} style={{ fontSize:13, padding:'6px 14px', borderRadius:20, background: showForm ? '#2a2a3a' : '#1a1a2e', border:'none', color:'#a78bfa', cursor:'pointer', fontFamily:'inherit', fontWeight:600 }}>
+          {showForm ? 'Cancel' : '+ Add date'}
+        </button>
       </div>
-      <div style={{ padding:'16px 20px 60px' }}>
+      <div style={{ padding:'16px 20px 80px' }}>
+        {submitted && (
+          <div style={{ background:'#0f2a0f', border:'0.5px solid #2a4a2a', borderRadius:10, padding:'12px 16px', marginBottom:14, fontSize:13, color:'#6bcb77' }}>
+            Blackout date submitted!
+          </div>
+        )}
+        {showForm && (
+          <div style={{ background:'#111118', border:'0.5px solid #2a2a3a', borderRadius:14, padding:18, marginBottom:20 }}>
+            <div style={{ fontSize:14, fontWeight:600, marginBottom:14 }}>Submit a blackout date</div>
+            <div style={{ marginBottom:12 }}>
+              <div style={{ fontSize:12, color:'#6b7280', marginBottom:6 }}>Date you cannot play</div>
+              <input type="date" value={date} onChange={e => setDate(e.target.value)} style={{ width:'100%', padding:'11px 14px', background:'#1a1a2a', border:'0.5px solid #3a3a4a', borderRadius:10, color:'#ffffff', fontSize:14, fontFamily:'inherit' }} />
+            </div>
+            <div style={{ marginBottom:16 }}>
+              <div style={{ fontSize:12, color:'#6b7280', marginBottom:8 }}>Reason</div>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                {REASONS.map(r => (
+                  <button key={r} onClick={() => setReason(r)} style={{ padding:'9px 12px', background: reason===r ? '#1a1a2e' : '#0a0a1a', border: reason===r ? '0.5px solid #a78bfa' : '0.5px solid #2a2a3a', borderRadius:10, color: reason===r ? '#a78bfa' : '#6b7280', fontSize:13, cursor:'pointer', fontFamily:'inherit', fontWeight: reason===r ? 600 : 400 }}>{r}</button>
+                ))}
+              </div>
+            </div>
+            <button onClick={submitBlackout} disabled={!date || submitting} style={{ width:'100%', padding:'13px', background: date ? '#1a1a2e' : '#0a0a1a', border:'none', borderRadius:12, color: date ? '#a78bfa' : '#3a3a4a', fontSize:14, fontWeight:700, cursor: date ? 'pointer' : 'default', fontFamily:'inherit' }}>
+              {submitting ? 'Submitting...' : 'Submit blackout date'}
+            </button>
+          </div>
+        )}
+        <div style={{ fontSize:11, fontWeight:600, color:'#6b7280', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:12 }}>
+          {myBlackouts.length} date{myBlackouts.length !== 1 ? 's' : ''} on record
+        </div>
         {myBlackouts.length ? myBlackouts.map((b, i) => (
           <div key={i} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'14px 0', borderBottom:'0.5px solid #1a1a2a' }}>
             <div>
               <div style={{ fontSize:14, fontWeight:600 }}>{fmt(b.fields['Date'])}</div>
               <div style={{ fontSize:12, color:'#6b7280', marginTop:2 }}>{b.fields['Reason'] || 'No reason listed'}</div>
             </div>
-            <div style={{ fontSize:12, color:'#ff9f7f' }}>
+            <div style={{ fontSize:12, color: daysUntil(b.fields['Date']) > 0 ? '#ff9f7f' : '#3a3a3a' }}>
               {daysUntil(b.fields['Date']) > 0 ? `In ${daysUntil(b.fields['Date'])} days` : 'Past'}
             </div>
           </div>
-        )) : <div style={{ color:'#6b7280', fontSize:14, paddingTop:'1rem', textAlign:'center' }}>No blackout dates on record.</div>}
+        )) : (
+          <div style={{ color:'#6b7280', fontSize:14, paddingTop:'1rem', textAlign:'center' }}>
+            No blackout dates yet.
+          </div>
+        )}
       </div>
     </div>
   )
