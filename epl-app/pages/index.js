@@ -444,13 +444,13 @@ function ShowDetail({ data, member, show, resolve, resolveField, onBack }) {
 function MasterCalendar({ data, resolve, resolveField, onShowClick, onBack }) {
   const year = new Date().getFullYear()
   const currentMonth = new Date().getMonth()
-  const currentMonthRef = useState(null)
-  const monthRefs = {}
 
   useEffect(() => {
-    const el = document.getElementById('month-' + currentMonth)
-    if (el) el.scrollIntoView({ behavior:'instant', block:'start' })
-  }, [])
+    try {
+      const el = document.getElementById('month-' + currentMonth)
+      if (el) el.scrollIntoView({ behavior:'instant', block:'start' })
+    } catch(e) {}
+  }, [currentMonth])
 
   // Generate all Fridays (5) and Saturdays (6) for the year
   const weekendDates = []
