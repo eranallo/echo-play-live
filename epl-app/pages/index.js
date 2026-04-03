@@ -497,6 +497,16 @@ function MasterCalendar({ data, resolve, resolveField, onShowClick, onBack }) {
     const ds = toDateStr(dt)
     return !showsByDate[ds] && !blackoutsByDate[ds] && dt >= today
   }).length
+  const blackedOutCount = weekendDates.filter(dt => {
+    const ds = toDateStr(dt)
+    return blackoutsByDate[ds] && !showsByDate[ds] && dt >= today
+  }).length
+
+  const [filter, setFilter] = useState('all')
+
+  function toggleFilter(f) {
+    setFilter(prev => prev === f ? 'all' : f)
+  }
 
   return (
     <div style={{ minHeight:'100vh', background:'#0a0a0f', color:'#ffffff', fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif' }}>
@@ -507,41 +517,56 @@ function MasterCalendar({ data, resolve, resolveField, onShowClick, onBack }) {
           <div style={{ fontSize:15, fontWeight:600 }}>Show Calendar {year}</div>
           <div style={{ fontSize:12, color:'#6b7280' }}>All Fridays & Saturdays</div>
         </div>
+        {filter !== 'all' && (
+          <button onClick={() => setFilter('all')} style={{ marginLeft:'auto', fontSize:12, padding:'5px 12px', borderRadius:20, background:'#2a2a3a', border:'none', color:'#a78bfa', cursor:'pointer', fontFamily:'inherit', fontWeight:600 }}>
+            Reset
+          </button>
+        )}
       </div>
 
       <div style={{ padding:'16px 20px 8px' }}>
-        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8, marginBottom:16 }}>
-          <div style={{ background:'#0f1f0f', border:'0.5px solid #2a4a2a', borderRadius:10, padding:'10px 12px', textAlign:'center' }}>
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8, marginBottom:12 }}>
+          <button onClick={() => toggleFilter('booked')} style={{ background: filter==='booked' ? '#1a3a1a' : '#0f1f0f', border: filter==='booked' ? '1.5px solid #6bcb77' : '0.5px solid #2a4a2a', borderRadius:10, padding:'10px 12px', textAlign:'center', cursor:'pointer', fontFamily:'inherit' }}>
             <div style={{ fontSize:18, fontWeight:700, color:'#6bcb77' }}>{bookedCount}</div>
-            <div style={{ fontSize:10, color:'#4a7a4a', marginTop:2 }}>Booked</div>
-          </div>
-          <div style={{ background:'#0a0a1f', border:'0.5px solid #2a2a4a', borderRadius:10, padding:'10px 12px', textAlign:'center' }}>
-            <div style={{ fontSize:18, fontWeight:700, color:'#ff9f7f' }}>{totalWeekends - availableCount - bookedCount < 0 ? 0 : totalWeekends - availableCount - bookedCount}</div>
-            <div style={{ fontSize:10, color:'#6b7280', marginTop:2 }}>Blacked Out</div>
-          </div>
-          <div style={{ background:'#111118', border:'0.5px solid #2a2a3a', borderRadius:10, padding:'10px 12px', textAlign:'center' }}>
+            <div style={{ fontSize:10, color: filter==='booked' ? '#6bcb77' : '#4a7a4a', marginTop:2, fontWeight: filter==='booked' ? 700 : 400 }}>Booked</div>
+          </button>
+          <button onClick={() => toggleFilter('blackout')} style={{ background: filter==='blackout' ? '#2a1010' : '#0f0a0a', border: filter==='blackout' ? '1.5px solid #ff9f7f' : '0.5px solid #3a2a2a', borderRadius:10, padding:'10px 12px', textAlign:'center', cursor:'pointer', fontFamily:'inherit' }}>
+            <div style={{ fontSize:18, fontWeight:700, color:'#ff9f7f' }}>{blackedOutCount}</div>
+            <div style={{ fontSize:10, color: filter==='blackout' ? '#ff9f7f' : '#6b7280', marginTop:2, fontWeight: filter==='blackout' ? 700 : 400 }}>Blacked Out</div>
+          </button>
+          <button onClick={() => toggleFilter('available')} style={{ background: filter==='available' ? '#16162e' : '#0d0d1a', border: filter==='available' ? '1.5px solid #a78bfa' : '0.5px solid #2a2a4a', borderRadius:10, padding:'10px 12px', textAlign:'center', cursor:'pointer', fontFamily:'inherit' }}>
             <div style={{ fontSize:18, fontWeight:700, color:'#a78bfa' }}>{availableCount}</div>
-            <div style={{ fontSize:10, color:'#6b7280', marginTop:2 }}>Available</div>
+            <div style={{ fontSize:10, color: filter==='available' ? '#a78bfa' : '#6b7280', marginTop:2, fontWeight: filter==='available' ? 700 : 400 }}>Available</div>
+          </button>
+        </div>
+        {filter !== 'all' && (
+          <div style={{ fontSize:12, color:'#6b7280', marginBottom:8, textAlign:'center' }}>
+            Showing <span style={{ color:'#ffffff', fontWeight:600 }}>{filter === 'booked' ? 'booked' : filter === 'blackout' ? 'blacked out' : 'available'}</span> dates only — tap again or Reset to clear
           </div>
-        </div>
-
-        <div style={{ display:'flex', gap:16, marginBottom:16, flexWrap:'wrap' }}>
-          <div style={{ display:'flex', alignItems:'center', gap:6, fontSize:11, color:'#6b7280' }}><div style={{ width:10, height:10, borderRadius:2, background:'#1a2e1a' }} />Booked</div>
-          <div style={{ display:'flex', alignItems:'center', gap:6, fontSize:11, color:'#6b7280' }}><div style={{ width:10, height:10, borderRadius:2, background:'#2e1a1a' }} />Blacked out</div>
-          <div style={{ display:'flex', alignItems:'center', gap:6, fontSize:11, color:'#6b7280' }}><div style={{ width:10, height:10, borderRadius:2, background:'#1a1a2e', border:'0.5px solid #3a3a5a' }} />Available</div>
-          <div style={{ display:'flex', alignItems:'center', gap:6, fontSize:11, color:'#6b7280' }}><div style={{ width:10, height:10, borderRadius:2, background:'#1a1a1a', border:'0.5px solid #222' }} />Past</div>
-        </div>
+        )}
       </div>
 
       <div style={{ padding:'0 20px 80px' }}>
-        {Object.values(grouped).map(group => (
+        {Object.values(grouped).map(group => {
+          const filteredDates = group.dates.filter(dt => {
+            const ds = toDateStr(dt)
+            const isBooked = !!showsByDate[ds]
+            const isBlackedOut = !!blackoutsByDate[ds] && !isBooked
+            const isAvailable = !isBooked && !isBlackedOut && dt >= today
+            if (filter === 'booked') return isBooked
+            if (filter === 'blackout') return isBlackedOut
+            if (filter === 'available') return isAvailable
+            return true
+          })
+          if (filteredDates.length === 0) return null
+          return (
           <div key={group.label} style={{ marginBottom:24 }}>
             <div style={{ fontSize:12, fontWeight:700, color:'#a78bfa', textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:10, display:'flex', alignItems:'center', gap:10 }}>
               <div style={{ flex:1, height:'0.5px', background:'#1a1a2e' }} />
               {group.label}
               <div style={{ flex:1, height:'0.5px', background:'#1a1a2e' }} />
             </div>
-            {group.dates.map(dt => {
+            {filteredDates.map(dt => {
               const ds = toDateStr(dt)
               const shows = showsByDate[ds] || []
               const blackouts = blackoutsByDate[ds] || []
@@ -601,7 +626,7 @@ function MasterCalendar({ data, resolve, resolveField, onShowClick, onBack }) {
               )
             })}
           </div>
-        ))}
+        )}.filter(Boolean))}
       </div>
     </div>
   )
