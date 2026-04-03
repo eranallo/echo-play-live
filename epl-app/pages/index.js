@@ -112,46 +112,57 @@ export default function Home() {
     </div>
   )
 
-  if (page === 'select') return <MemberSelect data={data} onSelect={selectMember} onBooking={() => setPage('booking')} />
+  if (page === 'select') return <MemberSelect data={data} onSelect={selectMember} onBooking={() => setPage('booking')} onCalendar={() => setPage('master-calendar')} />
   if (page === 'home') return <MemberHome data={data} member={member} resolve={resolve} resolveField={resolveField} onShowClick={openShow} onBack={() => { setMember(null); setPage('select') }} onNav={setPage} />
   if (page === 'show-detail') return <ShowDetail data={data} member={member} show={selectedShow} resolve={resolve} resolveField={resolveField} onBack={() => setPage('home')} />
   if (page === 'schedule') return <FullSchedule data={data} member={member} resolve={resolve} resolveField={resolveField} onShowClick={openShow} onBack={() => setPage('home')} />
   if (page === 'blackouts') return <Blackouts data={data} member={member} resolve={resolve} onBack={() => setPage('home')} />
-  if (page === 'master-calendar') return <MasterCalendar data={data} resolve={resolve} resolveField={resolveField} onShowClick={openShow} onBack={() => setPage('home')} />
+  if (page === 'master-calendar') return <MasterCalendar data={data} resolve={resolve} resolveField={resolveField} onShowClick={openShow} onBack={() => member ? setPage('home') : setPage('select')} />
   if (page === 'booking') return <BookingPage data={data} onBack={() => setPage('select')} />
   return null
 }
 
-function MemberSelect({ data, onSelect, onBooking }) {
+function MemberSelect({ data, onSelect, onBooking, onCalendar }) {
   const members = data['MEMBERS'] || []
+  const today = new Date()
+  const totalShows = (data['SHOWS'] || []).filter(s => s.fields['Date'] && new Date(s.fields['Date']) >= today).length
   return (
-    <div style={{ minHeight:'100vh', background:'#0a0a0f', display:'flex', flexDirection:'column', alignItems:'center', padding:'3rem 1.5rem 2rem' }}>
+    <div style={{ minHeight:'100vh', background:'#0a0a0f', display:'flex', flexDirection:'column', alignItems:'center', padding:'2.5rem 1.5rem 2rem' }}>
       <Head><title>Echo Play Live</title></Head>
-      <div style={{ marginBottom:'2.5rem', textAlign:'center' }}>
-        <img src="/logo.png" alt="Echo Play Live" style={{ width:140, height:140, objectFit:'contain', marginBottom:16 }} />
+      <div style={{ marginBottom:'1.75rem', textAlign:'center' }}>
+        <img src="/logo.png" alt="Echo Play Live" style={{ width:120, height:120, objectFit:'contain', marginBottom:14 }} />
         <div style={{ fontSize:13, color:'#6b7280' }}>Select your name to continue</div>
       </div>
-      <div style={{ width:'100%', maxWidth:380, display:'flex', flexDirection:'column', gap:10 }}>
-        {members.map(m => {
-          const f = m.fields
-          const name = f['Member Name'] || '—'
-          const instruments = (f['Instruments'] || []).join(', ') || f['Role/Instrument'] || ''
-          const bands = (f['Primary Bands'] || [])
-          return (
-            <button key={m.id} onClick={() => onSelect(m)} style={{ display:'flex', alignItems:'center', gap:14, padding:'12px 16px', background:'#111118', border:'0.5px solid #2a2a3a', borderRadius:14, cursor:'pointer', textAlign:'left', width:'100%', fontFamily:'inherit' }}>
-              <MemberAvatar member={m} size={46} />
-              <div style={{ flex:1, minWidth:0 }}>
-                <div style={{ fontSize:15, fontWeight:600, color:'#ffffff' }}>{name}</div>
-                <div style={{ fontSize:12, color:'#6b7280', marginTop:2 }}>{instruments}</div>
-              </div>
-              <div style={{ color:'#2a2a3a', fontSize:20, flexShrink:0 }}>›</div>
-            </button>
-          )
-        })}
-        <div style={{ height:'0.5px', background:'#1a1a2a', margin:'6px 0' }} />
-        <button onClick={onBooking} style={{ padding:'13px 16px', background:'transparent', border:'0.5px solid #2a2a3a', borderRadius:14, cursor:'pointer', fontSize:13, color:'#6b7280', fontFamily:'inherit', textAlign:'center' }}>
-          Book a show with Echo Play Live →
-        </button>
+      <div style={{ width:'100%', maxWidth:420 }}>
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:10 }}>
+          {members.map(m => {
+            const f = m.fields
+            const name = f['Member Name'] || '—'
+            const instruments = (f['Instruments'] || []).join(', ') || f['Role/Instrument'] || ''
+            return (
+              <button key={m.id} onClick={() => onSelect(m)} style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:8, padding:'16px 12px', background:'#111118', border:'0.5px solid #2a2a3a', borderRadius:14, cursor:'pointer', fontFamily:'inherit', textAlign:'center' }}>
+                <MemberAvatar member={m} size={48} />
+                <div>
+                  <div style={{ fontSize:13, fontWeight:600, color:'#ffffff' }}>{name}</div>
+                  <div style={{ fontSize:11, color:'#6b7280', marginTop:2 }}>{instruments}</div>
+                </div>
+              </button>
+            )
+          })}
+        </div>
+        <div style={{ height:'0.5px', background:'#1a1a2a', margin:'8px 0' }} />
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginTop:8 }}>
+          <button onClick={onCalendar} style={{ padding:'14px 12px', background:'#111118', border:'0.5px solid #2a2a3a', borderRadius:14, cursor:'pointer', fontFamily:'inherit', textAlign:'center' }}>
+            <div style={{ fontSize:20, marginBottom:4 }}>📅</div>
+            <div style={{ fontSize:13, fontWeight:600, color:'#6bcb77' }}>All Shows</div>
+            <div style={{ fontSize:11, color:'#6b7280', marginTop:2 }}>{totalShows} upcoming</div>
+          </button>
+          <button onClick={onBooking} style={{ padding:'14px 12px', background:'#111118', border:'0.5px solid #2a2a3a', borderRadius:14, cursor:'pointer', fontFamily:'inherit', textAlign:'center' }}>
+            <div style={{ fontSize:20, marginBottom:4 }}>📩</div>
+            <div style={{ fontSize:13, fontWeight:600, color:'#a78bfa' }}>Book a Show</div>
+            <div style={{ fontSize:11, color:'#6b7280', marginTop:2 }}>Send inquiry</div>
+          </button>
+        </div>
       </div>
     </div>
   )
