@@ -271,7 +271,7 @@ function ShowRow({ show, resolve, resolveField, onClick }) {
         <div style={{ fontSize:12, color:'#6b7280', marginBottom:4 }}>{fmt(f['Date'])}</div>
         <div>{bands.map((b, i) => <BandTag key={i} name={b} />)}</div>
       </div>
-      <div style={{ fontSize:12, color:'#f['Set Time'] ? '#ffffff' : '#6b7280' }}>
+      <div style={{ fontSize:12 }}>
         <div style={{ fontSize:12, color: f['Set Time'] ? '#ffffff' : '#6b7280' }}>{f['Set Time'] || '—'}</div>
         <div style={{ fontSize:10, color:'#6b7280' }}>set time</div>
       </div>
