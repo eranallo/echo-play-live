@@ -10,49 +10,40 @@ const BAND_COLORS = {
 
 function BandTag({ name }) {
   const c = BAND_COLORS[name] || { bg: '#1a1a2e', color: '#a78bfa' }
-  return <span className="band-tag" style={{ background: c.bg, color: c.color }}>{name}</span>
-}
-
-function StatusPill({ status }) {
-  if (!status) return null
-  const l = status.toLowerCase()
-  const cls = l.includes('confirm') ? 'pill-confirmed' : l.includes('hold') ? 'pill-hold' : l.includes('complet') ? 'pill-completed' : l.includes('new') ? 'pill-new' : 'pill-inquiry'
-  return <span className={`pill ${cls}`}>{status}</span>
+  return <span style={{ display:'inline-flex', padding:'2px 8px', borderRadius:20, fontSize:11, fontWeight:600, background:c.bg, color:c.color, margin:'0 2px' }}>{name}</span>
 }
 
 function fmt(d) {
   if (!d) return '—'
-  try { return new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) }
+  try { return new Date(d + 'T00:00:00').toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric', year:'numeric' }) }
   catch { return d }
 }
 
-function cur(n) {
-  if (!n && n !== 0) return '—'
-  return '$' + Math.round(Number(n)).toLocaleString()
+function fmtShort(d) {
+  if (!d) return '—'
+  try { return new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month:'short', day:'numeric' }) }
+  catch { return d }
 }
 
 function initials(name) {
   return (name || '?').split(' ').map(x => x[0]).join('').toUpperCase().slice(0, 2)
 }
 
-function Avatar({ name, size = 38 }) {
-  return (
-    <div className="avatar" style={{ width: size, height: size, fontSize: size < 35 ? 11 : 13 }}>
-      {initials(name)}
-    </div>
-  )
+function daysUntil(dateStr) {
+  if (!dateStr) return null
+  const diff = new Date(dateStr + 'T00:00:00') - new Date(new Date().toDateString())
+  return Math.ceil(diff / (1000 * 60 * 60 * 24))
 }
 
 export default function Home() {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [page, setPage] = useState('dashboard')
-  const [role, setRole] = useState('admin')
+  const [member, setMember] = useState(null)
+  const [page, setPage] = useState('select')
+  const [selectedShow, setSelectedShow] = useState(null)
 
   const loadData = useCallback(async () => {
-    setLoading(true)
-    setError(null)
     try {
       const res = await fetch('/api/airtable')
       const json = await res.json()
@@ -67,633 +58,425 @@ export default function Home() {
 
   useEffect(() => { loadData() }, [loadData])
 
-  function resolveLinked(ids, table, field) {
-    if (!ids || !Array.isArray(ids) || !data) return []
-    return ids.map(id => {
+  function resolve(ids, table, field) {
+    if (!ids || !data) return []
+    const arr = Array.isArray(ids) ? ids : [ids]
+    return arr.map(id => {
       const r = (data[table] || []).find(x => x.id === id)
-      return r ? (r.fields[field] || '?') : '?'
-    })
+      return r ? r : null
+    }).filter(Boolean)
   }
 
-  const nav = [
-    { section: 'Overview' },
-    { id: 'dashboard', label: 'Dashboard', color: '#a78bfa' },
-    { id: 'shows', label: 'Shows', color: '#6bcb77' },
-    { id: 'finances', label: 'Finances', color: '#ffd166' },
-    { section: 'People' },
-    { id: 'members', label: 'Members', color: '#7ecbcb' },
-    { id: 'availability', label: 'Availability', color: '#ff9f7f' },
-    { section: 'Operations' },
-    { id: 'venues', label: 'Venue CRM', color: '#a78bfa' },
-    { id: 'inquiries', label: 'Inquiries', color: '#6bcb77' },
-    { id: 'promote', label: 'Promote', color: '#ffd166' },
-  ]
+  function resolveField(ids, table, field) {
+    return resolve(ids, table, field).map(r => r.fields[field] || '?')
+  }
+
+  function selectMember(m) {
+    setMember(m)
+    setPage('home')
+    setSelectedShow(null)
+  }
+
+  function openShow(show) {
+    setSelectedShow(show)
+    setPage('show-detail')
+  }
+
+  if (loading) return (
+    <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', flexDirection:'column', gap:16, background:'#0a0a0f' }}>
+      <div style={{ width:40, height:40, borderRadius:10, background:'#1a1a2e', display:'flex', alignItems:'center', justifyContent:'center', fontSize:14, fontWeight:700, color:'#a78bfa' }}>EPL</div>
+      <div style={{ color:'#6b7280', fontSize:14 }}>Loading...</div>
+    </div>
+  )
+
+  if (error) return (
+    <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', background:'#0a0a0f' }}>
+      <div style={{ background:'#1a0a0a', border:'1px solid #3a1a1a', borderRadius:12, padding:'2rem', color:'#ff9f7f', fontSize:14, maxWidth:400 }}>
+        Connection error: {error}
+      </div>
+    </div>
+  )
+
+  if (page === 'select') return <MemberSelect data={data} onSelect={selectMember} />
+  if (page === 'home') return <MemberHome data={data} member={member} resolve={resolve} resolveField={resolveField} onShowClick={openShow} onBack={() => { setMember(null); setPage('select') }} onNav={setPage} />
+  if (page === 'show-detail') return <ShowDetail data={data} member={member} show={selectedShow} resolve={resolve} resolveField={resolveField} onBack={() => setPage('home')} />
+  if (page === 'schedule') return <FullSchedule data={data} member={member} resolve={resolve} resolveField={resolveField} onShowClick={openShow} onBack={() => setPage('home')} />
+  if (page === 'blackouts') return <Blackouts data={data} member={member} resolve={resolve} onBack={() => setPage('home')} />
+  if (page === 'booking') return <BookingPage data={data} onBack={() => setPage('select')} />
+
+  return null
+}
+
+function MemberSelect({ data, onSelect }) {
+  const members = data['MEMBERS'] || []
+  return (
+    <div style={{ minHeight:'100vh', background:'#0a0a0f', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:'2rem' }}>
+      <Head><title>Echo Play Live</title></Head>
+      <div style={{ marginBottom:'2rem', textAlign:'center' }}>
+        <div style={{ width:56, height:56, borderRadius:14, background:'#1a1a2e', display:'flex', alignItems:'center', justifyContent:'center', fontSize:18, fontWeight:700, color:'#a78bfa', margin:'0 auto 16px' }}>EPL</div>
+        <div style={{ fontSize:22, fontWeight:700, color:'#ffffff', marginBottom:6 }}>Echo Play Live</div>
+        <div style={{ fontSize:14, color:'#6b7280' }}>Select your name to continue</div>
+      </div>
+      <div style={{ width:'100%', maxWidth:360, display:'flex', flexDirection:'column', gap:10 }}>
+        {members.map(m => {
+          const f = m.fields
+          const name = f['Member Name'] || '—'
+          const instruments = (f['Instruments'] || []).join(', ') || f['Role/Instrument'] || ''
+          return (
+            <button key={m.id} onClick={() => onSelect(m)} style={{ display:'flex', alignItems:'center', gap:14, padding:'14px 16px', background:'#111118', border:'0.5px solid #2a2a3a', borderRadius:12, cursor:'pointer', textAlign:'left', width:'100%', fontFamily:'inherit' }}>
+              <div style={{ width:42, height:42, borderRadius:'50%', background:'#1a1a2e', display:'flex', alignItems:'center', justifyContent:'center', fontSize:14, fontWeight:700, color:'#a78bfa', flexShrink:0 }}>{initials(name)}</div>
+              <div>
+                <div style={{ fontSize:15, fontWeight:600, color:'#ffffff' }}>{name}</div>
+                <div style={{ fontSize:12, color:'#6b7280', marginTop:2 }}>{instruments}</div>
+              </div>
+            </button>
+          )
+        })}
+        <div style={{ height:1, background:'#1a1a2a', margin:'8px 0' }} />
+        <button onClick={() => onSelect({ id:'public', fields:{ 'Member Name':'Guest' }, isPublic:true })} style={{ padding:'12px 16px', background:'transparent', border:'0.5px solid #2a2a3a', borderRadius:12, cursor:'pointer', fontSize:13, color:'#6b7280', fontFamily:'inherit' }}>
+          Book a show →
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function MemberHome({ data, member, resolve, resolveField, onShowClick, onBack, onNav }) {
+  const f = member.fields
+  const name = f['Member Name'] || '—'
+  const today = new Date()
+  const myShows = (data['SHOWS'] || []).filter(s => {
+    const mp = s.fields['Members Playing'] || []
+    return Array.isArray(mp) && mp.includes(member.id) && new Date(s.fields['Date'] || '') >= today
+  }).sort((a, b) => a.fields['Date'] > b.fields['Date'] ? 1 : -1)
+
+  const nextShow = myShows[0]
+  const bands = resolveField(f['Primary Bands'], 'BANDS', 'Band Name')
+  const myBlackouts = (data['BLACKOUT DATES'] || []).filter(b => {
+    const bm = b.fields['Member'] || []
+    return Array.isArray(bm) ? bm.includes(member.id) : bm === member.id
+  })
 
   return (
-    <>
-      <Head>
-        <title>Echo Play Live</title>
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-      </Head>
+    <div style={{ minHeight:'100vh', background:'#0a0a0f', color:'#ffffff', fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif' }}>
+      <Head><title>EPL — {name}</title></Head>
 
-      <div className="topbar">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div className="logo-mark">EPL</div>
-          <div>
-            <div style={{ fontSize: 14, fontWeight: 600 }}>Echo Play Live</div>
-            <div style={{ fontSize: 11, color: 'var(--muted)' }}>Band Management</div>
-          </div>
+      <div style={{ background:'#111118', borderBottom:'0.5px solid #1e1e2e', padding:'14px 20px', display:'flex', alignItems:'center', justifyContent:'space-between', position:'sticky', top:0, zIndex:50 }}>
+        <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+          <div style={{ width:28, height:28, borderRadius:7, background:'#1a1a2e', display:'flex', alignItems:'center', justifyContent:'center', fontSize:10, fontWeight:700, color:'#a78bfa' }}>EPL</div>
+          <span style={{ fontSize:14, fontWeight:600 }}>Echo Play Live</span>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <select className="role-select" value={role} onChange={e => { setRole(e.target.value); setPage(e.target.value === 'admin' ? 'dashboard' : e.target.value === 'member' ? 'member-portal' : 'booking') }}>
-            <option value="admin">Admin (Evan)</option>
-            <option value="member">Member view</option>
-            <option value="public">Public booking</option>
-          </select>
-          <div className="avatar" style={{ width: 30, height: 30, fontSize: 11 }}>ER</div>
-        </div>
+        <button onClick={onBack} style={{ fontSize:12, color:'#6b7280', background:'none', border:'none', cursor:'pointer', fontFamily:'inherit' }}>Switch member</button>
       </div>
 
-      <div className="layout">
-        {role === 'admin' && (
-          <div className="sidebar">
-            {nav.map((item, i) =>
-              item.section ? (
-                <div key={i} className="nav-section">{item.section}</div>
-              ) : (
-                <button key={item.id} className={`nav-item ${page === item.id ? 'active' : ''}`} onClick={() => setPage(item.id)}>
-                  <div className="nav-dot" style={{ background: item.color }} />
-                  {item.label}
-                </button>
-              )
-            )}
-            <div className="nav-section">Data</div>
-            <button className="nav-item" onClick={loadData}>
-              <div className="nav-dot" style={{ background: '#9ca3af' }} />
-              Refresh
-            </button>
+      <div style={{ padding:'20px 20px 100px' }}>
+        <div style={{ display:'flex', alignItems:'center', gap:14, marginBottom:24 }}>
+          <div style={{ width:52, height:52, borderRadius:'50%', background:'#1a1a2e', display:'flex', alignItems:'center', justifyContent:'center', fontSize:17, fontWeight:700, color:'#a78bfa' }}>{initials(name)}</div>
+          <div>
+            <div style={{ fontSize:20, fontWeight:700 }}>{name}</div>
+            <div style={{ display:'flex', gap:4, marginTop:4, flexWrap:'wrap' }}>{bands.map((b, i) => <BandTag key={i} name={b} />)}</div>
+          </div>
+        </div>
+
+        {nextShow && (
+          <div style={{ marginBottom:24 }}>
+            <div style={{ fontSize:11, fontWeight:600, color:'#6b7280', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:10 }}>Next show</div>
+            <NextShowCard show={nextShow} resolve={resolve} resolveField={resolveField} onClick={() => onShowClick(nextShow)} />
           </div>
         )}
 
-        <div className="main">
-          {loading && <div className="loading"><div className="spinner" /><span>Loading from Airtable...</span></div>}
-          {error && <div className="alert alert-error">Connection error: {error}</div>}
+        <div style={{ marginBottom:24 }}>
+          <div style={{ fontSize:11, fontWeight:600, color:'#6b7280', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:10 }}>Upcoming shows ({myShows.length})</div>
+          {myShows.length ? myShows.map(s => (
+            <ShowRow key={s.id} show={s} resolve={resolve} resolveField={resolveField} onClick={() => onShowClick(s)} />
+          )) : <div style={{ fontSize:14, color:'#6b7280', padding:'1rem 0' }}>No upcoming shows assigned yet.</div>}
+        </div>
 
-          {!loading && data && (
-            <>
-              {page === 'dashboard' && <Dashboard data={data} resolveLinked={resolveLinked} />}
-              {page === 'shows' && <Shows data={data} resolveLinked={resolveLinked} />}
-              {page === 'finances' && <Finances data={data} resolveLinked={resolveLinked} />}
-              {page === 'members' && <Members data={data} resolveLinked={resolveLinked} />}
-              {page === 'availability' && <Availability data={data} resolveLinked={resolveLinked} />}
-              {page === 'venues' && <Venues data={data} resolveLinked={resolveLinked} />}
-              {page === 'inquiries' && <Inquiries data={data} resolveLinked={resolveLinked} />}
-              {page === 'promote' && <Promote data={data} resolveLinked={resolveLinked} />}
-              {page === 'member-portal' && <MemberPortal data={data} resolveLinked={resolveLinked} />}
-              {page === 'booking' && <Booking data={data} />}
-            </>
-          )}
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+          <QuickCard label="Blackout dates" value={myBlackouts.length} sub="on record" onClick={() => onNav('blackouts')} color="#ff9f7f" />
+          <QuickCard label="Full schedule" value={myShows.length} sub="upcoming shows" onClick={() => onNav('schedule')} color="#a78bfa" />
         </div>
       </div>
-    </>
+    </div>
   )
 }
 
-function Dashboard({ data, resolveLinked }) {
-  const shows = data['SHOWS'] || []
-  const members = data['MEMBERS'] || []
-  const venues = data['VENUES'] || []
-  const inquiries = data['INQUIRIES'] || []
-  const today = new Date()
-  const upcoming = shows.filter(s => s.fields['Date'] && new Date(s.fields['Date']) >= today)
-    .sort((a, b) => a.fields['Date'] > b.fields['Date'] ? 1 : -1).slice(0, 6)
-  const totalRev = shows.reduce((a, s) => a + Number(s.fields['Performance Rate'] || 0), 0)
-  const totalEPL = shows.reduce((a, s) => a + Number(s.fields['EPL Fee'] || 0), 0)
-  const newInq = inquiries.filter(i => (i.fields['Status'] || '').toLowerCase() === 'new').length
+function NextShowCard({ show, resolve, resolveField, onClick }) {
+  const f = show.fields
+  const days = daysUntil(f['Date'])
+  const bands = resolveField(f['Band'], 'BANDS', 'Band Name')
+  const venueRecs = resolve(f['Venue'], 'VENUES', 'Venue Name')
+  const venue = venueRecs[0]
+  const vf = venue ? venue.fields : {}
+  const address = f['Venue Address'] || vf['Address'] || ''
 
   return (
-    <div>
-      <div className="page-title">Dashboard</div>
-      <div className="page-sub">Connected to Airtable · {shows.length} shows · {members.length} members · {venues.length} venues</div>
-
-      <div className="stat-grid">
-        <div className="stat"><div className="stat-label">Total revenue</div><div className="stat-val">{cur(totalRev)}</div><div className="stat-sub">all bands</div></div>
-        <div className="stat"><div className="stat-label">EPL fees</div><div className="stat-val">{cur(totalEPL)}</div><div className="stat-sub">management</div></div>
-        <div className="stat"><div className="stat-label">Shows booked</div><div className="stat-val">{shows.length}</div><div className="stat-sub">{members.length} members</div></div>
-        <div className="stat"><div className="stat-label">New inquiries</div><div className="stat-val">{newInq}</div><div className="stat-sub">awaiting review</div></div>
-      </div>
-
-      <div className="two-col">
+    <div onClick={onClick} style={{ background:'#111118', border:'0.5px solid #2a2a3a', borderRadius:16, padding:20, cursor:'pointer' }}>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:14 }}>
         <div>
-          <div className="section-label">Upcoming shows</div>
-          <div className="card">
-            <table>
-              <thead><tr><th>Date</th><th>Band</th><th>Venue</th><th>Rate</th></tr></thead>
-              <tbody>
-                {upcoming.length ? upcoming.map(s => {
-                  const f = s.fields
-                  const bands = resolveLinked(f['Band'], 'BANDS', 'Band Name')
-                  const vs = resolveLinked(f['Venue'], 'VENUES', 'Venue Name')
-                  return <tr key={s.id}><td>{fmt(f['Date'])}</td><td>{bands.map((b, i) => <BandTag key={i} name={b} />)}</td><td>{vs[0] || '—'}</td><td>{cur(f['Performance Rate'])}</td></tr>
-                }) : <tr><td colSpan={4} style={{ textAlign: 'center', color: 'var(--hint)', padding: '1.5rem' }}>No upcoming shows yet.</td></tr>}
-              </tbody>
-            </table>
+          <div style={{ fontSize:18, fontWeight:700, marginBottom:4 }}>{vf['Venue Name'] || f['Venue'] || '—'}</div>
+          <div style={{ display:'flex', gap:4 }}>{bands.map((b, i) => <BandTag key={i} name={b} />)}</div>
+        </div>
+        <div style={{ background:'#1a1a2e', borderRadius:10, padding:'6px 12px', textAlign:'center', flexShrink:0 }}>
+          <div style={{ fontSize:22, fontWeight:700, color:'#a78bfa' }}>{days}</div>
+          <div style={{ fontSize:10, color:'#6b7280' }}>{days === 1 ? 'day' : 'days'}</div>
+        </div>
+      </div>
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:10, marginBottom: address ? 14 : 0 }}>
+        <TimeBlock label="Load in" value={f['Load-In Time']} />
+        <TimeBlock label="Set time" value={f['Set Time']} />
+        <TimeBlock label="End time" value={f['End Time']} />
+      </div>
+      {address && (
+        <a href={`https://maps.apple.com/?q=${encodeURIComponent(address)}`} onClick={e => e.stopPropagation()} style={{ display:'flex', alignItems:'center', gap:8, padding:'10px 12px', background:'#0a0a1a', borderRadius:10, textDecoration:'none', marginTop:4 }}>
+          <span style={{ fontSize:16 }}>📍</span>
+          <div>
+            <div style={{ fontSize:12, fontWeight:500, color:'#a78bfa' }}>Get directions</div>
+            <div style={{ fontSize:11, color:'#6b7280' }}>{address}</div>
           </div>
-        </div>
-        <div>
-          <div className="section-label">Bands</div>
-          <div className="card card-body">
-            {(data['BANDS'] || []).map(b => {
-              const f = b.fields
-              const name = f['Band Name'] || '—'
-              const c = BAND_COLORS[name] || { color: '#a78bfa' }
-              return (
-                <div key={b.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '0.5px solid var(--border)' }}>
-                  <div style={{ width: 8, height: 8, borderRadius: '50%', background: c.color, flexShrink: 0 }} />
-                  <div style={{ flex: 1, fontWeight: 500, fontSize: 13 }}>{name}</div>
-                  <div style={{ fontSize: 12, color: 'var(--muted)' }}>{f['Genre'] || ''}</div>
-                  <div style={{ fontSize: 12, color: 'var(--hint)' }}>{Number(f['Total Shows 2026'] || 0)} shows</div>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      </div>
-
-      <div className="section-label" style={{ marginTop: '0.5rem' }}>Member roster</div>
-      <div className="card card-body">
-        <div className="three-col">
-          {(data['MEMBERS'] || []).map(m => {
-            const f = m.fields
-            const name = f['Member Name'] || '—'
-            const bands = resolveLinked(f['Primary Bands'], 'BANDS', 'Band Name')
-            const subs = resolveLinked(f['Can Sub For'], 'BANDS', 'Band Name')
-            return (
-              <div key={m.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: 10, background: 'var(--surface2)', borderRadius: 8 }}>
-                <Avatar name={name} size={30} />
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: 13, fontWeight: 500 }}>{name}</div>
-                  <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 4 }}>{(f['Instruments'] || []).join(', ') || '—'}</div>
-                  <div>{bands.map((b, i) => <BandTag key={i} name={b} />)}</div>
-                  {subs.length > 0 && <div style={{ fontSize: 10, color: 'var(--hint)', marginTop: 2 }}>Sub: {subs.join(', ')}</div>}
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function Shows({ data, resolveLinked }) {
-  const [filter, setFilter] = useState('all')
-  const bands = ['all', ...(data['BANDS'] || []).map(b => b.fields['Band Name'])]
-  let shows = [...(data['SHOWS'] || [])].sort((a, b) => a.fields['Date'] > b.fields['Date'] ? 1 : -1)
-  if (filter !== 'all') shows = shows.filter(s => resolveLinked(s.fields['Band'], 'BANDS', 'Band Name').includes(filter))
-
-  return (
-    <div>
-      <div className="page-title">Shows</div>
-      <div className="page-sub">All events across every band</div>
-      <div style={{ display: 'flex', gap: 8, marginBottom: '1rem', flexWrap: 'wrap' }}>
-        {bands.map(b => {
-          const c = BAND_COLORS[b] || {}
-          return (
-            <button key={b} onClick={() => setFilter(b)} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 20, border: '0.5px solid', borderColor: filter === b ? (c.bg || '#1a1a2e') : 'var(--border2)', background: filter === b ? (c.bg || '#1a1a2e') : 'transparent', color: filter === b ? (c.color || '#a78bfa') : 'var(--muted)', cursor: 'pointer', fontFamily: 'inherit' }}>
-              {b === 'all' ? 'All shows' : b}
-            </button>
-          )
-        })}
-      </div>
-      <div className="card">
-        <table>
-          <thead><tr><th>Date</th><th>Band</th><th>Venue</th><th>Rate</th><th>EPL Fee</th><th>Net</th><th>Status</th></tr></thead>
-          <tbody>
-            {shows.map(s => {
-              const f = s.fields
-              const bands = resolveLinked(f['Band'], 'BANDS', 'Band Name')
-              const vs = resolveLinked(f['Venue'], 'VENUES', 'Venue Name')
-              return <tr key={s.id}><td>{fmt(f['Date'])}</td><td>{bands.map((b, i) => <BandTag key={i} name={b} />)}</td><td style={{ fontSize: 12 }}>{vs[0] || '—'}</td><td>{cur(f['Performance Rate'])}</td><td style={{ color: 'var(--muted)' }}>{cur(f['EPL Fee'])}</td><td style={{ fontWeight: 500 }}>{cur(f['Net Income'])}</td><td><StatusPill status={f['Status']} /></td></tr>
-            })}
-            {!shows.length && <tr><td colSpan={7} style={{ textAlign: 'center', color: 'var(--hint)', padding: '2rem' }}>No shows found.</td></tr>}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  )
-}
-
-function Finances({ data, resolveLinked }) {
-  const shows = data['SHOWS'] || []
-  const totalRev = shows.reduce((a, s) => a + Number(s.fields['Performance Rate'] || 0), 0)
-  const totalEPL = shows.reduce((a, s) => a + Number(s.fields['EPL Fee'] || 0), 0)
-  const totalExp = shows.reduce((a, s) => a + Number(s.fields['Total Expenses'] || 0), 0)
-  const totalPayout = shows.reduce((a, s) => a + Number(s.fields['Band Payout'] || 0), 0)
-  const sorted = [...shows].sort((a, b) => a.fields['Date'] > b.fields['Date'] ? 1 : -1)
-
-  return (
-    <div>
-      <div className="page-title">Finances</div>
-      <div className="page-sub">P&L per show and band</div>
-      <div className="stat-grid">
-        <div className="stat"><div className="stat-label">Performance fees</div><div className="stat-val">{cur(totalRev)}</div></div>
-        <div className="stat"><div className="stat-label">EPL fees</div><div className="stat-val">{cur(totalEPL)}</div></div>
-        <div className="stat"><div className="stat-label">Total expenses</div><div className="stat-val">{cur(totalExp)}</div></div>
-        <div className="stat"><div className="stat-label">Band payouts</div><div className="stat-val">{cur(totalPayout)}</div></div>
-      </div>
-      <div className="card">
-        <table>
-          <thead><tr><th>Date</th><th>Band</th><th>Venue</th><th>Rate</th><th>EPL</th><th>Trailer</th><th>Audio</th><th>Ads</th><th>Net</th><th>Payout</th><th>Status</th></tr></thead>
-          <tbody>
-            {sorted.map(s => {
-              const f = s.fields
-              const bands = resolveLinked(f['Band'], 'BANDS', 'Band Name')
-              const vs = resolveLinked(f['Venue'], 'VENUES', 'Venue Name')
-              return <tr key={s.id}><td>{fmt(f['Date'])}</td><td>{bands.map((b, i) => <BandTag key={i} name={b} />)}</td><td style={{ fontSize: 12 }}>{vs[0] || '—'}</td><td>{cur(f['Performance Rate'])}</td><td style={{ color: 'var(--muted)' }}>{cur(f['EPL Fee'])}</td><td style={{ color: 'var(--muted)' }}>{cur(f['Trailer Cost'])}</td><td style={{ color: 'var(--muted)' }}>{cur(f['Audio Engineer Cost'])}</td><td style={{ color: 'var(--muted)' }}>{cur(f['Social Ads Spend'])}</td><td style={{ fontWeight: 500 }}>{cur(f['Net Income'])}</td><td style={{ color: '#a78bfa' }}>{cur(f['Band Payout'])}</td><td><StatusPill status={f['Status']} /></td></tr>
-            })}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  )
-}
-
-function Members({ data, resolveLinked }) {
-  return (
-    <div>
-      <div className="page-title">Members</div>
-      <div className="page-sub">Roster, instruments, sub coverage</div>
-      <div className="three-col">
-        {(data['MEMBERS'] || []).map(m => {
-          const f = m.fields
-          const name = f['Member Name'] || '—'
-          const bands = resolveLinked(f['Primary Bands'], 'BANDS', 'Band Name')
-          const subs = resolveLinked(f['Can Sub For'], 'BANDS', 'Band Name')
-          return (
-            <div key={m.id} className="member-card">
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-                <Avatar name={name} />
-                <div>
-                  <div style={{ fontSize: 15, fontWeight: 600 }}>{name}</div>
-                  <div style={{ fontSize: 12, color: 'var(--muted)' }}>{(f['Instruments'] || []).join(', ') || f['Role/Instrument'] || '—'}</div>
-                </div>
-              </div>
-              <div style={{ marginBottom: 8 }}>
-                <div style={{ fontSize: 11, color: 'var(--hint)', marginBottom: 4 }}>Primary bands</div>
-                {bands.length ? bands.map((b, i) => <BandTag key={i} name={b} />) : <span style={{ fontSize: 12, color: 'var(--hint)' }}>—</span>}
-              </div>
-              {subs.length > 0 && (
-                <div style={{ marginBottom: 8 }}>
-                  <div style={{ fontSize: 11, color: 'var(--hint)', marginBottom: 4 }}>Can sub for</div>
-                  {subs.map((b, i) => <BandTag key={i} name={b} />)}
-                </div>
-              )}
-              <div style={{ paddingTop: 10, borderTop: '0.5px solid var(--border)', fontSize: 12, color: 'var(--muted)', display: 'flex', justifyContent: 'space-between' }}>
-                <span>{f['Experience Level'] || 'Primary'}</span>
-                <span style={{ color: f['Active'] === false ? 'var(--danger-text)' : 'var(--success-text)' }}>{f['Active'] === false ? 'Inactive' : 'Active'}</span>
-              </div>
-            </div>
-          )
-        })}
-      </div>
-    </div>
-  )
-}
-
-function Availability({ data, resolveLinked }) {
-  const [selectedMember, setSelectedMember] = useState('')
-  const today = new Date()
-  const year = today.getFullYear(), month = today.getMonth()
-  const firstDay = new Date(year, month, 1).getDay()
-  const daysInMonth = new Date(year, month + 1, 0).getDate()
-  const monthName = today.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
-  const showDates = new Set((data['SHOWS'] || []).map(s => s.fields['Date']).filter(Boolean))
-  const blackoutDates = new Set((data['BLACKOUT DATES'] || []).map(b => b.fields['Date']).filter(Boolean))
-  const upcoming = (data['SHOWS'] || []).filter(s => s.fields['Date'] && new Date(s.fields['Date']) >= today).sort((a, b) => a.fields['Date'] > b.fields['Date'] ? 1 : -1)
-
-  const conflicts = []
-  upcoming.forEach(show => {
-    const showDate = show.fields['Date'];
-    (data['BLACKOUT DATES'] || []).forEach(b => {
-      if (b.fields['Date'] === showDate) {
-        const mids = b.fields['Member'] || []
-        const mRec = (data['MEMBERS'] || []).find(m => Array.isArray(mids) ? mids.includes(m.id) : mids === m.id)
-        if (mRec) {
-          const bands = resolveLinked(show.fields['Band'], 'BANDS', 'Band Name')
-          const vs = resolveLinked(show.fields['Venue'], 'VENUES', 'Venue Name')
-          conflicts.push({ date: showDate, member: mRec.fields['Member Name'] || 'Unknown', band: bands[0] || '—', venue: vs[0] || '—' })
-        }
-      }
-    })
-  })
-
-  const myShows = selectedMember ? (data['SHOWS'] || []).filter(s => {
-    const mp = s.fields['Members Playing'] || []
-    return Array.isArray(mp) && mp.includes(selectedMember) && new Date(s.fields['Date'] || '') >= today
-  }).sort((a, b) => a.fields['Date'] > b.fields['Date'] ? 1 : -1) : []
-
-  const myBlackouts = selectedMember ? (data['BLACKOUT DATES'] || []).filter(b => {
-    const bm = b.fields['Member'] || []
-    return Array.isArray(bm) ? bm.includes(selectedMember) : bm === selectedMember
-  }) : []
-
-  const days = []
-  for (let i = 0; i < firstDay; i++) days.push(null)
-  for (let d = 1; d <= daysInMonth; d++) {
-    const ds = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`
-    days.push({ d, ds, hasShow: showDates.has(ds), isBlock: blackoutDates.has(ds), isToday: d === today.getDate() })
-  }
-
-  return (
-    <div>
-      <div className="page-title">Availability & conflicts</div>
-      <div className="page-sub">Blackout dates, show conflicts, and member schedules</div>
-      <div className="two-col">
-        <div>
-          <div className="section-label">{monthName}</div>
-          <div className="card card-body">
-            <div className="cal-grid">
-              {['Su','Mo','Tu','We','Th','Fr','Sa'].map(d => <div key={d} className="cal-header">{d}</div>)}
-              {days.map((day, i) => day ? (
-                <div key={i} className={`cal-day ${day.hasShow ? 'has-show' : ''} ${day.isBlock && !day.hasShow ? 'blocked' : ''} ${day.isToday ? 'today' : ''}`}>
-                  <span className="cal-num">{day.d}</span>
-                  {day.hasShow && <span className="cal-label show">gig</span>}
-                  {day.isBlock && !day.hasShow && <span className="cal-label block">out</span>}
-                </div>
-              ) : <div key={i} />)}
-            </div>
-            <div style={{ display: 'flex', gap: 16, marginTop: 12, paddingTop: 10, borderTop: '0.5px solid var(--border)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--muted)' }}><div style={{ width: 10, height: 10, borderRadius: 2, background: '#1a1a2e' }} />Show booked</div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--muted)' }}><div style={{ width: 10, height: 10, borderRadius: 2, background: '#2e1a1a' }} />Member blackout</div>
-            </div>
-          </div>
-
-          <div style={{ marginTop: '1rem' }}>
-            <div className="section-label">Member schedule lookup</div>
-            <div className="card card-body">
-              <select className="form-input" style={{ marginBottom: 12 }} value={selectedMember} onChange={e => setSelectedMember(e.target.value)}>
-                <option value="">— select member —</option>
-                {(data['MEMBERS'] || []).map(m => <option key={m.id} value={m.id}>{m.fields['Member Name'] || '—'}</option>)}
-              </select>
-              {selectedMember && (
-                <>
-                  <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>Upcoming shows</div>
-                  {myShows.length ? myShows.map(s => {
-                    const bands = resolveLinked(s.fields['Band'], 'BANDS', 'Band Name')
-                    const vs = resolveLinked(s.fields['Venue'], 'VENUES', 'Venue Name')
-                    return <div key={s.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '0.5px solid var(--border)', fontSize: 12 }}><span>{fmt(s.fields['Date'])}</span><span>{bands.map((b, i) => <BandTag key={i} name={b} />)}</span><span style={{ color: 'var(--muted)' }}>{vs[0] || '—'}</span></div>
-                  }) : <div style={{ fontSize: 12, color: 'var(--hint)' }}>No upcoming shows assigned.</div>}
-                  {myBlackouts.length > 0 && <>
-                    <div style={{ fontSize: 13, fontWeight: 500, margin: '10px 0 6px' }}>Blackout dates</div>
-                    {myBlackouts.map((b, i) => <div key={i} style={{ fontSize: 12, color: 'var(--warning-text)', padding: '4px 0' }}>{fmt(b.fields['Date'])} — {b.fields['Reason'] || '—'}</div>)}
-                  </>}
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-
-        <div>
-          <div className="section-label">Booking conflicts ({conflicts.length})</div>
-          {conflicts.length ? conflicts.map((c, i) => (
-            <div key={i} className="conflict-row">
-              <div style={{ width: 20, height: 20, borderRadius: '50%', background: 'var(--warning-text)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, color: 'white', fontWeight: 600, flexShrink: 0 }}>!</div>
-              <div style={{ fontSize: 13 }}><strong>{c.member}</strong> blacked out {fmt(c.date)} — <BandTag name={c.band} /> @ {c.venue}</div>
-            </div>
-          )) : <div className="card card-body" style={{ textAlign: 'center', color: 'var(--hint)', fontSize: 13 }}>No conflicts detected.</div>}
-
-          <div style={{ marginTop: '1rem' }}>
-            <div className="section-label">All blackout dates</div>
-            <div className="card">
-              <table>
-                <thead><tr><th>Member</th><th>Date</th><th>Reason</th></tr></thead>
-                <tbody>
-                  {(data['BLACKOUT DATES'] || []).sort((a, b) => a.fields['Date'] > b.fields['Date'] ? 1 : -1).map(b => {
-                    const f = b.fields
-                    const mids = f['Member'] || []
-                    const mRec = (data['MEMBERS'] || []).find(m => Array.isArray(mids) ? mids.includes(m.id) : mids === m.id)
-                    return <tr key={b.id}><td style={{ fontWeight: 500 }}>{mRec ? mRec.fields['Member Name'] : '—'}</td><td>{fmt(f['Date'])}</td><td style={{ color: 'var(--muted)' }}>{f['Reason'] || '—'}</td></tr>
-                  })}
-                  {!(data['BLACKOUT DATES'] || []).length && <tr><td colSpan={3} style={{ textAlign: 'center', color: 'var(--hint)', padding: '1rem' }}>No blackout dates yet.</td></tr>}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function Venues({ data, resolveLinked }) {
-  return (
-    <div>
-      <div className="page-title">Venue CRM</div>
-      <div className="page-sub">Relationships, communications, outreach timing</div>
-      <div className="three-col" style={{ marginBottom: '1rem' }}>
-        {(data['VENUES'] || []).map(v => {
-          const f = v.fields
-          return (
-            <div key={v.id} className="card card-body">
-              <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 2 }}>{f['Venue Name'] || '—'}</div>
-              <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 8 }}>{f['City'] || ''}{f['State'] ? ', ' + f['State'] : ''}{f['Capacity'] ? ` · Cap. ${Number(f['Capacity']).toLocaleString()}` : ''}</div>
-              <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 6 }}>{f['Booking Email'] || f['Contact Email'] || ''}</div>
-              {f['Relationship Status'] && <StatusPill status={f['Relationship Status']} />}
-              {f['Next Available Outreach Date'] && <div style={{ fontSize: 11, color: 'var(--hint)', marginTop: 6 }}>Outreach from: {fmt(f['Next Available Outreach Date'])}</div>}
-            </div>
-          )
-        })}
-        {!(data['VENUES'] || []).length && <div style={{ gridColumn: '1/-1', textAlign: 'center', color: 'var(--hint)', padding: '2rem' }}>No venues yet — add them in Airtable.</div>}
-      </div>
-      <div className="section-label">Communication log</div>
-      <div className="card">
-        <table>
-          <thead><tr><th>Venue</th><th>Date</th><th>Type</th><th>Notes</th><th>Outcome</th></tr></thead>
-          <tbody>
-            {[...(data['COMMUNICATIONS'] || [])].sort((a, b) => a.fields['Date'] > b.fields['Date'] ? -1 : 1).map(c => {
-              const f = c.fields
-              const vRec = (data['VENUES'] || []).find(v => v.id === (Array.isArray(f['Venue']) ? f['Venue'][0] : f['Venue']))
-              return <tr key={c.id}><td style={{ fontWeight: 500 }}>{vRec ? vRec.fields['Venue Name'] : '—'}</td><td>{fmt(f['Date'])}</td><td>{f['Type'] || '—'}</td><td style={{ color: 'var(--muted)', fontSize: 12 }}>{(f['Notes'] || '').slice(0, 60)}{(f['Notes'] || '').length > 60 ? '...' : ''}</td><td><StatusPill status={f['Outcome']} /></td></tr>
-            })}
-            {!(data['COMMUNICATIONS'] || []).length && <tr><td colSpan={5} style={{ textAlign: 'center', color: 'var(--hint)', padding: '1.5rem' }}>No communications logged yet.</td></tr>}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  )
-}
-
-function Inquiries({ data, resolveLinked }) {
-  const inqs = [...(data['INQUIRIES'] || [])].sort((a, b) => a.fields['Submitted Date'] > b.fields['Submitted Date'] ? -1 : 1)
-  return (
-    <div>
-      <div className="page-title">Booking inquiries</div>
-      <div className="page-sub">Incoming requests from the public booking form</div>
-      <div className="card">
-        <table>
-          <thead><tr><th>Submitted</th><th>Booker</th><th>Band(s)</th><th>Event date</th><th>Type</th><th>Status</th></tr></thead>
-          <tbody>
-            {inqs.map(i => {
-              const f = i.fields
-              const bands = resolveLinked(f['Band(s) Requested'] || f['Bands Requested'], 'BANDS', 'Band Name')
-              return <tr key={i.id}><td>{fmt(f['Submitted Date'])}</td><td style={{ fontWeight: 500 }}>{f['Booker Name'] || '—'}</td><td>{bands.map((b, idx) => <BandTag key={idx} name={b} />)}</td><td>{fmt(f['Requested Date'])}</td><td style={{ color: 'var(--muted)' }}>{f['Booker Type'] || '—'}</td><td><StatusPill status={f['Status'] || 'New'} /></td></tr>
-            })}
-            {!inqs.length && <tr><td colSpan={6} style={{ textAlign: 'center', color: 'var(--hint)', padding: '2rem' }}>No inquiries yet.</td></tr>}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  )
-}
-
-function Promote({ data, resolveLinked }) {
-  const [selected, setSelected] = useState('')
-  const [copy, setCopy] = useState(null)
-  const today = new Date()
-  const upcoming = (data['SHOWS'] || []).filter(s => s.fields['Date'] && new Date(s.fields['Date']) >= today).sort((a, b) => a.fields['Date'] > b.fields['Date'] ? 1 : -1)
-
-  function generate(idx) {
-    setSelected(idx)
-    const s = upcoming[parseInt(idx)]
-    if (!s) { setCopy(null); return }
-    const f = s.fields
-    const bands = resolveLinked(f['Band'], 'BANDS', 'Band Name')
-    const vs = resolveLinked(f['Venue'], 'VENUES', 'Venue Name')
-    const band = bands[0] || 'The Band', venue = vs[0] || 'the venue'
-    const dt = new Date((f['Date'] || '') + 'T00:00:00')
-    const long = dt.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
-    setCopy([
-      { name: 'Facebook Event', text: `LIVE MUSIC — ${band}\n${long}\n${venue}, Fort Worth TX\n\nCome out for a great night of live music!\n\n#livemusic #${band.replace(/\s/g, '')} #fortworthmusic` },
-      { name: 'Bandsintown', text: `Artist: ${band}\nVenue: ${venue}\nDate: ${f['Date']}\nCity: Fort Worth, TX\nTicket URL: (add link)` },
-      { name: 'Instagram caption', text: `Back at ${venue}!\n${long} — come see us. Doors at 7pm.\n\n#${band.replace(/\s/g, '')} #LiveMusic #FortWorth` },
-      { name: 'Text blast', text: `${band} is playing ${venue} on ${long}. Come out! Doors at 7pm.` },
-    ])
-  }
-
-  return (
-    <div>
-      <div className="page-title">Promote</div>
-      <div className="page-sub">Generate ready-to-use promotion copy per show</div>
-      <div style={{ marginBottom: '1.25rem' }}>
-        <label className="form-label">Select a show:</label>
-        <select className="form-input" style={{ maxWidth: 440, marginTop: 6 }} value={selected} onChange={e => generate(e.target.value)}>
-          <option value="">— choose a show —</option>
-          {upcoming.map((s, i) => {
-            const bands = resolveLinked(s.fields['Band'], 'BANDS', 'Band Name')
-            const vs = resolveLinked(s.fields['Venue'], 'VENUES', 'Venue Name')
-            return <option key={s.id} value={i}>{fmt(s.fields['Date'])} — {bands[0] || 'Band'} @ {vs[0] || 'Venue'}</option>
-          })}
-        </select>
-      </div>
-      {copy && (
-        <div className="two-col">
-          {copy.map((c, i) => <CopyCard key={i} name={c.name} text={c.text} />)}
-        </div>
+        </a>
       )}
+      <div style={{ marginTop:12, fontSize:12, color:'#6b7280', display:'flex', justifyContent:'space-between' }}>
+        <span>{fmt(f['Date'])}</span>
+        <span style={{ color:'#a78bfa' }}>View details →</span>
+      </div>
     </div>
   )
 }
 
-function CopyCard({ name, text }) {
-  const [copied, setCopied] = useState(false)
+function TimeBlock({ label, value }) {
   return (
-    <div className="card card-body">
-      <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>{name}</div>
-      <pre style={{ fontSize: 12, color: 'var(--muted)', whiteSpace: 'pre-wrap', fontFamily: 'monospace', background: 'var(--surface2)', padding: 10, borderRadius: 6, marginBottom: 8 }}>{text}</pre>
-      <button className="btn btn-sm" onClick={() => { navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 1500) }}>{copied ? 'Copied!' : 'Copy'}</button>
+    <div style={{ background:'#0a0a1a', borderRadius:8, padding:'8px 10px', textAlign:'center' }}>
+      <div style={{ fontSize:10, color:'#6b7280', marginBottom:4, textTransform:'uppercase', letterSpacing:'0.05em' }}>{label}</div>
+      <div style={{ fontSize:14, fontWeight:600, color:'#ffffff' }}>{value || '—'}</div>
     </div>
   )
 }
 
-function MemberPortal({ data, resolveLinked }) {
-  const [selected, setSelected] = useState('')
-  const today = new Date()
-  const member = selected ? (data['MEMBERS'] || []).find(m => m.id === selected) : null
-  const myShows = member ? (data['SHOWS'] || []).filter(s => {
-    const mp = s.fields['Members Playing'] || []
-    return Array.isArray(mp) && mp.includes(selected) && new Date(s.fields['Date'] || '') >= today
-  }).sort((a, b) => a.fields['Date'] > b.fields['Date'] ? 1 : -1) : []
-  const myBlackouts = member ? (data['BLACKOUT DATES'] || []).filter(b => {
-    const bm = b.fields['Member'] || []
-    return Array.isArray(bm) ? bm.includes(selected) : bm === selected
-  }) : []
+function ShowRow({ show, resolve, resolveField, onClick }) {
+  const f = show.fields
+  const days = daysUntil(f['Date'])
+  const bands = resolveField(f['Band'], 'BANDS', 'Band Name')
+  const venueRecs = resolve(f['Venue'], 'VENUES', 'Venue Name')
+  const vf = venueRecs[0] ? venueRecs[0].fields : {}
 
   return (
-    <div>
-      <div className="page-title">Member portal</div>
-      <div className="page-sub">Select your name to view your schedule</div>
-      <select className="form-input" style={{ maxWidth: 300, marginBottom: '1.5rem' }} value={selected} onChange={e => setSelected(e.target.value)}>
-        <option value="">— select your name —</option>
-        {(data['MEMBERS'] || []).map(m => <option key={m.id} value={m.id}>{m.fields['Member Name'] || '—'}</option>)}
-      </select>
-      {member && (
-        <div className="two-col">
-          <div className="member-card">
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
-              <Avatar name={member.fields['Member Name']} />
-              <div>
-                <div style={{ fontSize: 16, fontWeight: 600 }}>{member.fields['Member Name']}</div>
-                <div style={{ fontSize: 13, color: 'var(--muted)' }}>{(member.fields['Instruments'] || []).join(', ') || '—'}</div>
-              </div>
+    <div onClick={onClick} style={{ display:'flex', alignItems:'center', gap:14, padding:'14px 0', borderBottom:'0.5px solid #1a1a2a', cursor:'pointer' }}>
+      <div style={{ width:44, textAlign:'center', flexShrink:0 }}>
+        <div style={{ fontSize:13, fontWeight:700, color:'#a78bfa' }}>{days != null ? days : '—'}</div>
+        <div style={{ fontSize:10, color:'#6b7280' }}>days</div>
+      </div>
+      <div style={{ flex:1, minWidth:0 }}>
+        <div style={{ fontSize:14, fontWeight:600, marginBottom:2 }}>{vf['Venue Name'] || '—'}</div>
+        <div style={{ fontSize:12, color:'#6b7280', marginBottom:4 }}>{fmt(f['Date'])}</div>
+        <div>{bands.map((b, i) => <BandTag key={i} name={b} />)}</div>
+      </div>
+      <div style={{ fontSize:12, color:'#f['Set Time'] ? '#ffffff' : '#6b7280' }}>
+        <div style={{ fontSize:12, color: f['Set Time'] ? '#ffffff' : '#6b7280' }}>{f['Set Time'] || '—'}</div>
+        <div style={{ fontSize:10, color:'#6b7280' }}>set time</div>
+      </div>
+      <div style={{ color:'#2a2a3a', fontSize:18 }}>›</div>
+    </div>
+  )
+}
+
+function QuickCard({ label, value, sub, onClick, color }) {
+  return (
+    <div onClick={onClick} style={{ background:'#111118', border:'0.5px solid #2a2a3a', borderRadius:12, padding:16, cursor:'pointer' }}>
+      <div style={{ fontSize:24, fontWeight:700, color:color, marginBottom:2 }}>{value}</div>
+      <div style={{ fontSize:13, fontWeight:600, marginBottom:2 }}>{label}</div>
+      <div style={{ fontSize:11, color:'#6b7280' }}>{sub}</div>
+    </div>
+  )
+}
+
+function ShowDetail({ data, member, show, resolve, resolveField, onBack }) {
+  const f = show.fields
+  const bands = resolveField(f['Band'], 'BANDS', 'Band Name')
+  const venueRecs = resolve(f['Venue'], 'VENUES', 'Venue Name')
+  const vf = venueRecs[0] ? venueRecs[0].fields : {}
+  const address = f['Venue Address'] || vf['Address'] || ''
+  const days = daysUntil(f['Date'])
+
+  const setlistRecs = resolve(f['Setlist'], 'SETLISTS', 'Set Name')
+  const setlist = setlistRecs[0]
+  const songs = setlist ? (setlist.fields['Songs'] || '').split('\n').filter(s => s.trim()) : []
+
+  function openMaps(addr) {
+    const encoded = encodeURIComponent(addr)
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
+    if (isIOS) window.open(`maps://maps.apple.com/?q=${encoded}`)
+    else window.open(`https://maps.google.com/?q=${encoded}`)
+  }
+
+  return (
+    <div style={{ minHeight:'100vh', background:'#0a0a0f', color:'#ffffff', fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif' }}>
+      <Head><title>EPL — Show Details</title></Head>
+
+      <div style={{ background:'#111118', borderBottom:'0.5px solid #1e1e2e', padding:'14px 20px', display:'flex', alignItems:'center', gap:14, position:'sticky', top:0, zIndex:50 }}>
+        <button onClick={onBack} style={{ background:'none', border:'none', color:'#a78bfa', fontSize:20, cursor:'pointer', padding:0, lineHeight:1 }}>‹</button>
+        <div>
+          <div style={{ fontSize:15, fontWeight:600 }}>{vf['Venue Name'] || '—'}</div>
+          <div style={{ fontSize:12, color:'#6b7280' }}>{fmt(f['Date'])}</div>
+        </div>
+      </div>
+
+      <div style={{ padding:'20px 20px 100px' }}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20 }}>
+          <div style={{ display:'flex', gap:4, flexWrap:'wrap' }}>{bands.map((b, i) => <BandTag key={i} name={b} />)}</div>
+          {days != null && <div style={{ background:'#1a1a2e', borderRadius:10, padding:'6px 14px', textAlign:'center' }}>
+            <div style={{ fontSize:20, fontWeight:700, color:'#a78bfa' }}>{days}</div>
+            <div style={{ fontSize:10, color:'#6b7280' }}>{days === 1 ? 'day away' : 'days away'}</div>
+          </div>}
+        </div>
+
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:10, marginBottom:20 }}>
+          <TimeBlock label="Load in" value={f['Load-In Time']} />
+          <TimeBlock label="Set time" value={f['Set Time']} />
+          <TimeBlock label="End time" value={f['End Time']} />
+        </div>
+
+        {address && (
+          <div style={{ marginBottom:20 }}>
+            <div style={{ fontSize:11, fontWeight:600, color:'#6b7280', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:10 }}>Venue</div>
+            <div style={{ background:'#111118', border:'0.5px solid #2a2a3a', borderRadius:12, padding:16 }}>
+              <div style={{ fontSize:15, fontWeight:600, marginBottom:4 }}>{vf['Venue Name'] || '—'}</div>
+              {address && <div style={{ fontSize:13, color:'#9ca3af', marginBottom:12 }}>{address}</div>}
+              {vf['Parking Notes'] && <div style={{ fontSize:12, color:'#6b7280', marginBottom:12 }}>🅿️ {vf['Parking Notes']}</div>}
+              {address && (
+                <div style={{ display:'flex', gap:10 }}>
+                  <button onClick={() => openMaps(address)} style={{ flex:1, padding:'10px', background:'#1a1a2e', border:'none', borderRadius:10, color:'#a78bfa', fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>
+                    Apple Maps
+                  </button>
+                  <button onClick={() => window.open(`https://maps.google.com/?q=${encodeURIComponent(address)}`)} style={{ flex:1, padding:'10px', background:'#1a2e1a', border:'none', borderRadius:10, color:'#6bcb77', fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>
+                    Google Maps
+                  </button>
+                </div>
+              )}
             </div>
-            <div style={{ marginBottom: 10 }}>
-              <div style={{ fontSize: 11, color: 'var(--hint)', marginBottom: 4 }}>My bands</div>
-              {resolveLinked(member.fields['Primary Bands'], 'BANDS', 'Band Name').map((b, i) => <BandTag key={i} name={b} />)}
+          </div>
+        )}
+
+        {songs.length > 0 && (
+          <div style={{ marginBottom:20 }}>
+            <div style={{ fontSize:11, fontWeight:600, color:'#6b7280', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:10 }}>Setlist ({songs.length} songs)</div>
+            <div style={{ background:'#111118', border:'0.5px solid #2a2a3a', borderRadius:12, overflow:'hidden' }}>
+              {songs.map((song, i) => (
+                <div key={i} style={{ display:'flex', alignItems:'center', gap:14, padding:'12px 16px', borderBottom: i < songs.length - 1 ? '0.5px solid #1a1a2a' : 'none' }}>
+                  <div style={{ width:24, textAlign:'center', fontSize:12, color:'#6b7280', fontWeight:600 }}>{i + 1}</div>
+                  <div style={{ fontSize:14, color:'#ffffff' }}>{song.trim()}</div>
+                </div>
+              ))}
             </div>
-            {resolveLinked(member.fields['Can Sub For'], 'BANDS', 'Band Name').length > 0 && (
-              <div>
-                <div style={{ fontSize: 11, color: 'var(--hint)', marginBottom: 4 }}>Can sub for</div>
-                {resolveLinked(member.fields['Can Sub For'], 'BANDS', 'Band Name').map((b, i) => <BandTag key={i} name={b} />)}
+            {setlist?.fields['Notes'] && (
+              <div style={{ marginTop:10, padding:14, background:'#111118', border:'0.5px solid #2a2a3a', borderRadius:12 }}>
+                <div style={{ fontSize:11, color:'#6b7280', marginBottom:6, fontWeight:600 }}>Set notes</div>
+                <div style={{ fontSize:13, color:'#9ca3af', lineHeight:1.6 }}>{setlist.fields['Notes']}</div>
               </div>
             )}
           </div>
-          <div>
-            <div className="section-label">Upcoming shows</div>
-            <div className="card">
-              <table>
-                <thead><tr><th>Date</th><th>Band</th><th>Venue</th></tr></thead>
-                <tbody>
-                  {myShows.map(s => {
-                    const bands = resolveLinked(s.fields['Band'], 'BANDS', 'Band Name')
-                    const vs = resolveLinked(s.fields['Venue'], 'VENUES', 'Venue Name')
-                    return <tr key={s.id}><td>{fmt(s.fields['Date'])}</td><td>{bands.map((b, i) => <BandTag key={i} name={b} />)}</td><td style={{ fontSize: 12 }}>{vs[0] || '—'}</td></tr>
-                  })}
-                  {!myShows.length && <tr><td colSpan={3} style={{ textAlign: 'center', color: 'var(--hint)', padding: '1rem' }}>No upcoming shows assigned yet.</td></tr>}
-                </tbody>
-              </table>
-            </div>
-            <div className="section-label" style={{ marginTop: '1rem' }}>Blackout dates</div>
-            <div className="card">
-              <table>
-                <thead><tr><th>Date</th><th>Reason</th></tr></thead>
-                <tbody>
-                  {myBlackouts.map((b, i) => <tr key={i}><td>{fmt(b.fields['Date'])}</td><td style={{ color: 'var(--muted)' }}>{b.fields['Reason'] || '—'}</td></tr>)}
-                  {!myBlackouts.length && <tr><td colSpan={2} style={{ textAlign: 'center', color: 'var(--hint)', padding: '1rem' }}>No blackouts on record.</td></tr>}
-                </tbody>
-              </table>
+        )}
+
+        {!songs.length && (
+          <div style={{ marginBottom:20 }}>
+            <div style={{ fontSize:11, fontWeight:600, color:'#6b7280', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:10 }}>Setlist</div>
+            <div style={{ background:'#111118', border:'0.5px solid #2a2a3a', borderRadius:12, padding:20, textAlign:'center', color:'#6b7280', fontSize:13 }}>
+              No setlist added yet — check back closer to the show.
             </div>
           </div>
+        )}
+
+        {f['Show Notes'] && (
+          <div style={{ marginBottom:20 }}>
+            <div style={{ fontSize:11, fontWeight:600, color:'#6b7280', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:10 }}>Show notes</div>
+            <div style={{ background:'#1a1a0a', border:'0.5px solid #2a2a1a', borderRadius:12, padding:16, fontSize:13, color:'#e5e5b0', lineHeight:1.6 }}>{f['Show Notes']}</div>
+          </div>
+        )}
+
+        <div style={{ marginBottom:20 }}>
+          <div style={{ fontSize:11, fontWeight:600, color:'#6b7280', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:10 }}>Show info</div>
+          <div style={{ background:'#111118', border:'0.5px solid #2a2a3a', borderRadius:12, overflow:'hidden' }}>
+            {[
+              ['Deal type', f['Deal Type']],
+              ['Sound check', f['Sound Check Confirmed'] ? 'Confirmed' : 'TBC'],
+              ['Contract', f['Contract Signed'] ? 'Signed' : 'Pending'],
+              ['Status', f['Status']],
+            ].map(([label, val]) => val && (
+              <div key={label} style={{ display:'flex', justifyContent:'space-between', padding:'12px 16px', borderBottom:'0.5px solid #1a1a2a' }}>
+                <span style={{ fontSize:13, color:'#6b7280' }}>{label}</span>
+                <span style={{ fontSize:13, color:'#ffffff', fontWeight:500 }}>{val}</span>
+              </div>
+            ))}
+          </div>
         </div>
-      )}
+      </div>
     </div>
   )
 }
 
-function Booking({ data }) {
+function FullSchedule({ data, member, resolve, resolveField, onShowClick, onBack }) {
+  const today = new Date()
+  const myShows = (data['SHOWS'] || []).filter(s => {
+    const mp = s.fields['Members Playing'] || []
+    return Array.isArray(mp) && mp.includes(member.id) && new Date(s.fields['Date'] || '') >= today
+  }).sort((a, b) => a.fields['Date'] > b.fields['Date'] ? 1 : -1)
+
+  return (
+    <div style={{ minHeight:'100vh', background:'#0a0a0f', color:'#ffffff', fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif' }}>
+      <Head><title>EPL — Schedule</title></Head>
+      <div style={{ background:'#111118', borderBottom:'0.5px solid #1e1e2e', padding:'14px 20px', display:'flex', alignItems:'center', gap:14, position:'sticky', top:0, zIndex:50 }}>
+        <button onClick={onBack} style={{ background:'none', border:'none', color:'#a78bfa', fontSize:20, cursor:'pointer', padding:0 }}>‹</button>
+        <div style={{ fontSize:15, fontWeight:600 }}>Full schedule</div>
+      </div>
+      <div style={{ padding:'20px' }}>
+        {myShows.map(s => <ShowRow key={s.id} show={s} resolve={resolve} resolveField={resolveField} onClick={() => onShowClick(s)} />)}
+        {!myShows.length && <div style={{ color:'#6b7280', fontSize:14, paddingTop:'1rem' }}>No upcoming shows assigned yet.</div>}
+      </div>
+    </div>
+  )
+}
+
+function Blackouts({ data, member, resolve, onBack }) {
+  const myBlackouts = (data['BLACKOUT DATES'] || []).filter(b => {
+    const bm = b.fields['Member'] || []
+    return Array.isArray(bm) ? bm.includes(member.id) : bm === member.id
+  }).sort((a, b) => a.fields['Date'] > b.fields['Date'] ? 1 : -1)
+
+  return (
+    <div style={{ minHeight:'100vh', background:'#0a0a0f', color:'#ffffff', fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif' }}>
+      <Head><title>EPL — Blackout Dates</title></Head>
+      <div style={{ background:'#111118', borderBottom:'0.5px solid #1e1e2e', padding:'14px 20px', display:'flex', alignItems:'center', gap:14, position:'sticky', top:0, zIndex:50 }}>
+        <button onClick={onBack} style={{ background:'none', border:'none', color:'#a78bfa', fontSize:20, cursor:'pointer', padding:0 }}>‹</button>
+        <div style={{ fontSize:15, fontWeight:600 }}>Blackout dates</div>
+      </div>
+      <div style={{ padding:'20px' }}>
+        {myBlackouts.length ? myBlackouts.map((b, i) => (
+          <div key={i} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'14px 0', borderBottom:'0.5px solid #1a1a2a' }}>
+            <div>
+              <div style={{ fontSize:14, fontWeight:600 }}>{fmt(b.fields['Date'])}</div>
+              <div style={{ fontSize:12, color:'#6b7280', marginTop:2 }}>{b.fields['Reason'] || 'No reason listed'}</div>
+            </div>
+            <div style={{ fontSize:12, color:'#ff9f7f' }}>{daysUntil(b.fields['Date']) > 0 ? `In ${daysUntil(b.fields['Date'])} days` : 'Past'}</div>
+          </div>
+        )) : <div style={{ color:'#6b7280', fontSize:14, paddingTop:'1rem' }}>No blackout dates on record.</div>}
+      </div>
+    </div>
+  )
+}
+
+function BookingPage({ data, onBack }) {
   const [bookerType, setBookerType] = useState('')
   const [selectedBands, setSelectedBands] = useState([])
-  const [form, setForm] = useState({ name: '', email: '', phone: '', date: '', date2: '', venue: '', notes: '', budget: '', attendance: '', dealType: '' })
+  const [form, setForm] = useState({ name:'', email:'', phone:'', date:'', date2:'', venue:'', notes:'' })
   const [submitting, setSubmitting] = useState(false)
-  const [result, setResult] = useState(null)
+  const [done, setDone] = useState(false)
 
   function toggleBand(name) {
-    setSelectedBands(prev => prev.includes(name) ? prev.filter(b => b !== name) : [...prev, name])
+    setSelectedBands(p => p.includes(name) ? p.filter(b => b !== name) : [...p, name])
   }
 
   async function submit() {
     setSubmitting(true)
-    setResult(null)
     try {
       const fields = {
         'Booker Name': form.name,
@@ -707,89 +490,67 @@ function Booking({ data }) {
       }
       if (form.date) fields['Requested Date'] = form.date
       if (form.date2) fields['Alternate Date'] = form.date2
-      const res = await fetch('/api/inquiry', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(fields) })
+      const res = await fetch('/api/inquiry', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(fields) })
       const json = await res.json()
       if (json.error) throw new Error(json.error)
-      setResult('success')
-      setForm({ name: '', email: '', phone: '', date: '', date2: '', venue: '', notes: '', budget: '', attendance: '', dealType: '' })
-      setSelectedBands([])
-      setBookerType('')
-    } catch (e) {
-      setResult('error: ' + e.message)
-    }
+      setDone(true)
+    } catch (e) { alert('Error: ' + e.message) }
     setSubmitting(false)
   }
 
+  const bands = data['BANDS'] || []
+  const inp = (id, ph, type='text') => <input type={type} placeholder={ph} value={form[id]} onChange={e => setForm(f => ({...f,[id]:e.target.value}))} style={{ width:'100%', padding:'12px 14px', background:'#1a1a2a', border:'0.5px solid #2a2a3a', borderRadius:10, color:'#ffffff', fontSize:14, fontFamily:'inherit', marginBottom:12 }} />
+
   return (
-    <div style={{ maxWidth: 560 }}>
-      <div className="page-title">Book a show</div>
-      <div className="page-sub">Fill out the form below and Evan will be in touch</div>
-
-      {result === 'success' && <div className="alert alert-success">Inquiry submitted! We'll be in touch shortly.</div>}
-      {result && result.startsWith('error') && <div className="alert alert-error">{result}</div>}
-
-      <div className="booking-step">
-        <div className="step-header"><div className="step-num">1</div><div className="step-title">Who are you?</div></div>
-        <select className="form-input" value={bookerType} onChange={e => setBookerType(e.target.value)}>
-          <option value="">— select —</option>
-          <option value="Venue/Bar">Venue / Bar</option>
-          <option value="Private Event">Private event (wedding, birthday, corporate)</option>
-          <option value="Festival">Festival / Multi-band event</option>
-          <option value="Other">Other</option>
-        </select>
+    <div style={{ minHeight:'100vh', background:'#0a0a0f', color:'#ffffff', fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif' }}>
+      <Head><title>EPL — Book a Show</title></Head>
+      <div style={{ background:'#111118', borderBottom:'0.5px solid #1e1e2e', padding:'14px 20px', display:'flex', alignItems:'center', gap:14, position:'sticky', top:0, zIndex:50 }}>
+        <button onClick={onBack} style={{ background:'none', border:'none', color:'#a78bfa', fontSize:20, cursor:'pointer', padding:0 }}>‹</button>
+        <div style={{ fontSize:15, fontWeight:600 }}>Book a show</div>
       </div>
-
-      <div className="booking-step">
-        <div className="step-header"><div className="step-num">2</div><div className="step-title">Which band(s)?</div></div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-          {(data['BANDS'] || []).map(b => {
-            const name = b.fields['Band Name'] || '—'
-            const c = BAND_COLORS[name] || { bg: '#1a1a2e', color: '#a78bfa' }
-            const sel = selectedBands.includes(name)
-            return <button key={b.id} onClick={() => toggleBand(name)} style={{ padding: '6px 14px', borderRadius: 20, fontSize: 13, border: `1.5px solid ${c.bg}`, color: c.color, background: sel ? c.bg : 'transparent', cursor: 'pointer', fontFamily: 'inherit' }}>{name}</button>
-          })}
-        </div>
+      <div style={{ padding:'20px', maxWidth:520, margin:'0 auto' }}>
+        {done ? (
+          <div style={{ textAlign:'center', padding:'3rem 0' }}>
+            <div style={{ fontSize:48, marginBottom:16 }}>🎸</div>
+            <div style={{ fontSize:20, fontWeight:700, marginBottom:8 }}>Inquiry sent!</div>
+            <div style={{ fontSize:14, color:'#6b7280', marginBottom:24 }}>Evan will be in touch shortly.</div>
+            <button onClick={onBack} style={{ padding:'12px 24px', background:'#1a1a2e', border:'none', borderRadius:10, color:'#a78bfa', fontSize:14, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>Back to home</button>
+          </div>
+        ) : (
+          <>
+            <div style={{ marginBottom:20 }}>
+              <div style={{ fontSize:12, color:'#6b7280', marginBottom:8, fontWeight:600 }}>WHO ARE YOU?</div>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                {['Venue/Bar','Private Event','Festival','Other'].map(t => (
+                  <button key={t} onClick={() => setBookerType(t)} style={{ padding:'10px', background: bookerType===t ? '#1a1a2e' : '#111118', border:`0.5px solid ${bookerType===t?'#a78bfa':'#2a2a3a'}`, borderRadius:10, color: bookerType===t ? '#a78bfa' : '#9ca3af', fontSize:13, cursor:'pointer', fontFamily:'inherit' }}>{t}</button>
+                ))}
+              </div>
+            </div>
+            <div style={{ marginBottom:20 }}>
+              <div style={{ fontSize:12, color:'#6b7280', marginBottom:8, fontWeight:600 }}>WHICH BAND(S)?</div>
+              <div style={{ display:'flex', flexWrap:'wrap', gap:8 }}>
+                {bands.map(b => {
+                  const name = b.fields['Band Name'] || '—'
+                  const c = BAND_COLORS[name] || { bg:'#1a1a2e', color:'#a78bfa' }
+                  const sel = selectedBands.includes(name)
+                  return <button key={b.id} onClick={() => toggleBand(name)} style={{ padding:'8px 16px', borderRadius:20, fontSize:13, border:`1.5px solid ${c.bg}`, color:c.color, background: sel ? c.bg : 'transparent', cursor:'pointer', fontFamily:'inherit', fontWeight:sel?600:400 }}>{name}</button>
+                })}
+              </div>
+            </div>
+            <div style={{ fontSize:12, color:'#6b7280', marginBottom:8, fontWeight:600 }}>EVENT DETAILS</div>
+            {inp('name','Your name')}
+            {inp('email','Email address','email')}
+            {inp('phone','Phone number','tel')}
+            {inp('venue','Venue / location name')}
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:12 }}>
+              <div><div style={{ fontSize:12, color:'#6b7280', marginBottom:4 }}>Preferred date</div><input type="date" value={form.date} onChange={e => setForm(f=>({...f,date:e.target.value}))} style={{ width:'100%', padding:'11px 12px', background:'#1a1a2a', border:'0.5px solid #2a2a3a', borderRadius:10, color:'#ffffff', fontSize:13, fontFamily:'inherit' }} /></div>
+              <div><div style={{ fontSize:12, color:'#6b7280', marginBottom:4 }}>Alternate date</div><input type="date" value={form.date2} onChange={e => setForm(f=>({...f,date2:e.target.value}))} style={{ width:'100%', padding:'11px 12px', background:'#1a1a2a', border:'0.5px solid #2a2a3a', borderRadius:10, color:'#ffffff', fontSize:13, fontFamily:'inherit' }} /></div>
+            </div>
+            <textarea placeholder="Notes / special requests" value={form.notes} onChange={e => setForm(f=>({...f,notes:e.target.value}))} rows={3} style={{ width:'100%', padding:'12px 14px', background:'#1a1a2a', border:'0.5px solid #2a2a3a', borderRadius:10, color:'#ffffff', fontSize:14, fontFamily:'inherit', marginBottom:20, resize:'vertical' }} />
+            <button onClick={submit} disabled={submitting} style={{ width:'100%', padding:'14px', background:'#1a1a2e', border:'none', borderRadius:12, color:'#a78bfa', fontSize:15, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>{submitting ? 'Submitting...' : 'Send booking inquiry'}</button>
+          </>
+        )}
       </div>
-
-      {bookerType === 'Venue/Bar' && (
-        <div className="booking-step" style={{ borderColor: '#1a2e1a' }}>
-          <div className="step-header"><div className="step-num" style={{ background: '#1a2e1a', color: '#6bcb77' }}>+</div><div className="step-title">Venue details</div></div>
-          <select className="form-input" value={form.dealType} onChange={e => setForm(f => ({ ...f, dealType: e.target.value }))}><option value="">Deal type</option><option>Flat fee</option><option>Door deal</option><option>Ticket %</option><option>Guarantee + %</option></select>
-          <input className="form-input" placeholder="Expected attendance" value={form.attendance} onChange={e => setForm(f => ({ ...f, attendance: e.target.value }))} />
-          <input className="form-input" placeholder="Budget / rate expectation" value={form.budget} onChange={e => setForm(f => ({ ...f, budget: e.target.value }))} />
-        </div>
-      )}
-      {bookerType === 'Private Event' && (
-        <div className="booking-step" style={{ borderColor: '#1a2e1a' }}>
-          <div className="step-header"><div className="step-num" style={{ background: '#1a2e1a', color: '#6bcb77' }}>+</div><div className="step-title">Event details</div></div>
-          <input className="form-input" placeholder="Guest count" value={form.attendance} onChange={e => setForm(f => ({ ...f, attendance: e.target.value }))} />
-          <input className="form-input" placeholder="Budget range" value={form.budget} onChange={e => setForm(f => ({ ...f, budget: e.target.value }))} />
-        </div>
-      )}
-      {bookerType === 'Festival' && (
-        <div className="booking-step" style={{ borderColor: '#1a2e1a' }}>
-          <div className="step-header"><div className="step-num" style={{ background: '#1a2e1a', color: '#6bcb77' }}>+</div><div className="step-title">Festival details</div></div>
-          <input className="form-input" placeholder="Festival name" />
-          <input className="form-input" placeholder="Set length (minutes)" />
-        </div>
-      )}
-
-      <div className="booking-step">
-        <div className="step-header"><div className="step-num">3</div><div className="step-title">Event details</div></div>
-        <div className="two-col">
-          <div className="form-group"><label className="form-label">Preferred date</label><input type="date" className="form-input" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} /></div>
-          <div className="form-group"><label className="form-label">Alternate date</label><input type="date" className="form-input" value={form.date2} onChange={e => setForm(f => ({ ...f, date2: e.target.value }))} /></div>
-        </div>
-        <div className="form-group"><label className="form-label">Location / venue name</label><input className="form-input" placeholder="Where?" value={form.venue} onChange={e => setForm(f => ({ ...f, venue: e.target.value }))} /></div>
-        <div className="two-col">
-          <div className="form-group"><label className="form-label">Your name</label><input className="form-input" placeholder="Full name" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} /></div>
-          <div className="form-group"><label className="form-label">Email</label><input type="email" className="form-input" placeholder="you@email.com" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} /></div>
-        </div>
-        <div className="form-group"><label className="form-label">Phone</label><input type="tel" className="form-input" placeholder="(555) 000-0000" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} /></div>
-        <div className="form-group"><label className="form-label">Notes</label><textarea className="form-input" rows={3} placeholder="Anything we should know?" value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} /></div>
-      </div>
-
-      <button className="btn btn-primary" style={{ width: '100%', padding: '13px', fontSize: 14 }} onClick={submit} disabled={submitting}>{submitting ? 'Submitting...' : 'Submit booking inquiry'}</button>
     </div>
   )
 }
