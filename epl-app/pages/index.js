@@ -59,6 +59,7 @@ export default function Home() {
   const [member, setMember] = useState(null)
   const [page, setPage] = useState('select')
   const [selectedShow, setSelectedShow] = useState(null)
+  const [previousPage, setPreviousPage] = useState('home')
 
   const loadData = useCallback(async () => {
     try {
@@ -98,6 +99,7 @@ export default function Home() {
   }
 
   function openShow(show) {
+    setPreviousPage(page)
     setSelectedShow(show)
     setPage('show-detail')
   }
@@ -120,7 +122,7 @@ export default function Home() {
 
   if (page === 'select') return <MemberSelect data={data} onSelect={selectMember} onBooking={() => setPage('booking')} onCalendar={() => setPage('master-calendar')} />
   if (page === 'home') return <MemberHome data={data} member={member} resolve={resolve} resolveField={resolveField} onShowClick={openShow} onBack={goToSelect} onNav={setPage} />
-  if (page === 'show-detail') return <ShowDetail data={data} member={member} show={selectedShow} resolve={resolve} resolveField={resolveField} onBack={() => setPage('home')} />
+  if (page === 'show-detail') return <ShowDetail data={data} member={member} show={selectedShow} resolve={resolve} resolveField={resolveField} onBack={() => setPage(previousPage)} />
   if (page === 'schedule') return <FullSchedule data={data} member={member} resolve={resolve} resolveField={resolveField} onShowClick={openShow} onBack={() => setPage('home')} />
   if (page === 'blackouts') return <Blackouts data={data} member={member} resolve={resolve} onBack={() => setPage('home')} />
   if (page === 'master-calendar') return <MasterCalendar data={data} resolve={resolve} resolveField={resolveField} onShowClick={openShow} onBack={() => member ? setPage('home') : setPage('select')} />
