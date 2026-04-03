@@ -556,7 +556,7 @@ function MasterCalendar({ data, resolve, resolveField, onShowClick, onBack }) {
         </div>
       </div>
 
-      <div style={{ padding:'16px 20px 80px' }}>
+      <div style={{ padding:'8px 20px 80px' }}>
         {Object.values(grouped).map(group => {
           const filteredDates = group.dates.filter(dt => {
             const ds = toDateStr(dt)
@@ -571,7 +571,7 @@ function MasterCalendar({ data, resolve, resolveField, onShowClick, onBack }) {
           if (filteredDates.length === 0) return null
           return (
           <div key={group.label} style={{ marginBottom:24 }}>
-            <div id={'month-' + group.monthIdx} style={{ fontSize:12, fontWeight:700, color:'#a78bfa', textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:10, marginTop:8, display:'flex', alignItems:'center', gap:10 }}>
+            <div id={'month-' + group.monthIdx} style={{ fontSize:12, fontWeight:700, color:'#a78bfa', textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:10, marginTop:8, display:'flex', alignItems:'center', gap:10, scrollMarginTop:145 }}>
               <div style={{ flex:1, height:'0.5px', background:'#1a1a2e' }} />
               {group.label}
               <div style={{ flex:1, height:'0.5px', background:'#1a1a2e' }} />
@@ -598,12 +598,12 @@ function MasterCalendar({ data, resolve, resolveField, onShowClick, onBack }) {
                   <div onClick={() => {
                     if (isBooked && shows.length === 1) onShowClick(shows[0])
                     else if (isBlackedOut) setExpandedBlackout(isExpanded ? null : ds)
-                  }} style={{ display:'flex', alignItems:'center', gap:12, padding:'11px 14px', background:bg, border: isExpanded ? '1px solid #ff9f7f' : border, borderRadius: isExpanded ? '10px 10px 0 0' : 10, cursor: isBooked || isBlackedOut ? 'pointer' : 'default' }}>
-                    <div style={{ width:36, textAlign:'center', flexShrink:0 }}>
+                  }} style={{ display:'flex', alignItems:'flex-start', gap:12, padding:'10px 14px', background:bg, border: isExpanded ? '1px solid #ff9f7f' : border, borderRadius: isExpanded ? '10px 10px 0 0' : 10, cursor: isBooked || isBlackedOut ? 'pointer' : 'default' }}>
+                    <div style={{ width:36, textAlign:'center', flexShrink:0, paddingTop:1 }}>
                       <div style={{ fontSize:16, fontWeight:700, color: isPast ? '#3a3a3a' : isBooked ? '#6bcb77' : isBlackedOut ? '#ff9f7f' : '#a78bfa' }}>{dayNum}</div>
                       <div style={{ fontSize:10, color:'#6b7280' }}>{dayName}</div>
                     </div>
-                    <div style={{ width:'0.5px', height:30, background:'#2a2a3a', flexShrink:0 }} />
+                    <div style={{ width:'0.5px', alignSelf:'stretch', background:'#2a2a3a', flexShrink:0 }} />
                     <div style={{ flex:1, minWidth:0 }}>
                       {isBooked ? shows.map((s, i) => {
                         const venueRecs = resolve(s.fields['Venue'], 'VENUES')
@@ -759,7 +759,7 @@ function Blackouts({ data, member, resolve, onBack }) {
         </button>
       </div>
 
-      <div style={{ padding:'16px 20px 80px' }}>
+      <div style={{ padding:'8px 20px 80px' }}>
         {submitted && (
           <div style={{ background:'#0f2a0f', border:'0.5px solid #2a4a2a', borderRadius:10, padding:'12px 16px', marginBottom:14, fontSize:13, color:'#6bcb77' }}>
             Blackout {localBlackouts.length === 1 ? 'date' : 'dates'} submitted successfully!
