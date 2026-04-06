@@ -385,42 +385,6 @@ function ShowDetail({ data, member, show, resolve, resolveField, onBack }) {
           <TimeBlock label="End time" value={f['End Time']} />
         </div>
 
-        {(() => {
-          const memberIds = f['Members Playing'] || []
-          const memberRecs = (Array.isArray(memberIds) ? memberIds : [memberIds])
-            .map(id => (data['MEMBERS'] || []).find(m => m.id === id))
-            .filter(Boolean)
-          if (!memberRecs.length) return null
-          return (
-            <div style={{ marginBottom:20 }}>
-              <div style={{ fontSize:11, fontWeight:600, color:'#6b7280', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:10 }}>
-                Band members ({memberRecs.length})
-              </div>
-              <div style={{ background:'#111118', border:'0.5px solid #2a2a3a', borderRadius:14, overflow:'hidden' }}>
-                {memberRecs.map((m, i) => {
-                  const mf = m.fields
-                  const name = mf['Member Name'] || '—'
-                  const instruments = (mf['Instruments'] || []).join(', ') || mf['Role/Instrument'] || '—'
-                  const initials = name.split(' ').map(x => x[0]).join('').toUpperCase().slice(0,2)
-                  const photo = mf['Photo'] && Array.isArray(mf['Photo']) && mf['Photo'][0] ? mf['Photo'][0].url : null
-                  return (
-                    <div key={m.id} style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 16px', borderBottom: i < memberRecs.length-1 ? '0.5px solid #1a1a2a' : 'none' }}>
-                      {photo
-                        ? <img src={photo} alt={name} style={{ width:36, height:36, borderRadius:'50%', objectFit:'cover', flexShrink:0 }} />
-                        : <div style={{ width:36, height:36, borderRadius:'50%', background:'#1a1a2e', display:'flex', alignItems:'center', justifyContent:'center', fontSize:12, fontWeight:700, color:'#a78bfa', flexShrink:0 }}>{initials}</div>
-                      }
-                      <div>
-                        <div style={{ fontSize:14, fontWeight:600, color:'#ffffff' }}>{name}</div>
-                        <div style={{ fontSize:12, color:'#6b7280', marginTop:1 }}>{instruments}</div>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          )
-        })()}
-
         {(address || vf['Venue Name']) && (
           <div style={{ marginBottom:20 }}>
             <div style={{ fontSize:11, fontWeight:600, color:'#6b7280', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:10 }}>Venue</div>
@@ -472,6 +436,42 @@ function ShowDetail({ data, member, show, resolve, resolveField, onBack }) {
             <div style={{ background:'#1a1a0a', border:'0.5px solid #2a2a1a', borderRadius:14, padding:16, fontSize:13, color:'#e5e5b0', lineHeight:1.6 }}>{f['Show Notes']}</div>
           </div>
         )}
+
+        {(() => {
+          const memberIds = f['Members Playing'] || []
+          const memberRecs = (Array.isArray(memberIds) ? memberIds : [memberIds])
+            .map(id => (data['MEMBERS'] || []).find(m => m.id === id))
+            .filter(Boolean)
+          if (!memberRecs.length) return null
+          return (
+            <div style={{ marginBottom:20 }}>
+              <div style={{ fontSize:11, fontWeight:600, color:'#6b7280', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:10 }}>
+                Band members ({memberRecs.length})
+              </div>
+              <div style={{ background:'#111118', border:'0.5px solid #2a2a3a', borderRadius:14, overflow:'hidden' }}>
+                {memberRecs.map((m, i) => {
+                  const mf = m.fields
+                  const name = mf['Member Name'] || '—'
+                  const instruments = (mf['Instruments'] || []).join(', ') || mf['Role/Instrument'] || '—'
+                  const initials = name.split(' ').map(x => x[0]).join('').toUpperCase().slice(0,2)
+                  const photo = mf['Photo'] && Array.isArray(mf['Photo']) && mf['Photo'][0] ? mf['Photo'][0].url : null
+                  return (
+                    <div key={m.id} style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 16px', borderBottom: i < memberRecs.length-1 ? '0.5px solid #1a1a2a' : 'none' }}>
+                      {photo
+                        ? <img src={photo} alt={name} style={{ width:36, height:36, borderRadius:'50%', objectFit:'cover', flexShrink:0 }} />
+                        : <div style={{ width:36, height:36, borderRadius:'50%', background:'#1a1a2e', display:'flex', alignItems:'center', justifyContent:'center', fontSize:12, fontWeight:700, color:'#a78bfa', flexShrink:0 }}>{initials}</div>
+                      }
+                      <div>
+                        <div style={{ fontSize:14, fontWeight:600, color:'#ffffff' }}>{name}</div>
+                        <div style={{ fontSize:12, color:'#6b7280', marginTop:1 }}>{instruments}</div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )
+        })()}
 
         <div style={{ marginBottom:20 }}>
           <div style={{ fontSize:11, fontWeight:600, color:'#6b7280', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:10 }}>Crew</div>
