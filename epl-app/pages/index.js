@@ -264,25 +264,52 @@ function NextShowCard({ show, resolve, resolveField, onClick }) {
   const f = show.fields
   const days = daysUntil(f['Date'])
   const bands = resolveField(f['Band'], 'BANDS', 'Band Name')
+  const bandRecs = resolve(f['Band'], 'BANDS')
   const venueRecs = resolve(f['Venue'], 'VENUES')
   const vf = venueRecs[0] ? venueRecs[0].fields : {}
   const address = f['Venue Address'] || vf['Address'] || ''
+  const venuePhoto = vf['Photo'] && Array.isArray(vf['Photo']) && vf['Photo'][0] ? vf['Photo'][0].url : null
+  const bandLogo = bandRecs[0]?.fields['Logo/Photo'] && Array.isArray(bandRecs[0].fields['Logo/Photo']) ? bandRecs[0].fields['Logo/Photo'][0]?.url : null
 
   return (
-    <div onClick={onClick} style={{ background:'#111118', border:'0.5px solid #2a2a3a', borderRadius:16, padding:20, cursor:'pointer' }}>
-      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:14 }}>
-        <div>
-          <div style={{ fontSize:18, fontWeight:700, marginBottom:6 }}>{vf['Venue Name'] || '—'}</div>
-          <div style={{ display:'flex', gap:4, flexWrap:'wrap', alignItems:'center' }}>
-            {bands.map((b, i) => <BandTag key={i} name={b} />)}
-            {f['Indoor / Outdoor'] && <span style={{ fontSize:10, padding:'1px 7px', borderRadius:20, background:'#0a0a1a', color:'#6b7280', border:'0.5px solid #2a2a3a' }}>{f['Indoor / Outdoor'] === 'Outdoor' ? '🌿 Outdoor' : f['Indoor / Outdoor'] === 'Both' ? '🏟️ Both' : '🏠 Indoor'}</span>}
+    <div onClick={onClick} style={{ background:'#111118', border:'0.5px solid #2a2a3a', borderRadius:16, overflow:'hidden', cursor:'pointer' }}>
+      {venuePhoto ? (
+        <div style={{ position:'relative', height:140 }}>
+          <img src={venuePhoto} alt={vf['Venue Name']} style={{ width:'100%', height:'100%', objectFit:'cover' }} />
+          <div style={{ position:'absolute', inset:0, background:'linear-gradient(to bottom, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0.75) 100%)' }} />
+          <div style={{ position:'absolute', bottom:12, left:14, right:14, display:'flex', alignItems:'flex-end', justifyContent:'space-between' }}>
+            <div>
+              <div style={{ fontSize:17, fontWeight:700, color:'#ffffff', textShadow:'0 1px 3px rgba(0,0,0,0.8)' }}>{vf['Venue Name'] || '—'}</div>
+              <div style={{ display:'flex', gap:4, marginTop:4, flexWrap:'wrap', alignItems:'center' }}>
+                {bands.map((b, i) => <BandTag key={i} name={b} />)}
+                {f['Indoor / Outdoor'] && <span style={{ fontSize:10, padding:'1px 7px', borderRadius:20, background:'rgba(0,0,0,0.5)', color:'#cccccc', border:'0.5px solid rgba(255,255,255,0.2)' }}>{f['Indoor / Outdoor'] === 'Outdoor' ? '🌿 Outdoor' : f['Indoor / Outdoor'] === 'Both' ? '🏟️ Both' : '🏠 Indoor'}</span>}
+              </div>
+            </div>
+            {bandLogo && <img src={bandLogo} alt="" style={{ width:50, height:50, objectFit:'contain', borderRadius:8, background:'rgba(0,0,0,0.5)', padding:5 }} />}
+          </div>
+          <div style={{ position:'absolute', top:10, right:12, background:'#1a1a2e', borderRadius:8, padding:'5px 12px', textAlign:'center' }}>
+            <div style={{ fontSize:18, fontWeight:700, color:'#a78bfa' }}>{days}</div>
+            <div style={{ fontSize:9, color:'#6b7280' }}>{days === 1 ? 'day' : 'days'}</div>
           </div>
         </div>
-        <div style={{ background:'#1a1a2e', borderRadius:10, padding:'6px 14px', textAlign:'center', flexShrink:0, marginLeft:12 }}>
-          <div style={{ fontSize:22, fontWeight:700, color:'#a78bfa' }}>{days}</div>
-          <div style={{ fontSize:10, color:'#6b7280' }}>{days === 1 ? 'day' : 'days'}</div>
+      ) : (
+        <div style={{ padding:'16px 16px 0' }}>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:14 }}>
+            <div>
+              <div style={{ fontSize:18, fontWeight:700, marginBottom:6 }}>{vf['Venue Name'] || '—'}</div>
+              <div style={{ display:'flex', gap:4, flexWrap:'wrap', alignItems:'center' }}>
+                {bands.map((b, i) => <BandTag key={i} name={b} />)}
+                {f['Indoor / Outdoor'] && <span style={{ fontSize:10, padding:'1px 7px', borderRadius:20, background:'#0a0a1a', color:'#6b7280', border:'0.5px solid #2a2a3a' }}>{f['Indoor / Outdoor'] === 'Outdoor' ? '🌿 Outdoor' : f['Indoor / Outdoor'] === 'Both' ? '🏟️ Both' : '🏠 Indoor'}</span>}
+              </div>
+            </div>
+            <div style={{ background:'#1a1a2e', borderRadius:10, padding:'6px 14px', textAlign:'center', flexShrink:0, marginLeft:12 }}>
+              <div style={{ fontSize:22, fontWeight:700, color:'#a78bfa' }}>{days}</div>
+              <div style={{ fontSize:10, color:'#6b7280' }}>{days === 1 ? 'day' : 'days'}</div>
+            </div>
+          </div>
         </div>
-      </div>
+      )}
+      <div style={{ padding: venuePhoto ? '14px 16px' : '0 16px' }}>
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8, marginBottom: address ? 14 : 0 }}>
         <TimeBlock label="Load in" value={f['Load-In Time']} />
         <TimeBlock label="Set time" value={f['Set Time']} />
@@ -300,6 +327,7 @@ function NextShowCard({ show, resolve, resolveField, onClick }) {
       <div style={{ marginTop:12, fontSize:12, color:'#6b7280', display:'flex', justifyContent:'space-between' }}>
         <span>{fmt(f['Date'])}</span>
         <span style={{ color:'#a78bfa' }}>View details →</span>
+      </div>
       </div>
     </div>
   )
@@ -439,14 +467,38 @@ function ShowDetail({ data, member, show, resolve, resolveField, onBack }) {
   return (
     <div style={{ minHeight:'100vh', background:'#0a0a0f', color:'#ffffff', fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif' }}>
       <Head><title>EPL — Show Details</title></Head>
-      <div style={{ background:'#111118', borderBottom:'0.5px solid #1e1e2e', padding:'12px 20px', display:'flex', alignItems:'center', gap:14, position:'sticky', top:0, zIndex:50 }}>
-        <button onClick={onBack} style={{ background:'none', border:'none', color:'#a78bfa', fontSize:22, cursor:'pointer', padding:0, lineHeight:1 }}>‹</button>
-        <div style={{ flex:1 }}>
-          <div style={{ fontSize:15, fontWeight:600 }}>{vf['Venue Name'] || '—'}</div>
-          <div style={{ fontSize:12, color:'#6b7280' }}>{fmt(f['Date'])}</div>
-        </div>
-        <img src="/logo.png" alt="EPL" onClick={() => onBack()} style={{ width:30, height:30, objectFit:'contain', mixBlendMode:'screen', cursor:'pointer', opacity:0.7 }} />
-      </div>
+      {(() => {
+        const venuePhoto = vf['Photo'] && Array.isArray(vf['Photo']) && vf['Photo'][0] ? vf['Photo'][0].url : null
+        const bandRecs = resolve(f['Band'], 'BANDS')
+        const bandLogo = bandRecs[0]?.fields['Logo/Photo'] && Array.isArray(bandRecs[0].fields['Logo/Photo']) ? bandRecs[0].fields['Logo/Photo'][0]?.url : null
+
+        return venuePhoto ? (
+          <div style={{ position:'relative', width:'100%', height:220 }}>
+            <img src={venuePhoto} alt={vf['Venue Name']} style={{ width:'100%', height:'100%', objectFit:'cover', display:'block' }} />
+            <div style={{ position:'absolute', inset:0, background:'linear-gradient(to bottom, rgba(0,0,0,0.35) 0%, rgba(0,0,0,0.7) 100%)' }} />
+            <button onClick={onBack} style={{ position:'absolute', top:16, left:16, background:'rgba(0,0,0,0.5)', border:'none', color:'#ffffff', fontSize:22, cursor:'pointer', padding:'4px 10px', borderRadius:20, backdropFilter:'blur(4px)' }}>‹</button>
+            <img src="/logo.png" alt="EPL" onClick={onBack} style={{ position:'absolute', top:14, right:14, width:32, height:32, objectFit:'contain', mixBlendMode:'screen', cursor:'pointer', opacity:0.8 }} />
+            <div style={{ position:'absolute', bottom:14, left:16, right:16, display:'flex', alignItems:'flex-end', justifyContent:'space-between' }}>
+              <div>
+                <div style={{ fontSize:20, fontWeight:700, color:'#ffffff', textShadow:'0 1px 4px rgba(0,0,0,0.8)' }}>{vf['Venue Name'] || '—'}</div>
+                <div style={{ fontSize:13, color:'rgba(255,255,255,0.75)', marginTop:2 }}>{fmt(f['Date'])}</div>
+              </div>
+              {bandLogo && (
+                <img src={bandLogo} alt={bandRecs[0]?.fields['Band Name']} style={{ width:64, height:64, objectFit:'contain', borderRadius:10, background:'rgba(0,0,0,0.4)', padding:6 }} />
+              )}
+            </div>
+          </div>
+        ) : (
+          <div style={{ background:'#111118', borderBottom:'0.5px solid #1e1e2e', padding:'12px 20px', display:'flex', alignItems:'center', gap:14, position:'sticky', top:0, zIndex:50 }}>
+            <button onClick={onBack} style={{ background:'none', border:'none', color:'#a78bfa', fontSize:22, cursor:'pointer', padding:0, lineHeight:1 }}>‹</button>
+            <div style={{ flex:1 }}>
+              <div style={{ fontSize:15, fontWeight:600 }}>{vf['Venue Name'] || '—'}</div>
+              <div style={{ fontSize:12, color:'#6b7280' }}>{fmt(f['Date'])}</div>
+            </div>
+            <img src="/logo.png" alt="EPL" onClick={onBack} style={{ width:30, height:30, objectFit:'contain', mixBlendMode:'screen', cursor:'pointer', opacity:0.7 }} />
+          </div>
+        )
+      })()}
 
       <div style={{ padding:'20px 20px 80px' }}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20 }}>
