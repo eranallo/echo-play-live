@@ -200,7 +200,7 @@ function MemberHome({ data, member, resolve, resolveField, onShowClick, onBack, 
       <Head><title>EPL — {name}</title></Head>
 
       <div style={{ background:'#111118', borderBottom:'0.5px solid #1e1e2e', padding:'12px 20px', display:'flex', alignItems:'center', justifyContent:'space-between', position:'sticky', top:0, zIndex:50 }}>
-        <img src="/logo.png" alt="EPL" style={{ width:36, height:36, objectFit:'contain' }} />
+        <img src="/logo.png" alt="EPL" onClick={onBack} style={{ width:36, height:36, objectFit:'contain', mixBlendMode:'screen', cursor:'pointer' }} />
         <button onClick={onBack} style={{ fontSize:12, color:'#6b7280', background:'none', border:'none', cursor:'pointer', fontFamily:'inherit' }}>Switch ›</button>
       </div>
 
@@ -361,10 +361,11 @@ function ShowDetail({ data, member, show, resolve, resolveField, onBack }) {
       <Head><title>EPL — Show Details</title></Head>
       <div style={{ background:'#111118', borderBottom:'0.5px solid #1e1e2e', padding:'12px 20px', display:'flex', alignItems:'center', gap:14, position:'sticky', top:0, zIndex:50 }}>
         <button onClick={onBack} style={{ background:'none', border:'none', color:'#a78bfa', fontSize:22, cursor:'pointer', padding:0, lineHeight:1 }}>‹</button>
-        <div>
+        <div style={{ flex:1 }}>
           <div style={{ fontSize:15, fontWeight:600 }}>{vf['Venue Name'] || '—'}</div>
           <div style={{ fontSize:12, color:'#6b7280' }}>{fmt(f['Date'])}</div>
         </div>
+        <img src="/logo.png" alt="EPL" onClick={() => onBack()} style={{ width:30, height:30, objectFit:'contain', mixBlendMode:'screen', cursor:'pointer', opacity:0.7 }} />
       </div>
 
       <div style={{ padding:'20px 20px 80px' }}>
@@ -564,15 +565,16 @@ function MasterCalendar({ data, resolve, resolveField, onShowClick, onBack }) {
       <Head><title>EPL — Show Calendar {year}</title></Head>
       <div style={{ background:'#111118', borderBottom:'0.5px solid #1e1e2e', padding:'12px 20px', display:'flex', alignItems:'center', gap:14, position:'sticky', top:0, zIndex:50 }}>
         <button onClick={onBack} style={{ background:'none', border:'none', color:'#a78bfa', fontSize:22, cursor:'pointer', padding:0 }}>‹</button>
-        <div>
+        <div style={{ flex:1 }}>
           <div style={{ fontSize:15, fontWeight:600 }}>Show Calendar {year}</div>
           <div style={{ fontSize:12, color:'#6b7280' }}>All Fridays & Saturdays</div>
         </div>
         {filter !== 'all' && (
-          <button onClick={() => setFilter('all')} style={{ marginLeft:'auto', fontSize:12, padding:'5px 12px', borderRadius:20, background:'#2a2a3a', border:'none', color:'#a78bfa', cursor:'pointer', fontFamily:'inherit', fontWeight:600 }}>
+          <button onClick={() => setFilter('all')} style={{ fontSize:12, padding:'5px 12px', borderRadius:20, background:'#2a2a3a', border:'none', color:'#a78bfa', cursor:'pointer', fontFamily:'inherit', fontWeight:600 }}>
             Reset
           </button>
         )}
+        <img src="/logo.png" alt="EPL" onClick={onBack} style={{ width:30, height:30, objectFit:'contain', mixBlendMode:'screen', cursor:'pointer', opacity:0.7 }} />
       </div>
 
       <div style={{ background:'#0a0a0f', padding:'12px 20px 10px', borderBottom:'0.5px solid #1e1e2e', position:'sticky', top:52, zIndex:40 }}>
@@ -717,10 +719,11 @@ function FullSchedule({ data, member, resolve, resolveField, onShowClick, onBack
       <Head><title>EPL — My Schedule</title></Head>
       <div style={{ background:'#111118', borderBottom:'0.5px solid #1e1e2e', padding:'12px 20px', display:'flex', alignItems:'center', gap:14, position:'sticky', top:0, zIndex:50 }}>
         <button onClick={onBack} style={{ background:'none', border:'none', color:'#a78bfa', fontSize:22, cursor:'pointer', padding:0 }}>‹</button>
-        <div>
+        <div style={{ flex:1 }}>
           <div style={{ fontSize:15, fontWeight:600 }}>My schedule</div>
           <div style={{ fontSize:12, color:'#6b7280' }}>{myShows.length} upcoming shows</div>
         </div>
+        <img src="/logo.png" alt="EPL" onClick={onBack} style={{ width:30, height:30, objectFit:'contain', mixBlendMode:'screen', cursor:'pointer', opacity:0.7 }} />
       </div>
       <div style={{ padding:'16px 20px 60px' }}>
         {myShows.map(s => <ShowRow key={s.id} show={s} resolve={resolve} resolveField={resolveField} onClick={() => onShowClick(s)} />)}
@@ -786,8 +789,9 @@ function Blackouts({ data, member, resolve, onBack }) {
     <div style={{ minHeight:'100vh', background:'#0a0a0f', color:'#ffffff', fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif' }}>
       <Head><title>EPL - Blackout Dates</title></Head>
       <div style={{ background:'#111118', borderBottom:'0.5px solid #1e1e2e', padding:'12px 20px', display:'flex', alignItems:'center', justifyContent:'space-between', position:'sticky', top:0, zIndex:50 }}>
-        <div style={{ display:'flex', alignItems:'center', gap:14 }}>
+        <div style={{ display:'flex', alignItems:'center', gap:10 }}>
           <button onClick={onBack} style={{ background:'none', border:'none', color:'#a78bfa', fontSize:22, cursor:'pointer', padding:0 }}>{String.fromCharCode(8249)}</button>
+          <img src="/logo.png" alt="EPL" onClick={onBack} style={{ width:28, height:28, objectFit:'contain', mixBlendMode:'screen', cursor:'pointer', opacity:0.7 }} />
           <div style={{ fontSize:15, fontWeight:600 }}>My blackout dates</div>
         </div>
         <button onClick={() => { setShowForm(f => !f); setPendingDates([]); setCurrentDate(''); setCurrentReason('Personal') }} style={{ fontSize:13, padding:'6px 14px', borderRadius:20, background: showForm ? '#2a2a3a' : '#1a1a2e', border:'none', color:'#a78bfa', cursor:'pointer', fontFamily:'inherit', fontWeight:600 }}>
@@ -880,7 +884,7 @@ function CrewSelect({ data, onSelect, onBack }) {
     <div style={{ minHeight:'100vh', background:'#0a0a0f', display:'flex', flexDirection:'column', alignItems:'center', padding:'2.5rem 1.5rem 2rem', fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif' }}>
       <Head><title>EPL — Crew</title></Head>
       <div style={{ marginBottom:'1.75rem', textAlign:'center' }}>
-        <img src="/logo.png" alt="Echo Play Live" style={{ width:100, height:100, objectFit:'contain', marginBottom:14, mixBlendMode:'screen' }} />
+        <img src="/logo.png" alt="Echo Play Live" onClick={onBack} style={{ width:100, height:100, objectFit:'contain', marginBottom:14, mixBlendMode:'screen', cursor:'pointer' }} />
         <div style={{ fontSize:15, fontWeight:700, color:'#ffffff', marginBottom:4 }}>Crew Portal</div>
         <div style={{ fontSize:13, color:'#6b7280' }}>Select your name to see your schedule</div>
       </div>
@@ -941,7 +945,7 @@ function CrewHome({ data, crew, resolve, resolveField, onShowClick, onBack }) {
       <Head><title>EPL — {name}</title></Head>
       <div style={{ background:'#111118', borderBottom:'0.5px solid #1e1e2e', padding:'12px 20px', display:'flex', alignItems:'center', justifyContent:'space-between', position:'sticky', top:0, zIndex:50 }}>
         <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-          <img src="/logo.png" alt="EPL" style={{ width:32, height:32, objectFit:'contain', mixBlendMode:'screen' }} />
+          <img src="/logo.png" alt="EPL" onClick={onBack} style={{ width:32, height:32, objectFit:'contain', mixBlendMode:'screen', cursor:'pointer' }} />
           <span style={{ fontSize:14, fontWeight:600 }}>Echo Play Live</span>
         </div>
         <button onClick={onBack} style={{ fontSize:12, color:'#6b7280', background:'none', border:'none', cursor:'pointer', fontFamily:'inherit' }}>Switch ›</button>
@@ -1101,7 +1105,7 @@ function BookingPage({ data, onBack }) {
       <div style={{ padding:'20px', maxWidth:520, margin:'0 auto' }}>
         {done ? (
           <div style={{ textAlign:'center', padding:'4rem 0' }}>
-            <img src="/logo.png" alt="EPL" style={{ width:100, height:100, objectFit:'contain', marginBottom:20, opacity:0.8 }} />
+            <img src="/logo.png" alt="EPL" style={{ width:100, height:100, objectFit:'contain', marginBottom:20, mixBlendMode:'screen' }} />
             <div style={{ fontSize:20, fontWeight:700, marginBottom:8 }}>Inquiry sent!</div>
             <div style={{ fontSize:14, color:'#6b7280', marginBottom:24 }}>Evan will be in touch shortly.</div>
             <button onClick={onBack} style={{ padding:'12px 28px', background:'#1a1a2e', border:'none', borderRadius:12, color:'#a78bfa', fontSize:14, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>Back to home</button>
