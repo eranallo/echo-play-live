@@ -60,6 +60,7 @@ export default function Home() {
   const [page, setPage] = useState('select')
   const [selectedShow, setSelectedShow] = useState(null)
   const [previousPage, setPreviousPage] = useState('home')
+  const [crewMember, setCrewMember] = useState(null)
 
   const loadData = useCallback(async () => {
     try {
@@ -120,7 +121,9 @@ export default function Home() {
     </div>
   )
 
-  if (page === 'select') return <MemberSelect data={data} onSelect={selectMember} onBooking={() => setPage('booking')} onCalendar={() => setPage('master-calendar')} />
+  if (page === 'select') return <MemberSelect data={data} onSelect={selectMember} onBooking={() => setPage('booking')} onCalendar={() => setPage('master-calendar')} onCrew={() => setPage('crew-select')} />
+  if (page === 'crew-select') return <CrewSelect data={data} onSelect={(c) => { setCrewMember(c); setPage('crew-home') }} onBack={() => setPage('select')} />
+  if (page === 'crew-home') return <CrewHome data={data} crew={crewMember} resolve={resolve} resolveField={resolveField} onShowClick={openShow} onBack={() => setPage('crew-select')} />
   if (page === 'home') return <MemberHome data={data} member={member} resolve={resolve} resolveField={resolveField} onShowClick={openShow} onBack={goToSelect} onNav={setPage} />
   if (page === 'show-detail') return <ShowDetail data={data} member={member} show={selectedShow} resolve={resolve} resolveField={resolveField} onBack={() => setPage(previousPage)} />
   if (page === 'schedule') return <FullSchedule data={data} member={member} resolve={resolve} resolveField={resolveField} onShowClick={openShow} onBack={() => setPage('home')} />
@@ -130,7 +133,7 @@ export default function Home() {
   return null
 }
 
-function MemberSelect({ data, onSelect, onBooking, onCalendar }) {
+function MemberSelect({ data, onSelect, onBooking, onCalendar, onCrew }) {
   const members = data['MEMBERS'] || []
   const today = new Date()
   const totalShows = (data['SHOWS'] || []).filter(s => s.fields['Date'] && new Date(s.fields['Date']) >= today).length
@@ -166,6 +169,11 @@ function MemberSelect({ data, onSelect, onBooking, onCalendar }) {
             )
           })}
         </div>
+        <div style={{ height:'0.5px', background:'#1a1a2a', margin:'12px 0 8px' }} />
+        <button onClick={onCrew} style={{ width:'100%', padding:'14px', background:'transparent', border:'0.5px solid #1a2a2e', borderRadius:14, cursor:'pointer', fontFamily:'inherit', textAlign:'center' }}>
+          <div style={{ fontSize:13, fontWeight:600, color:'#7ecbcb' }}>Not a band member?</div>
+          <div style={{ fontSize:11, color:'#6b7280', marginTop:3 }}>Sound engineers & merch crew →</div>
+        </button>
       </div>
     </div>
   )
@@ -427,6 +435,32 @@ function ShowDetail({ data, member, show, resolve, resolveField, onBack }) {
             <div style={{ background:'#1a1a0a', border:'0.5px solid #2a2a1a', borderRadius:14, padding:16, fontSize:13, color:'#e5e5b0', lineHeight:1.6 }}>{f['Show Notes']}</div>
           </div>
         )}
+
+        <div style={{ marginBottom:20 }}>
+          <div style={{ fontSize:11, fontWeight:600, color:'#6b7280', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:10 }}>Crew</div>
+          <div style={{ background:'#111118', border:'0.5px solid #2a2a3a', borderRadius:14, overflow:'hidden' }}>
+            {(() => {
+              const soundRecs = resolve(f['Sound Engineer'], 'CREW')
+              const merchRecs = resolve(f['Merch Person'], 'CREW')
+              const soundName = soundRecs[0] ? soundRecs[0].fields['Name'] : f['Sound Provider'] === 'Venue Provided' ? 'Venue provided' : f['Sound Provider'] || null
+              const merchName = merchRecs[0] ? merchRecs[0].fields['Name'] : null
+              const rows = [
+                ['Sound', soundName, f['Sound Notes']],
+                ['Merch', merchName, f['Merch Notes']],
+              ].filter(([,val]) => val)
+              if (!rows.length) return <div style={{ padding:'12px 16px', fontSize:13, color:'#6b7280' }}>No crew assigned yet.</div>
+              return rows.map(([label, val, notes], i) => (
+                <div key={label} style={{ padding:'12px 16px', borderBottom: i < rows.length-1 ? '0.5px solid #1a1a2a' : 'none' }}>
+                  <div style={{ display:'flex', justifyContent:'space-between' }}>
+                    <span style={{ fontSize:12, color:'#6b7280' }}>{label}</span>
+                    <span style={{ fontSize:13, color:'#7ecbcb', fontWeight:500 }}>{val}</span>
+                  </div>
+                  {notes && <div style={{ fontSize:11, color:'#6b7280', marginTop:4 }}>{notes}</div>}
+                </div>
+              ))
+            })()}
+          </div>
+        </div>
 
         <div style={{ marginBottom:20 }}>
           <div style={{ fontSize:11, fontWeight:600, color:'#6b7280', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:10 }}>Show info</div>
@@ -838,6 +872,188 @@ function Blackouts({ data, member, resolve, onBack }) {
     </div>
   )
 }
+
+function CrewSelect({ data, onSelect, onBack }) {
+  const crew = data['CREW'] || []
+  const active = crew.filter(c => c.fields['Active'] !== false)
+  return (
+    <div style={{ minHeight:'100vh', background:'#0a0a0f', display:'flex', flexDirection:'column', alignItems:'center', padding:'2.5rem 1.5rem 2rem', fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif' }}>
+      <Head><title>EPL — Crew</title></Head>
+      <div style={{ marginBottom:'1.75rem', textAlign:'center' }}>
+        <img src="/logo.png" alt="Echo Play Live" style={{ width:100, height:100, objectFit:'contain', marginBottom:14, mixBlendMode:'screen' }} />
+        <div style={{ fontSize:15, fontWeight:700, color:'#ffffff', marginBottom:4 }}>Crew Portal</div>
+        <div style={{ fontSize:13, color:'#6b7280' }}>Select your name to see your schedule</div>
+      </div>
+      <div style={{ width:'100%', maxWidth:380, display:'flex', flexDirection:'column', gap:10 }}>
+        {active.length ? active.map(c => {
+          const f = c.fields
+          const name = f['Name'] || '—'
+          const role = f['Role'] || '—'
+          const initials = name.split(' ').map(x => x[0]).join('').toUpperCase().slice(0,2)
+          return (
+            <button key={c.id} onClick={() => onSelect(c)} style={{ display:'flex', alignItems:'center', gap:14, padding:'14px 16px', background:'#111118', border:'0.5px solid #1a2a2e', borderRadius:14, cursor:'pointer', textAlign:'left', width:'100%', fontFamily:'inherit' }}>
+              <div style={{ width:44, height:44, borderRadius:'50%', background:'#1a2a2e', display:'flex', alignItems:'center', justifyContent:'center', fontSize:14, fontWeight:700, color:'#7ecbcb', flexShrink:0 }}>{initials}</div>
+              <div style={{ flex:1 }}>
+                <div style={{ fontSize:15, fontWeight:600, color:'#ffffff' }}>{name}</div>
+                <div style={{ fontSize:12, color:'#7ecbcb', marginTop:2 }}>{role}</div>
+              </div>
+              <div style={{ color:'#2a2a3a', fontSize:20 }}>›</div>
+            </button>
+          )
+        }) : (
+          <div style={{ textAlign:'center', color:'#6b7280', fontSize:14, padding:'2rem 0' }}>
+            No crew members found. Add them to the CREW table in Airtable.
+          </div>
+        )}
+        <div style={{ height:'0.5px', background:'#1a1a2a', margin:'6px 0' }} />
+        <button onClick={onBack} style={{ padding:'12px', background:'transparent', border:'none', cursor:'pointer', fontSize:13, color:'#6b7280', fontFamily:'inherit', textAlign:'center' }}>
+          ← Back to member select
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function CrewHome({ data, crew, resolve, resolveField, onShowClick, onBack }) {
+  const f = crew.fields
+  const name = f['Name'] || '—'
+  const role = f['Role'] || '—'
+  const today = new Date(new Date().toDateString())
+  const initials = name.split(' ').map(x => x[0]).join('').toUpperCase().slice(0,2)
+
+  const soundShows = (data['SHOWS'] || []).filter(s => {
+    const sr = s.fields['Sound Engineer'] || []
+    return (Array.isArray(sr) ? sr : [sr]).includes(crew.id) && new Date((s.fields['Date'] || '') + 'T00:00:00') >= today
+  }).sort((a,b) => a.fields['Date'] > b.fields['Date'] ? 1 : -1)
+
+  const merchShows = (data['SHOWS'] || []).filter(s => {
+    const mr = s.fields['Merch Person'] || []
+    return (Array.isArray(mr) ? mr : [mr]).includes(crew.id) && new Date((s.fields['Date'] || '') + 'T00:00:00') >= today
+  }).sort((a,b) => a.fields['Date'] > b.fields['Date'] ? 1 : -1)
+
+  const allShows = [...new Map([...soundShows, ...merchShows].map(s => [s.id, s])).values()]
+    .sort((a,b) => a.fields['Date'] > b.fields['Date'] ? 1 : -1)
+
+  const nextShow = allShows[0]
+
+  return (
+    <div style={{ minHeight:'100vh', background:'#0a0a0f', color:'#ffffff', fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif' }}>
+      <Head><title>EPL — {name}</title></Head>
+      <div style={{ background:'#111118', borderBottom:'0.5px solid #1e1e2e', padding:'12px 20px', display:'flex', alignItems:'center', justifyContent:'space-between', position:'sticky', top:0, zIndex:50 }}>
+        <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+          <img src="/logo.png" alt="EPL" style={{ width:32, height:32, objectFit:'contain', mixBlendMode:'screen' }} />
+          <span style={{ fontSize:14, fontWeight:600 }}>Echo Play Live</span>
+        </div>
+        <button onClick={onBack} style={{ fontSize:12, color:'#6b7280', background:'none', border:'none', cursor:'pointer', fontFamily:'inherit' }}>Switch ›</button>
+      </div>
+
+      <div style={{ padding:'20px 20px 60px' }}>
+        <div style={{ display:'flex', alignItems:'center', gap:14, marginBottom:24 }}>
+          <div style={{ width:52, height:52, borderRadius:'50%', background:'#1a2a2e', display:'flex', alignItems:'center', justifyContent:'center', fontSize:17, fontWeight:700, color:'#7ecbcb' }}>{initials}</div>
+          <div>
+            <div style={{ fontSize:20, fontWeight:700 }}>{name}</div>
+            <div style={{ fontSize:13, color:'#7ecbcb', marginTop:2 }}>{role}</div>
+          </div>
+        </div>
+
+        {nextShow && (
+          <div style={{ marginBottom:20 }}>
+            <div style={{ fontSize:11, fontWeight:600, color:'#6b7280', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:10 }}>Next assignment</div>
+            <CrewShowCard show={nextShow} crew={crew} resolve={resolve} resolveField={resolveField} soundShows={soundShows} merchShows={merchShows} onClick={() => onShowClick(nextShow)} />
+          </div>
+        )}
+
+        {!nextShow && (
+          <div style={{ padding:20, background:'#111118', border:'0.5px solid #2a2a3a', borderRadius:16, textAlign:'center', color:'#6b7280', fontSize:14, marginBottom:20 }}>
+            No upcoming assignments yet.
+          </div>
+        )}
+
+        {allShows.length > 1 && (
+          <div>
+            <div style={{ fontSize:11, fontWeight:600, color:'#6b7280', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:10 }}>All upcoming ({allShows.length})</div>
+            {allShows.map(s => {
+              const sf = s.fields
+              const venueRecs = resolve(sf['Venue'], 'VENUES')
+              const vf = venueRecs[0] ? venueRecs[0].fields : {}
+              const bands = resolveField(sf['Band'], 'BANDS', 'Band Name')
+              const days = daysUntil(sf['Date'])
+              const isSound = soundShows.find(x => x.id === s.id)
+              const isMerch = merchShows.find(x => x.id === s.id)
+              return (
+                <div key={s.id} onClick={() => onShowClick(s)} style={{ display:'flex', alignItems:'center', gap:14, padding:'13px 0', borderBottom:'0.5px solid #1a1a2a', cursor:'pointer' }}>
+                  <div style={{ width:44, textAlign:'center', flexShrink:0 }}>
+                    <div style={{ fontSize:14, fontWeight:700, color:'#7ecbcb' }}>{days}</div>
+                    <div style={{ fontSize:10, color:'#6b7280' }}>days</div>
+                  </div>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ fontSize:14, fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{vf['Venue Name'] || '—'}</div>
+                    <div style={{ fontSize:12, color:'#6b7280', marginBottom:4 }}>{fmt(sf['Date'])}</div>
+                    <div style={{ display:'flex', gap:4 }}>
+                      {bands.map((b,i) => <BandTag key={i} name={b} />)}
+                      {isSound && <span style={{ fontSize:10, padding:'1px 6px', borderRadius:20, background:'#1a2a2e', color:'#7ecbcb', fontWeight:600 }}>Sound</span>}
+                      {isMerch && <span style={{ fontSize:10, padding:'1px 6px', borderRadius:20, background:'#1a1a2e', color:'#a78bfa', fontWeight:600 }}>Merch</span>}
+                    </div>
+                  </div>
+                  <div style={{ color:'#2a2a3a', fontSize:18 }}>›</div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function CrewShowCard({ show, crew, resolve, resolveField, soundShows, merchShows, onClick }) {
+  const f = show.fields
+  const days = daysUntil(f['Date'])
+  const bands = resolveField(f['Band'], 'BANDS', 'Band Name')
+  const venueRecs = resolve(f['Venue'], 'VENUES')
+  const vf = venueRecs[0] ? venueRecs[0].fields : {}
+  const address = f['Venue Address'] || vf['Address'] || ''
+  const isSound = soundShows.find(x => x.id === show.id)
+  const isMerch = merchShows.find(x => x.id === show.id)
+
+  return (
+    <div onClick={onClick} style={{ background:'#111118', border:'0.5px solid #1a2a2e', borderRadius:16, padding:20, cursor:'pointer' }}>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:14 }}>
+        <div>
+          <div style={{ fontSize:18, fontWeight:700, marginBottom:6 }}>{vf['Venue Name'] || '—'}</div>
+          <div style={{ display:'flex', gap:4, flexWrap:'wrap' }}>
+            {bands.map((b,i) => <BandTag key={i} name={b} />)}
+            {isSound && <span style={{ fontSize:10, padding:'2px 8px', borderRadius:20, background:'#1a2a2e', color:'#7ecbcb', fontWeight:600 }}>Your role: Sound</span>}
+            {isMerch && <span style={{ fontSize:10, padding:'2px 8px', borderRadius:20, background:'#1a1a2e', color:'#a78bfa', fontWeight:600 }}>Your role: Merch</span>}
+          </div>
+        </div>
+        <div style={{ background:'#1a2a2e', borderRadius:10, padding:'6px 14px', textAlign:'center', flexShrink:0, marginLeft:12 }}>
+          <div style={{ fontSize:22, fontWeight:700, color:'#7ecbcb' }}>{days}</div>
+          <div style={{ fontSize:10, color:'#6b7280' }}>days</div>
+        </div>
+      </div>
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8, marginBottom: address ? 14 : 0 }}>
+        <TimeBlock label="Load in" value={f['Load-In Time']} />
+        <TimeBlock label="Set time" value={f['Set Time']} />
+        <TimeBlock label="End time" value={f['End Time']} />
+      </div>
+      {address && (
+        <a href={`https://maps.apple.com/?q=${encodeURIComponent(address)}`} onClick={e => e.stopPropagation()} style={{ display:'flex', alignItems:'center', gap:8, padding:'10px 12px', background:'#0a0a1a', borderRadius:10, textDecoration:'none', marginTop:4 }}>
+          <span style={{ fontSize:14 }}>📍</span>
+          <div>
+            <div style={{ fontSize:12, fontWeight:500, color:'#7ecbcb' }}>Get directions</div>
+            <div style={{ fontSize:11, color:'#6b7280' }}>{address}</div>
+          </div>
+        </a>
+      )}
+      <div style={{ marginTop:12, fontSize:12, color:'#6b7280', display:'flex', justifyContent:'space-between' }}>
+        <span>{fmt(f['Date'])}</span>
+        <span style={{ color:'#7ecbcb' }}>View details →</span>
+      </div>
+    </div>
+  )
+}
+
 
 function BookingPage({ data, onBack }) {
   const [bookerType, setBookerType] = useState('')
