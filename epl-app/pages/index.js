@@ -480,7 +480,7 @@ function ShowDetail({ data, member, show, resolve, resolveField, onBack, onSetli
   const vf = venueRecs[0] ? venueRecs[0].fields : {}
   const address = f['Venue Address'] || vf['Address'] || ''
   const days = daysUntil(f['Date'])
-  const setlistRecs = resolve(f['Setlist'] || f['Setlists'] || [], 'SETLISTS')
+  const setlistRecs = resolve(f['SETLISTS'] || f['Setlist'] || [], 'SETLISTS')
   const setlist = setlistRecs[0]
   const songIds = setlist ? (setlist.fields['Songs'] || []) : []
   const songRecs = (Array.isArray(songIds) ? songIds : [songIds])
