@@ -638,49 +638,21 @@ function ShowDetail({ data, member, show, resolve, resolveField, onBack, onSetli
         )}
 
         <div style={{ marginBottom:20 }}>
-          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 }}>
-            <div style={{ fontSize:11, fontWeight:600, color:'#6b7280', textTransform:'uppercase', letterSpacing:'0.08em' }}>
-              Setlist {songRecs.length > 0 ? `(${songRecs.length} songs)` : ''}
-            </div>
-            {setLength && <div style={{ fontSize:11, color:'#6b7280' }}>{setLength} min</div>}
-          </div>
-          {setName && <div style={{ fontSize:12, color:'#a78bfa', marginBottom:10, fontWeight:500 }}>{setName}</div>}
+          <div style={{ fontSize:11, fontWeight:600, color:'#6b7280', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:10 }}>Setlist</div>
           {songRecs.length > 0 ? (
-            <>
-              <div style={{ background:'#111118', border:'0.5px solid #2a2a3a', borderRadius:14, overflow:'hidden' }}>
-                {songRecs.map((song, i) => {
-                  const sf = song.fields
-                  return (
-                    <div key={song.id} style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 16px', borderBottom: i < songRecs.length-1 ? '0.5px solid #1a1a2a' : 'none' }}>
-                      <div style={{ width:22, textAlign:'center', flexShrink:0, fontSize:12, fontWeight:700, color:'#3a3a5a' }}>{i+1}</div>
-                      <div style={{ flex:1, minWidth:0 }}>
-                        <div style={{ fontSize:14, fontWeight:600, color:'#ffffff', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{sf['Song Title'] || '—'}</div>
-                        <div style={{ fontSize:12, color:'#6b7280', marginTop:2 }}>{sf['Artist'] || ''}{sf['Duration'] ? ` · ${sf['Duration']}` : ''}</div>
-                      </div>
-                      {sf['Guitar Tuning'] && (
-                        <div style={{ textAlign:'right', flexShrink:0 }}>
-                          <div style={{ fontSize:9, color:'#3a3a5a', marginBottom:1, textTransform:'uppercase', letterSpacing:'0.04em' }}>Guitar</div>
-                          <div style={{ fontSize:11, color:'#a78bfa', fontWeight:600 }}>{sf['Guitar Tuning']}</div>
-                        </div>
-                      )}
-                    </div>
-                  )
-                })}
+            <div onClick={() => onSetlist({ setlist, songRecs, show })} style={{ background:'#111118', border:'0.5px solid #2a2a3a', borderRadius:14, padding:'16px', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+              <div>
+                <div style={{ fontSize:14, fontWeight:600, color:'#ffffff', marginBottom:4 }}>{setName || 'View setlist'}</div>
+                <div style={{ fontSize:12, color:'#6b7280' }}>{songRecs.length} songs{setLength ? ` · ${setLength} min` : ''}</div>
               </div>
-              {setlist?.fields['Notes'] && (
-                <div style={{ marginTop:10, padding:14, background:'#111118', border:'0.5px solid #2a2a3a', borderRadius:12 }}>
-                  <div style={{ fontSize:11, color:'#6b7280', marginBottom:6, fontWeight:600 }}>Set notes</div>
-                  <div style={{ fontSize:13, color:'#9ca3af', lineHeight:1.6 }}>{setlist.fields['Notes']}</div>
-                </div>
-              )}
-            </>
+              <div style={{ color:'#a78bfa', fontSize:22 }}>›</div>
+            </div>
           ) : (
             <div style={{ background:'#111118', border:'0.5px solid #2a2a3a', borderRadius:14, padding:20, textAlign:'center', color:'#6b7280', fontSize:13 }}>
               No setlist added yet — check back closer to the show.
-
             </div>
           )}
-        </div>
+        </div></div>
 
         {f['Show Notes'] && (
           <div style={{ marginBottom:20 }}>
