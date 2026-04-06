@@ -896,8 +896,9 @@ function MasterCalendar({ data, resolve, resolveField, onShowClick, onBack }) {
                 <div key={ds} style={{ marginBottom:6 }}>
                   <div onClick={() => {
                     if (isBooked && shows.length === 1) onShowClick(shows[0])
+                    else if (isBooked && shows.length > 1) setExpandedBlackout(expandedBlackout === ds ? null : ds)
                     else if (isBlackedOut) setExpandedBlackout(isExpanded ? null : ds)
-                  }} style={{ display:'flex', alignItems:'flex-start', gap:12, padding:'10px 14px', background:bg, border: isExpanded ? '1px solid #ff9f7f' : border, borderRadius: isExpanded ? '10px 10px 0 0' : 10, cursor: isBooked || isBlackedOut ? 'pointer' : 'default' }}>
+                  }} style={{ display:'flex', alignItems:'flex-start', gap:12, padding:'10px 14px', background:bg, border: isExpanded ? '1px solid #6bcb77' : border, borderRadius: isExpanded ? '10px 10px 0 0' : 10, cursor: isBooked || isBlackedOut ? 'pointer' : 'default' }}>
                     <div style={{ width:36, textAlign:'center', flexShrink:0, paddingTop:1 }}>
                       <div style={{ fontSize:16, fontWeight:700, color: isPast ? '#3a3a3a' : isBooked ? '#6bcb77' : isBlackedOut ? '#ff9f7f' : '#a78bfa' }}>{dayNum}</div>
                       <div style={{ fontSize:10, color:'#6b7280' }}>{dayName}</div>
