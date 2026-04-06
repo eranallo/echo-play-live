@@ -652,7 +652,7 @@ function ShowDetail({ data, member, show, resolve, resolveField, onBack, onSetli
               No setlist added yet — check back closer to the show.
             </div>
           )}
-        </div></div>
+        </div>
 
         {f['Show Notes'] && (
           <div style={{ marginBottom:20 }}>
