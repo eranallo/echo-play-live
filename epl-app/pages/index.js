@@ -339,6 +339,7 @@ function ShowRow({ show, resolve, resolveField, onClick }) {
 }
 
 function ShowDetail({ data, member, show, resolve, resolveField, onBack }) {
+  useEffect(() => { window.scrollTo(0, 0) }, [])
   const f = show.fields
   const bands = resolveField(f['Band'], 'BANDS', 'Band Name')
   const venueRecs = resolve(f['Venue'], 'VENUES')
