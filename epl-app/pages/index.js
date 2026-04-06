@@ -441,22 +441,54 @@ function ShowDetail({ data, member, show, resolve, resolveField, onBack }) {
           <div style={{ fontSize:11, fontWeight:600, color:'#6b7280', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:10 }}>Crew</div>
           <div style={{ background:'#111118', border:'0.5px solid #2a2a3a', borderRadius:14, overflow:'hidden' }}>
             {(() => {
-              const soundRecs = resolve(f['Sound Engineer'], 'CREW')
-              const merchRecs = resolve(f['Merch Person'], 'CREW')
-              const soundName = soundRecs[0] ? soundRecs[0].fields['Name'] : f['Sound Provider'] === 'Venue Provided' ? 'Venue provided' : f['Sound Provider'] || null
-              const merchName = merchRecs[0] ? merchRecs[0].fields['Name'] : null
+              // Resolve sound — check linked CREW first, then linked MEMBERS, then fallback to Sound Provider text
+              const soundCrewRecs = resolve(f['Sound Engineer'], 'CREW')
+              const soundMemberRecs = resolve(f['Sound Engineer'], 'MEMBERS')
+              const soundName = soundCrewRecs[0]
+                ? soundCrewRecs[0].fields['Name']
+                : soundMemberRecs[0]
+                ? soundMemberRecs[0].fields['Member Name']
+                : f['Sound Provider'] === 'Venue Provided'
+                ? 'Venue provided'
+                : f['Sound Provider'] || null
+
+              // Resolve merch — check linked CREW first, then linked MEMBERS
+              const merchCrewRecs = resolve(f['Merch Person'], 'CREW')
+              const merchMemberRecs = resolve(f['Merch Person'], 'MEMBERS')
+              const merchName = merchCrewRecs[0]
+                ? merchCrewRecs[0].fields['Name']
+                : merchMemberRecs[0]
+                ? merchMemberRecs[0].fields['Member Name']
+                : null
+
+              const soundRole = soundCrewRecs[0]
+                ? soundCrewRecs[0].fields['Role'] || 'Sound Engineer'
+                : soundMemberRecs[0]
+                ? 'Member (Sound)'
+                : f['Sound Provider'] || null
+
+              const merchRole = merchCrewRecs[0]
+                ? merchCrewRecs[0].fields['Role'] || 'Merch'
+                : merchMemberRecs[0]
+                ? 'Member (Merch)'
+                : null
+
               const rows = [
-                ['Sound', soundName, f['Sound Notes']],
-                ['Merch', merchName, f['Merch Notes']],
+                ['Sound', soundName, soundRole, f['Sound Notes']],
+                ['Merch', merchName, merchRole, f['Merch Notes']],
               ].filter(([,val]) => val)
+
               if (!rows.length) return <div style={{ padding:'12px 16px', fontSize:13, color:'#6b7280' }}>No crew assigned yet.</div>
-              return rows.map(([label, val, notes], i) => (
+              return rows.map(([label, name, role, notes], i) => (
                 <div key={label} style={{ padding:'12px 16px', borderBottom: i < rows.length-1 ? '0.5px solid #1a1a2a' : 'none' }}>
-                  <div style={{ display:'flex', justifyContent:'space-between' }}>
-                    <span style={{ fontSize:12, color:'#6b7280' }}>{label}</span>
-                    <span style={{ fontSize:13, color:'#7ecbcb', fontWeight:500 }}>{val}</span>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
+                    <div>
+                      <div style={{ fontSize:12, color:'#6b7280', marginBottom:2 }}>{label}</div>
+                      <div style={{ fontSize:14, fontWeight:600, color:'#ffffff' }}>{name}</div>
+                      {role && name !== 'Venue provided' && <div style={{ fontSize:11, color:'#7ecbcb', marginTop:2 }}>{role}</div>}
+                    </div>
                   </div>
-                  {notes && <div style={{ fontSize:11, color:'#6b7280', marginTop:4 }}>{notes}</div>}
+                  {notes && <div style={{ fontSize:12, color:'#6b7280', marginTop:6, paddingTop:6, borderTop:'0.5px solid #1a1a2a' }}>{notes}</div>}
                 </div>
               ))
             })()}
