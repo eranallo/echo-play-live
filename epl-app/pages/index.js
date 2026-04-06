@@ -909,12 +909,17 @@ function MasterCalendar({ data, resolve, resolveField, onShowClick, onBack }) {
                         const venueRecs = resolve(shows[0].fields['Venue'], 'VENUES')
                         const vf = venueRecs[0] ? venueRecs[0].fields : {}
                         const bands = resolveField(shows[0].fields['Band'], 'BANDS', 'Band Name')
+                        const bRec = (data['BANDS'] || []).find(br => br.fields['Band Name'] === bands[0])
+                        const logo = bRec?.fields['Logo/Photo']?.[0]?.url
                         return (
-                          <div>
-                            <div style={{ fontSize:13, fontWeight:600, color:'#ffffff', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{vf['Venue Name'] || '—'}</div>
-                            <div style={{ display:'flex', gap:4, marginTop:2, alignItems:'center', flexWrap:'wrap' }}>
-                              {bands.map((b, bi) => <span key={bi} style={{ fontSize:10, padding:'1px 6px', borderRadius:20, background:BAND_COLORS[b]?.bg||'#1a1a2e', color:BAND_COLORS[b]?.color||'#a78bfa', fontWeight:600 }}>{b}</span>)}
-                              {shows[0].fields['Set Time'] && <span style={{ fontSize:10, color:'#6b7280' }}>{shows[0].fields['Set Time']}</span>}
+                          <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                            {logo && <img src={logo} alt={bands[0]} style={{ width:34, height:34, objectFit:'contain', borderRadius:6, background:'#0a1a0a', padding:2, flexShrink:0 }} />}
+                            <div>
+                              <div style={{ fontSize:13, fontWeight:600, color:'#ffffff', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{vf['Venue Name'] || '—'}</div>
+                              <div style={{ display:'flex', gap:4, marginTop:2, alignItems:'center', flexWrap:'wrap' }}>
+                                {bands.map((b, bi) => <span key={bi} style={{ fontSize:10, padding:'1px 6px', borderRadius:20, background:BAND_COLORS[b]?.bg||'#1a1a2e', color:BAND_COLORS[b]?.color||'#a78bfa', fontWeight:600 }}>{b}</span>)}
+                                {shows[0].fields['Set Time'] && <span style={{ fontSize:10, color:'#6b7280' }}>{shows[0].fields['Set Time']}</span>}
+                              </div>
                             </div>
                           </div>
                         )
