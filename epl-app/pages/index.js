@@ -622,11 +622,13 @@ function ShowDetail({ data, member, show, resolve, resolveField, onBack, onSetli
               {vf['Parking Notes'] && <div style={{ fontSize:12, color:'#6b7280', marginBottom:12 }}>🅿️ {vf['Parking Notes']}</div>}
               {address && (
                 <div style={{ display:'flex', gap:10 }}>
-                  <button onClick={() => openMaps(address)} style={{ flex:1, padding:'11px', background:'#1a1a2e', border:'none', borderRadius:10, color:'#a78bfa', fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>
-                    🍎 Apple Maps
+                  <button onClick={() => openMaps(address)} style={{ flex:1, padding:'10px', background:'#1a1a2e', border:'none', borderRadius:10, cursor:'pointer', fontFamily:'inherit', display:'flex', alignItems:'center', justifyContent:'center', gap:7 }}>
+                    <img src="https://www.apple.com/favicon.ico" alt="Apple" style={{ width:16, height:16, borderRadius:3 }} />
+                    <span style={{ color:'#a78bfa', fontSize:13, fontWeight:600 }}>Apple Maps</span>
                   </button>
-                  <button onClick={() => window.open(`https://maps.google.com/?q=${encodeURIComponent(address)}`)} style={{ flex:1, padding:'11px', background:'#1a2e1a', border:'none', borderRadius:10, color:'#6bcb77', fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>
-                    🗺 Google Maps
+                  <button onClick={() => window.open(`https://maps.google.com/?q=${encodeURIComponent(address)}`)} style={{ flex:1, padding:'10px', background:'#1a2e1a', border:'none', borderRadius:10, cursor:'pointer', fontFamily:'inherit', display:'flex', alignItems:'center', justifyContent:'center', gap:7 }}>
+                    <img src="https://maps.gstatic.com/mapfiles/maps_lite/favicon_hdpi.ico" alt="Google Maps" style={{ width:16, height:16 }} />
+                    <span style={{ color:'#6bcb77', fontSize:13, fontWeight:600 }}>Google Maps</span>
                   </button>
                 </div>
               )}
@@ -1469,25 +1471,37 @@ function SetlistPage({ data, setlistData, onBack }) {
           {(songRecs || []).map((song, i) => {
             const s = song.fields
             return (
-              <div key={song.id} style={{ display:'flex', alignItems:'center', gap:12, padding:'14px 16px', borderBottom: i < songRecs.length-1 ? '0.5px solid #1a1a2a' : 'none' }}>
-                <div style={{ width:26, textAlign:'center', flexShrink:0, fontSize:13, fontWeight:700, color:'#3a3a5a' }}>{i+1}</div>
-                <div style={{ flex:1, minWidth:0 }}>
-                  <div style={{ fontSize:15, fontWeight:600, color:'#ffffff' }}>{s['Song Title'] || '—'}</div>
-                  <div style={{ fontSize:12, color:'#6b7280', marginTop:2 }}>{s['Artist'] || ''}{s['Duration'] ? ` · ${s['Duration']}` : ''}</div>
+              <div key={song.id} style={{ padding:'14px 16px', borderBottom: i < songRecs.length-1 ? '0.5px solid #1a1a2a' : 'none' }}>
+                <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:10 }}>
+                  <div style={{ width:26, textAlign:'center', flexShrink:0, fontSize:13, fontWeight:700, color:'#3a3a5a' }}>{i+1}</div>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ fontSize:15, fontWeight:600, color:'#ffffff' }}>{s['Song Title'] || '—'}</div>
+                    <div style={{ fontSize:12, color:'#6b7280', marginTop:2 }}>{s['Artist'] || ''}{s['Duration'] ? ` · ${s['Duration']}` : ''}</div>
+                  </div>
+                  <div style={{ textAlign:'right', flexShrink:0, display:'flex', flexDirection:'column', gap:4 }}>
+                    {s['Guitar Tuning'] && (
+                      <div>
+                        <div style={{ fontSize:9, color:'#3a3a5a', textTransform:'uppercase', letterSpacing:'0.04em' }}>Guitar</div>
+                        <div style={{ fontSize:11, color:'#a78bfa', fontWeight:600 }}>{s['Guitar Tuning']}</div>
+                      </div>
+                    )}
+                    {s['Bass Tuning'] && (
+                      <div>
+                        <div style={{ fontSize:9, color:'#3a3a5a', textTransform:'uppercase', letterSpacing:'0.04em' }}>Bass</div>
+                        <div style={{ fontSize:11, color:bandColor, fontWeight:600 }}>{s['Bass Tuning']}</div>
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <div style={{ textAlign:'right', flexShrink:0, display:'flex', flexDirection:'column', gap:4 }}>
-                  {s['Guitar Tuning'] && (
-                    <div>
-                      <div style={{ fontSize:9, color:'#3a3a5a', textTransform:'uppercase', letterSpacing:'0.04em' }}>Guitar</div>
-                      <div style={{ fontSize:11, color:'#a78bfa', fontWeight:600 }}>{s['Guitar Tuning']}</div>
-                    </div>
-                  )}
-                  {s['Bass Tuning'] && (
-                    <div>
-                      <div style={{ fontSize:9, color:'#3a3a5a', textTransform:'uppercase', letterSpacing:'0.04em' }}>Bass</div>
-                      <div style={{ fontSize:11, color:bandColor, fontWeight:600 }}>{s['Bass Tuning']}</div>
-                    </div>
-                  )}
+                <div style={{ display:'flex', gap:8, paddingLeft:38 }}>
+                  <a href={`https://open.spotify.com/search/${encodeURIComponent((s['Song Title'] || '') + ' ' + (s['Artist'] || ''))}`} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} style={{ display:'flex', alignItems:'center', gap:5, padding:'5px 10px', background:'#0d1f0d', border:'0.5px solid #1a3a1a', borderRadius:20, textDecoration:'none' }}>
+                    <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/8/84/Spotify_icon.svg/64px-Spotify_icon.svg.png" alt="Spotify" style={{ width:14, height:14 }} />
+                    <span style={{ fontSize:11, fontWeight:600, color:'#1db954' }}>Spotify</span>
+                  </a>
+                  <a href={`https://www.ultimate-guitar.com/search.php?search_type=title&value=${encodeURIComponent(s['Song Title'] || '')}`} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} style={{ display:'flex', alignItems:'center', gap:5, padding:'5px 10px', background:'#1a1000', border:'0.5px solid #3a2a00', borderRadius:20, textDecoration:'none' }}>
+                    <img src="https://www.ultimate-guitar.com/favicon.ico" alt="UG" style={{ width:14, height:14, borderRadius:2 }} />
+                    <span style={{ fontSize:11, fontWeight:600, color:'#f5a623' }}>Tabs</span>
+                  </a>
                 </div>
               </div>
             )
