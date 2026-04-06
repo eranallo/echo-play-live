@@ -380,25 +380,50 @@ function ShowDetail({ data, member, show, resolve, resolveField, onBack }) {
           )}
         </div>
 
-        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:8, marginBottom:20 }}>
-          <TimeBlock label="Load in" value={f['Load-In Time']} />
-          <TimeBlock label="Sound check" value={f['Sound Check Confirmed'] ? 'Confirmed' : f['Set Time'] ? 'TBC' : null} />
-          <TimeBlock label="Set time" value={f['Set Time']} />
-          <TimeBlock label="End time" value={f['End Time']} />
+        <div style={{ marginBottom:20 }}>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:8 }}>
+            <div style={{ background:'#0a0a1a', borderRadius:10, padding:'12px 14px' }}>
+              <div style={{ fontSize:10, color:'#6b7280', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:4 }}>Load in</div>
+              <div style={{ fontSize:18, fontWeight:700, color:'#ffffff' }}>{f['Load-In Time'] || '—'}</div>
+            </div>
+            <div style={{ background:'#0a0a1a', borderRadius:10, padding:'12px 14px' }}>
+              <div style={{ fontSize:10, color:'#6b7280', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:4 }}>Sound check</div>
+              <div style={{ fontSize:18, fontWeight:700, color: f['Sound Check Confirmed'] ? '#6bcb77' : '#ffffff' }}>
+                {f['Sound Check Confirmed'] ? 'Confirmed ✓' : 'TBC'}
+              </div>
+            </div>
+          </div>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+            <div style={{ background:'#0a0a1a', borderRadius:10, padding:'12px 14px' }}>
+              <div style={{ fontSize:10, color:'#6b7280', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:4 }}>Set time</div>
+              <div style={{ fontSize:18, fontWeight:700, color:'#a78bfa' }}>{f['Set Time'] || '—'}</div>
+            </div>
+            <div style={{ background:'#0a0a1a', borderRadius:10, padding:'12px 14px' }}>
+              <div style={{ fontSize:10, color:'#6b7280', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:4 }}>End time</div>
+              <div style={{ fontSize:18, fontWeight:700, color:'#ffffff' }}>{f['End Time'] || '—'}</div>
+            </div>
+          </div>
         </div>
 
         {(address || vf['Venue Name']) && (
           <div style={{ marginBottom:20 }}>
             <div style={{ fontSize:11, fontWeight:600, color:'#6b7280', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:10 }}>Venue</div>
             <div style={{ background:'#111118', border:'0.5px solid #2a2a3a', borderRadius:14, padding:16 }}>
-              <div style={{ fontSize:15, fontWeight:600, marginBottom:4 }}>{vf['Venue Name'] || '—'}</div>
+              <div style={{ fontSize:15, fontWeight:600, marginBottom: address ? 6 : 0 }}>{vf['Venue Name'] || '—'}</div>
               {address && <div style={{ fontSize:13, color:'#9ca3af', marginBottom:12 }}>{address}</div>}
               {vf['Parking Notes'] && <div style={{ fontSize:12, color:'#6b7280', marginBottom:12 }}>🅿️ {vf['Parking Notes']}</div>}
               {address && (
                 <div style={{ display:'flex', gap:10 }}>
-                  <button onClick={() => openMaps(address)} style={{ flex:1, padding:'10px', background:'#1a1a2e', border:'none', borderRadius:10, color:'#a78bfa', fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>Apple Maps</button>
-                  <button onClick={() => window.open(`https://maps.google.com/?q=${encodeURIComponent(address)}`)} style={{ flex:1, padding:'10px', background:'#1a2e1a', border:'none', borderRadius:10, color:'#6bcb77', fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>Google Maps</button>
+                  <button onClick={() => openMaps(address)} style={{ flex:1, padding:'11px', background:'#1a1a2e', border:'none', borderRadius:10, color:'#a78bfa', fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>
+                    🍎 Apple Maps
+                  </button>
+                  <button onClick={() => window.open(`https://maps.google.com/?q=${encodeURIComponent(address)}`)} style={{ flex:1, padding:'11px', background:'#1a2e1a', border:'none', borderRadius:10, color:'#6bcb77', fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>
+                    🗺 Google Maps
+                  </button>
                 </div>
+              )}
+              {!address && (
+                <div style={{ fontSize:12, color:'#3a3a4a', marginTop:4 }}>No address on file — add it in Airtable</div>
               )}
             </div>
           </div>
@@ -533,19 +558,7 @@ function ShowDetail({ data, member, show, resolve, resolveField, onBack }) {
           </div>
         </div>
 
-        <div style={{ marginBottom:20 }}>
-          <div style={{ fontSize:11, fontWeight:600, color:'#6b7280', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:10 }}>Show info</div>
-          <div style={{ background:'#111118', border:'0.5px solid #2a2a3a', borderRadius:14, overflow:'hidden' }}>
-            {[
-              ['Status', f['Status']],
-            ].filter(([, val]) => val).map(([label, val], i, arr) => (
-              <div key={label} style={{ display:'flex', justifyContent:'space-between', padding:'12px 16px', borderBottom: i < arr.length - 1 ? '0.5px solid #1a1a2a' : 'none' }}>
-                <span style={{ fontSize:13, color:'#6b7280' }}>{label}</span>
-                <span style={{ fontSize:13, color:'#ffffff', fontWeight:500 }}>{val}</span>
-              </div>
-            ))}
-          </div>
-        </div>
+
       </div>
     </div>
   )
