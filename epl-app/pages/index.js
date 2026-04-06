@@ -478,7 +478,9 @@ function ShowDetail({ data, member, show, resolve, resolveField, onBack }) {
   const vf = venueRecs[0] ? venueRecs[0].fields : {}
   const address = f['Venue Address'] || vf['Address'] || ''
   const days = daysUntil(f['Date'])
-  const setlistRecs = resolve(f['Setlist'], 'SETLISTS')
+  // Try both 'Setlist' and 'Setlists' field names
+  const setlistField = f['Setlist'] || f['Setlists'] || f['SETLISTS'] || []
+  const setlistRecs = resolve(setlistField, 'SETLISTS')
   const setlist = setlistRecs[0]
   const songIds = setlist ? (setlist.fields['Songs'] || []) : []
   const songRecs = (Array.isArray(songIds) ? songIds : [songIds])
@@ -486,6 +488,8 @@ function ShowDetail({ data, member, show, resolve, resolveField, onBack }) {
     .filter(Boolean)
   const setName = setlist?.fields['Set Name'] || null
   const setLength = setlist?.fields['Set Length'] || null
+  // Debug
+  const _setlistDebug = `fields:${Object.keys(f).join(',')} | setlistField:${JSON.stringify(setlistField)} | setlistRecs:${setlistRecs.length} | songs:${songRecs.length} | allSetlists:${(data['SETLISTS']||[]).length} | allSongs:${(data['SONGS']||[]).length}`
 
   function openMaps(addr) {
     const encoded = encodeURIComponent(addr)
@@ -674,6 +678,7 @@ function ShowDetail({ data, member, show, resolve, resolveField, onBack }) {
           ) : (
             <div style={{ background:'#111118', border:'0.5px solid #2a2a3a', borderRadius:14, padding:20, textAlign:'center', color:'#6b7280', fontSize:13 }}>
               No setlist added yet — check back closer to the show.
+              <div style={{ fontSize:9, color:'#3a3a4a', marginTop:8, wordBreak:'break-all', textAlign:'left' }}>{_setlistDebug}</div>
             </div>
           )}
         </div>
