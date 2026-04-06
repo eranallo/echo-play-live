@@ -552,8 +552,8 @@ function ShowDetail({ data, member, show, resolve, resolveField, onBack }) {
             </div>
             <div style={{ background:'#0a0a1a', borderRadius:10, padding:'12px 14px' }}>
               <div style={{ fontSize:10, color:'#6b7280', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:4 }}>Sound check</div>
-              <div style={{ fontSize:18, fontWeight:700, color: f['Sound Check Confirmed'] ? '#6bcb77' : '#ffffff' }}>
-                {f['Sound Check Confirmed'] ? 'Confirmed ✓' : 'TBC'}
+              <div style={{ fontSize:18, fontWeight:700, color:'#ffffff' }}>
+                {f['Sound Check Time'] || '—'}
               </div>
             </div>
           </div>
