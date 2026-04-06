@@ -506,7 +506,7 @@ function ShowDetail({ data, member, show, resolve, resolveField, onBack }) {
             )}
             <div>
               {bands.map((b, i) => (
-                <div key={i} style={{ fontSize:22, fontWeight:700, color:'#ffffff', lineHeight:1.2 }}>{b}</div>
+                <div key={i} style={{ fontSize:22, fontWeight:700, color: BAND_COLORS[b]?.color || '#ffffff', lineHeight:1.2 }}>{b}</div>
               ))}
             </div>
           </div>
@@ -928,9 +928,33 @@ function MasterCalendar({ data, resolve, resolveField, onShowClick, onBack }) {
                       )}
                     </div>
                     <div style={{ fontSize:14, color:statusColor, flexShrink:0 }}>
-                      {isBooked ? '›' : isBlackedOut ? (isExpanded ? '▲' : '▼') : ''}
+                      {isBooked && shows.length === 1 ? '›' : isBooked && shows.length > 1 ? (isExpanded ? '▲' : '▼') : isBlackedOut ? (isExpanded ? '▲' : '▼') : ''}
                     </div>
                   </div>
+
+                  {isExpanded && isBooked && shows.length > 1 && (
+                    <div style={{ background:'#0f1f0f', border:'1px solid #2a4a2a', borderTop:'none', borderRadius:'0 0 10px 10px', padding:'8px 12px', marginBottom:6 }}>
+                      <div style={{ fontSize:11, fontWeight:600, color:'#6bcb77', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:8 }}>Select a show</div>
+                      {shows.map((s, i) => {
+                        const sf = s.fields
+                        const sBands = resolveField(sf['Band'], 'BANDS', 'Band Name')
+                        const sVenue = resolve(sf['Venue'], 'VENUES')
+                        const svf = sVenue[0] ? sVenue[0].fields : {}
+                        return (
+                          <div key={s.id} onClick={e => { e.stopPropagation(); onShowClick(s) }} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'10px 0', borderBottom: i < shows.length-1 ? '0.5px solid #1a2a1a' : 'none', cursor:'pointer' }}>
+                            <div>
+                              <div style={{ fontSize:13, fontWeight:600, color:'#ffffff' }}>{svf['Venue Name'] || '—'}</div>
+                              <div style={{ display:'flex', gap:4, marginTop:3 }}>
+                                {sBands.map((b, bi) => <span key={bi} style={{ fontSize:10, padding:'1px 6px', borderRadius:20, background:BAND_COLORS[b]?.bg||'#1a1a2e', color:BAND_COLORS[b]?.color||'#a78bfa', fontWeight:600 }}>{b}</span>)}
+                                {sf['Set Time'] && <span style={{ fontSize:10, color:'#6b7280' }}>{sf['Set Time']}</span>}
+                              </div>
+                            </div>
+                            <span style={{ color:'#6bcb77', fontSize:16 }}>›</span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
 
                   {isExpanded && isBlackedOut && (
                     <div style={{ background:'#1a0a0a', border:'1px solid #ff9f7f', borderTop:'none', borderRadius:'0 0 10px 10px', padding:'12px 16px' }}>
