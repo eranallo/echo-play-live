@@ -21,7 +21,7 @@ async function fetchTable(table) {
 export default async function handler(req, res) {
   if (!TOKEN || !BASE) return res.status(500).json({ error: 'Missing credentials.' });
   try {
-    const tables = ['BANDS','MEMBERS','SHOWS','VENUES','BLACKOUT DATES','SETLISTS','CREW'];
+    const tables = ['BANDS','MEMBERS','SHOWS','VENUES','BLACKOUT DATES','SETLISTS','SONGS','CREW'];
     const results = {};
     await Promise.all(tables.map(async (t) => {
       try { results[t] = await fetchTable(t); }
