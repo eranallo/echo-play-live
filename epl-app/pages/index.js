@@ -193,7 +193,7 @@ function MemberHome({ data, member, resolve, resolveField, onShowClick, onBack, 
   const myBlackouts = (data['BLACKOUT DATES'] || []).filter(b => {
     const bm = b.fields['Member'] || []
     return Array.isArray(bm) ? bm.includes(member.id) : bm === member.id
-  })
+  }).sort((a, b) => a.fields['Date'] > b.fields['Date'] ? 1 : -1)
 
   return (
     <div style={{ minHeight:'100vh', background:'#0a0a0f', color:'#ffffff', fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif' }}>
@@ -517,10 +517,17 @@ function MasterCalendar({ data, resolve, resolveField, onShowClick, onBack }) {
 
   const blackoutsByDate = {}
   ;(data['BLACKOUT DATES'] || []).forEach(b => {
-    const dt = b.fields['Date']
-    if (dt) {
-      if (!blackoutsByDate[dt]) blackoutsByDate[dt] = []
-      blackoutsByDate[dt].push(b)
+    const startStr = b.fields['Date']
+    const endStr = b.fields['End Date'] || startStr
+    if (!startStr) return
+    const start = new Date(startStr + 'T00:00:00')
+    const end = new Date(endStr + 'T00:00:00')
+    const cur = new Date(start)
+    while (cur <= end) {
+      const ds = `${cur.getFullYear()}-${String(cur.getMonth()+1).padStart(2,'0')}-${String(cur.getDate()).padStart(2,'0')}`
+      if (!blackoutsByDate[ds]) blackoutsByDate[ds] = []
+      blackoutsByDate[ds].push(b)
+      cur.setDate(cur.getDate() + 1)
     }
   })
 
@@ -736,6 +743,7 @@ function FullSchedule({ data, member, resolve, resolveField, onShowClick, onBack
 function Blackouts({ data, member, resolve, onBack }) {
   const [showForm, setShowForm] = useState(false)
   const [currentDate, setCurrentDate] = useState('')
+  const [currentEndDate, setCurrentEndDate] = useState('')
   const [currentReason, setCurrentReason] = useState('Personal')
   const [pendingDates, setPendingDates] = useState([])
   const [submitting, setSubmitting] = useState(false)
@@ -752,8 +760,9 @@ function Blackouts({ data, member, resolve, onBack }) {
   function addToPending() {
     if (!currentDate) return
     if (pendingDates.find(p => p.date === currentDate)) return
-    setPendingDates(prev => [...prev, { date: currentDate, reason: currentReason }])
+    setPendingDates(prev => [...prev, { date: currentDate, endDate: currentEndDate || currentDate, reason: currentReason }])
     setCurrentDate('')
+    setCurrentEndDate('')
     setCurrentReason('Personal')
   }
 
@@ -794,7 +803,7 @@ function Blackouts({ data, member, resolve, onBack }) {
           <img src="/logo.png" alt="EPL" onClick={onBack} style={{ width:28, height:28, objectFit:'contain', mixBlendMode:'screen', cursor:'pointer', opacity:0.7 }} />
           <div style={{ fontSize:15, fontWeight:600 }}>My blackout dates</div>
         </div>
-        <button onClick={() => { setShowForm(f => !f); setPendingDates([]); setCurrentDate(''); setCurrentReason('Personal') }} style={{ fontSize:13, padding:'6px 14px', borderRadius:20, background: showForm ? '#2a2a3a' : '#1a1a2e', border:'none', color:'#a78bfa', cursor:'pointer', fontFamily:'inherit', fontWeight:600 }}>
+        <button onClick={() => { setShowForm(f => !f); setPendingDates([]); setCurrentDate(''); setCurrentEndDate(''); setCurrentReason('Personal') }} style={{ fontSize:13, padding:'6px 14px', borderRadius:20, background: showForm ? '#2a2a3a' : '#1a1a2e', border:'none', color:'#a78bfa', cursor:'pointer', fontFamily:'inherit', fontWeight:600 }}>
           {showForm ? 'Cancel' : '+ Add dates'}
         </button>
       </div>
@@ -810,14 +819,26 @@ function Blackouts({ data, member, resolve, onBack }) {
           <div style={{ background:'#111118', border:'0.5px solid #2a2a3a', borderRadius:14, padding:16, marginBottom:20 }}>
             <div style={{ fontSize:14, fontWeight:600, marginBottom:14 }}>Add blackout dates</div>
 
-            <div style={{ marginBottom:10 }}>
-              <div style={{ fontSize:12, color:'#6b7280', marginBottom:6 }}>Date you cannot play</div>
-              <input
-                type="date"
-                value={currentDate}
-                onChange={e => setCurrentDate(e.target.value)}
-                style={{ width:'100%', padding:'10px 12px', background:'#1a1a2a', border:'0.5px solid #3a3a4a', borderRadius:10, color:'#ffffff', fontSize:15, fontFamily:'inherit', boxSizing:'border-box', display:'block' }}
-              />
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:10 }}>
+              <div>
+                <div style={{ fontSize:12, color:'#6b7280', marginBottom:6 }}>Start date</div>
+                <input
+                  type="date"
+                  value={currentDate}
+                  onChange={e => setCurrentDate(e.target.value)}
+                  style={{ width:'100%', padding:'10px 8px', background:'#1a1a2a', border:'0.5px solid #3a3a4a', borderRadius:10, color:'#ffffff', fontSize:13, fontFamily:'inherit', boxSizing:'border-box', display:'block' }}
+                />
+              </div>
+              <div>
+                <div style={{ fontSize:12, color:'#6b7280', marginBottom:6 }}>End date <span style={{ color:'#3a3a4a' }}>(optional)</span></div>
+                <input
+                  type="date"
+                  value={currentEndDate}
+                  min={currentDate}
+                  onChange={e => setCurrentEndDate(e.target.value)}
+                  style={{ width:'100%', padding:'10px 8px', background:'#1a1a2a', border:'0.5px solid #3a3a4a', borderRadius:10, color:'#ffffff', fontSize:13, fontFamily:'inherit', boxSizing:'border-box', display:'block' }}
+                />
+              </div>
             </div>
 
             <div style={{ marginBottom:12 }}>
@@ -839,7 +860,7 @@ function Blackouts({ data, member, resolve, onBack }) {
                 {pendingDates.map((p, i) => (
                   <div key={i} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'8px 12px', background:'#0a0a1a', borderRadius:8, marginBottom:6 }}>
                     <div>
-                      <span style={{ fontSize:13, fontWeight:600, color:'#ffffff' }}>{fmt(p.date)}</span>
+                      <span style={{ fontSize:13, fontWeight:600, color:'#ffffff' }}>{p.endDate && p.endDate !== p.date ? `${fmt(p.date)} → ${fmt(p.endDate)}` : fmt(p.date)}</span>
                       <span style={{ fontSize:12, color:'#6b7280', marginLeft:8 }}>{p.reason}</span>
                     </div>
                     <button onClick={() => removePending(p.date)} style={{ background:'none', border:'none', color:'#ff9f7f', fontSize:16, cursor:'pointer', padding:'0 4px', fontFamily:'inherit' }}>×</button>
@@ -857,17 +878,21 @@ function Blackouts({ data, member, resolve, onBack }) {
           {myBlackouts.length} date{myBlackouts.length !== 1 ? 's' : ''} on record
         </div>
 
-        {myBlackouts.length ? myBlackouts.map((b, i) => (
+        {myBlackouts.length ? myBlackouts.map((b, i) => {
+          const hasEnd = b.fields['End Date'] && b.fields['End Date'] !== b.fields['Date']
+          const dateDisplay = hasEnd ? `${fmt(b.fields['Date'])} → ${fmt(b.fields['End Date'])}` : fmt(b.fields['Date'])
+          const daysOut = daysUntil(b.fields['Date'])
+          return (
           <div key={i} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'14px 0', borderBottom:'0.5px solid #1a1a2a' }}>
             <div>
-              <div style={{ fontSize:14, fontWeight:600 }}>{fmt(b.fields['Date'])}</div>
+              <div style={{ fontSize:14, fontWeight:600 }}>{dateDisplay}</div>
               <div style={{ fontSize:12, color:'#6b7280', marginTop:2 }}>{b.fields['Reason'] || 'No reason listed'}</div>
             </div>
-            <div style={{ fontSize:12, color: daysUntil(b.fields['Date']) > 0 ? '#ff9f7f' : '#3a3a3a' }}>
-              {daysUntil(b.fields['Date']) > 0 ? `In ${daysUntil(b.fields['Date'])} days` : 'Past'}
+            <div style={{ fontSize:12, color: daysOut > 0 ? '#ff9f7f' : '#3a3a3a' }}>
+              {daysOut > 0 ? `In ${daysOut} days` : 'Past'}
             </div>
           </div>
-        )) : (
+        )}) : (
           <div style={{ color:'#6b7280', fontSize:14, paddingTop:'1rem', textAlign:'center' }}>
             No blackout dates yet.
           </div>
