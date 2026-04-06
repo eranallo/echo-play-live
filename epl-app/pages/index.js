@@ -344,7 +344,6 @@ function ShowRow({ show, resolve, resolveField, onClick }) {
 function ShowDetail({ data, member, show, resolve, resolveField, onBack }) {
   useEffect(() => { window.scrollTo(0, 0) }, [])
   const [weather, setWeather] = useState(null)
-  const [weatherDebug, setWeatherDebug] = useState(null)
 
   useEffect(() => {
     async function fetchWeather() {
@@ -385,11 +384,9 @@ function ShowDetail({ data, member, show, resolve, resolveField, onBack }) {
         }
 
         const weatherRes = await fetch(
-          `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max,weathercode&temperature_unit=fahrenheit&timezone=America%2FChicago&start_date=${showDate}&end_date=${showDate}&forecast_days=16`
+          `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max,weathercode&temperature_unit=fahrenheit&timezone=America%2FChicago&start_date=${showDate}&end_date=${showDate}`
         )
         const wData = await weatherRes.json()
-
-        setWeatherDebug(JSON.stringify({ daysAway, lat, lon, date: showDate, daily: wData.daily ? Object.keys(wData.daily) : 'none', max: wData.daily?.temperature_2m_max, error: wData.error }))
 
         if (wData.daily && wData.daily.temperature_2m_max && wData.daily.temperature_2m_max.length > 0 && wData.daily.temperature_2m_max[0] !== null) {
           const code = wData.daily.weathercode[0]
@@ -414,7 +411,6 @@ function ShowDetail({ data, member, show, resolve, resolveField, onBack }) {
         }
       } catch(e) {
         setWeather('unavailable')
-        setWeatherDebug('Error: ' + e.message)
       }
     }
     fetchWeather()
@@ -566,12 +562,6 @@ function ShowDetail({ data, member, show, resolve, resolveField, onBack }) {
             </div>
           )}
         </div>
-
-        {weatherDebug && (
-          <div style={{ fontSize:10, color:'#4a4a5a', padding:'0 0 12px', wordBreak:'break-all', lineHeight:1.4 }}>
-            Weather debug: {weatherDebug}
-          </div>
-        )}
 
         {f['Show Notes'] && (
           <div style={{ marginBottom:20 }}>
