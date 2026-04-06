@@ -300,7 +300,6 @@ function NextShowCard({ show, resolve, resolveField, onClick }) {
           <div style={{ position:'absolute', bottom:12, left:14, right:14 }}>
             <div style={{ fontSize:17, fontWeight:700, color:'#ffffff', textShadow:'0 1px 3px rgba(0,0,0,0.8)' }}>{vf['Venue Name'] || '—'}</div>
             <div style={{ display:'flex', gap:4, marginTop:4, flexWrap:'wrap', alignItems:'center' }}>
-              {bands.map((b, i) => <BandTag key={i} name={b} />)}
               {f['Indoor / Outdoor'] && <span style={{ fontSize:10, padding:'1px 7px', borderRadius:20, background:'rgba(0,0,0,0.5)', color:'#cccccc', border:'0.5px solid rgba(255,255,255,0.2)' }}>{f['Indoor / Outdoor'] === 'Outdoor' ? '🌿 Outdoor' : f['Indoor / Outdoor'] === 'Both' ? '🏟️ Both' : '🏠 Indoor'}</span>}
             </div>
           </div>
@@ -330,7 +329,7 @@ function NextShowCard({ show, resolve, resolveField, onClick }) {
         {bandLogo && (
           <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:12 }}>
             <img src={bandLogo} alt="" style={{ width:44, height:44, objectFit:'contain', borderRadius:8, background:'#1a1a2e', padding:4, flexShrink:0 }} />
-            <div style={{ fontSize:16, fontWeight:700, color:'#ffffff' }}>{bands[0]}</div>
+            <div style={{ fontSize:18, fontWeight:700, color: BAND_COLORS[bands[0]]?.color || '#ffffff' }}>{bands[0]}</div>
           </div>
         )}
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8, marginBottom: address ? 14 : 0 }}>
