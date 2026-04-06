@@ -295,3 +295,35 @@ tr:hover td { background: #fafafa; }
   .two-col { grid-template-columns: 1fr; }
   .three-col { grid-template-columns: 1fr; }
 }
+
+/* iPhone safe area / Dynamic Island fix */
+html {
+  background-color: #0a0a0f;
+}
+body {
+  background-color: #0a0a0f;
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Pull to refresh indicator */
+.ptr-indicator {
+  position: fixed;
+  top: env(safe-area-inset-top);
+  left: 0; right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 60px;
+  background: #0a0a0f;
+  color: #6b7280;
+  font-size: 13px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  gap: 8px;
+  z-index: 200;
+  transform: translateY(-100%);
+  transition: transform 0.2s;
+}
+.ptr-indicator.visible {
+  transform: translateY(0);
+}
