@@ -480,7 +480,12 @@ function ShowDetail({ data, member, show, resolve, resolveField, onBack }) {
   const days = daysUntil(f['Date'])
   const setlistRecs = resolve(f['Setlist'], 'SETLISTS')
   const setlist = setlistRecs[0]
-  const songs = setlist ? (setlist.fields['Songs'] || '').split('\n').filter(s => s.trim()) : []
+  const songIds = setlist ? (setlist.fields['Songs'] || []) : []
+  const songRecs = (Array.isArray(songIds) ? songIds : [songIds])
+    .map(id => (data['SONGS'] || []).find(s => s.id === id))
+    .filter(Boolean)
+  const setName = setlist?.fields['Set Name'] || null
+  const setLength = setlist?.fields['Set Length'] || null
 
   function openMaps(addr) {
     const encoded = encodeURIComponent(addr)
@@ -630,18 +635,34 @@ function ShowDetail({ data, member, show, resolve, resolveField, onBack }) {
         )}
 
         <div style={{ marginBottom:20 }}>
-          <div style={{ fontSize:11, fontWeight:600, color:'#6b7280', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:10 }}>
-            Setlist {songs.length > 0 ? `(${songs.length} songs)` : ''}
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 }}>
+            <div style={{ fontSize:11, fontWeight:600, color:'#6b7280', textTransform:'uppercase', letterSpacing:'0.08em' }}>
+              Setlist {songRecs.length > 0 ? `(${songRecs.length} songs)` : ''}
+            </div>
+            {setLength && <div style={{ fontSize:11, color:'#6b7280' }}>{setLength} min</div>}
           </div>
-          {songs.length > 0 ? (
+          {setName && <div style={{ fontSize:12, color:'#a78bfa', marginBottom:10, fontWeight:500 }}>{setName}</div>}
+          {songRecs.length > 0 ? (
             <>
               <div style={{ background:'#111118', border:'0.5px solid #2a2a3a', borderRadius:14, overflow:'hidden' }}>
-                {songs.map((song, i) => (
-                  <div key={i} style={{ display:'flex', alignItems:'center', gap:14, padding:'12px 16px', borderBottom: i < songs.length - 1 ? '0.5px solid #1a1a2a' : 'none' }}>
-                    <div style={{ width:24, textAlign:'center', fontSize:12, color:'#6b7280', fontWeight:600 }}>{i + 1}</div>
-                    <div style={{ fontSize:14 }}>{song.trim()}</div>
-                  </div>
-                ))}
+                {songRecs.map((song, i) => {
+                  const sf = song.fields
+                  return (
+                    <div key={song.id} style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 16px', borderBottom: i < songRecs.length-1 ? '0.5px solid #1a1a2a' : 'none' }}>
+                      <div style={{ width:22, textAlign:'center', flexShrink:0, fontSize:12, fontWeight:700, color:'#3a3a5a' }}>{i+1}</div>
+                      <div style={{ flex:1, minWidth:0 }}>
+                        <div style={{ fontSize:14, fontWeight:600, color:'#ffffff', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{sf['Song Title'] || '—'}</div>
+                        <div style={{ fontSize:12, color:'#6b7280', marginTop:2 }}>{sf['Artist'] || ''}{sf['Duration'] ? ` · ${sf['Duration']}` : ''}</div>
+                      </div>
+                      {sf['Guitar Tuning'] && (
+                        <div style={{ textAlign:'right', flexShrink:0 }}>
+                          <div style={{ fontSize:9, color:'#3a3a5a', marginBottom:1, textTransform:'uppercase', letterSpacing:'0.04em' }}>Guitar</div>
+                          <div style={{ fontSize:11, color:'#a78bfa', fontWeight:600 }}>{sf['Guitar Tuning']}</div>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
               </div>
               {setlist?.fields['Notes'] && (
                 <div style={{ marginTop:10, padding:14, background:'#111118', border:'0.5px solid #2a2a3a', borderRadius:12 }}>
