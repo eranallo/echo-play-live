@@ -1481,16 +1481,20 @@ function SetlistPage({ data, setlistData, onBack }) {
                   <div style={{ textAlign:'right', flexShrink:0, display:'flex', flexDirection:'column', gap:4 }}>
                     {(s['Guitar Tuning'] || s['Bass Tuning']) && (
                       <div style={{ textAlign:'center' }}>
-                        <div style={{ fontSize:9, color:'#3a3a5a', textTransform:'uppercase', letterSpacing:'0.04em' }}>Tuning</div>
-                        <div style={{ fontSize:15, color:'#a78bfa', fontWeight:700 }}>{(s['Guitar Tuning'] || s['Bass Tuning']).split('.')[0]}</div>
+                        <div style={{ fontSize:9, color:'#3a3a5a', textTransform:'uppercase', letterSpacing:'0.04em', marginBottom:2 }}>Tuning</div>
+                        <div style={{ fontSize:22, color:'#a78bfa', fontWeight:800, lineHeight:1 }}>{(s['Guitar Tuning'] || s['Bass Tuning']).split('.')[0]}</div>
                       </div>
                     )}
                   </div>
                 </div>
-                <div style={{ display:'flex', gap:8, paddingLeft:38 }}>
+                <div style={{ display:'flex', gap:8, paddingLeft:38, flexWrap:'wrap' }}>
                   <a href={`https://open.spotify.com/search/${encodeURIComponent((s['Song Title'] || '') + ' ' + (s['Artist'] || ''))}`} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} style={{ display:'flex', alignItems:'center', gap:5, padding:'5px 10px', background:'#0d1f0d', border:'0.5px solid #1a3a1a', borderRadius:20, textDecoration:'none' }}>
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="#1db954"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg>
                     <span style={{ fontSize:11, fontWeight:600, color:'#1db954' }}>Spotify</span>
+                  </a>
+                  <a href={`https://music.apple.com/search?term=${encodeURIComponent((s['Song Title'] || '') + ' ' + (s['Artist'] || ''))}`} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} style={{ display:'flex', alignItems:'center', gap:5, padding:'5px 10px', background:'#1a0a1a', border:'0.5px solid #3a1a3a', borderRadius:20, textDecoration:'none' }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="url(#appleGrad)"><defs><linearGradient id="appleGrad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#fc3c44"/><stop offset="100%" stopColor="#fd8bab"/></linearGradient></defs><path d="M23.994 6.124a9.23 9.23 0 00-.24-2.19c-.317-1.31-1.048-2.31-2.18-3.043a6.303 6.303 0 00-1.862-.81c-.676-.17-1.36-.243-2.048-.25H6.337c-.688.007-1.373.08-2.05.25a6.304 6.304 0 00-1.86.81C1.294 1.623.563 2.624.246 3.934A9.23 9.23 0 00.006 6.124C0 6.5 0 6.875 0 7.25v9.5c0 .375 0 .75.006 1.126.034 1.313.326 2.57 1.178 3.554.786.908 1.846 1.388 3.026 1.552.424.058.853.086 1.284.1h13.012c.43-.014.86-.042 1.284-.1 1.18-.164 2.24-.644 3.026-1.552.852-.984 1.144-2.241 1.178-3.554C24 17.5 24 17.125 24 16.75v-9.5c0-.375 0-.75-.006-1.126zM15.73 16.16c-.28.49-.77.78-1.34.78-.18 0-.36-.04-.53-.1l-1.26-.49c-.14-.05-.28-.08-.43-.08-.25 0-.48.08-.66.23l-.63.52c-.39.32-.87.5-1.38.5-.43 0-.84-.13-1.18-.38C7.47 16.56 7 15.6 7 14.56c0-1.03.47-1.99 1.29-2.63.43-.32.95-.52 1.49-.56.36-.03.73.02 1.07.15l1.26.49c.14.05.29.08.43.08.25 0 .48-.08.66-.23l.63-.52c.39-.32.87-.5 1.38-.5.95 0 1.8.54 2.22 1.38.29.58.38 1.24.25 1.87-.1.49-.33.95-.68 1.31zM17 9.5c0 .83-.67 1.5-1.5 1.5S14 10.33 14 9.5c0-.56.3-1.05.76-1.3V5.5c0-.28.22-.5.5-.5s.5.22.5.5v2.7c.46.25.74.74.74 1.3z"/></svg>
+                    <span style={{ fontSize:11, fontWeight:600, color:'#fc3c44' }}>Apple Music</span>
                   </a>
                   <a href={`https://www.ultimate-guitar.com/search.php?search_type=title&value=${encodeURIComponent(s['Song Title'] || '')}`} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} style={{ display:'flex', alignItems:'center', gap:5, padding:'5px 10px', background:'#1a1000', border:'0.5px solid #3a2a00', borderRadius:20, textDecoration:'none' }}>
                     <img src="https://www.ultimate-guitar.com/favicon.ico" alt="UG" style={{ width:14, height:14, borderRadius:2 }} />
