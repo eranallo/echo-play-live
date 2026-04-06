@@ -61,6 +61,7 @@ export default function Home() {
   const [selectedShow, setSelectedShow] = useState(null)
   const [previousPage, setPreviousPage] = useState('home')
   const [crewMember, setCrewMember] = useState(null)
+  const [setlistData, setSetlistData] = useState(null)
 
   const loadData = useCallback(async () => {
     try {
@@ -132,7 +133,8 @@ export default function Home() {
   if (page === 'crew-select') return <CrewSelect data={data} onSelect={(c) => { setCrewMember(c); setPage('crew-home') }} onBack={() => setPage('select')} />
   if (page === 'crew-home') return <CrewHome data={data} crew={crewMember} resolve={resolve} resolveField={resolveField} onShowClick={openShow} onBack={() => setPage('crew-select')} />
   if (page === 'home') return <MemberHome data={data} member={member} resolve={resolve} resolveField={resolveField} onShowClick={openShow} onBack={goToSelect} onNav={setPage} />
-  if (page === 'show-detail') return <ShowDetail data={data} member={member} show={selectedShow} resolve={resolve} resolveField={resolveField} onBack={() => setPage(previousPage)} />
+  if (page === 'show-detail') return <ShowDetail data={data} member={member} show={selectedShow} resolve={resolve} resolveField={resolveField} onBack={() => setPage(previousPage)} onSetlist={(d) => { setSetlistData(d); setPage('setlist') }} />
+  if (page === 'setlist') return <SetlistPage data={data} setlistData={setlistData} onBack={() => setPage('show-detail')} />
   if (page === 'schedule') return <FullSchedule data={data} member={member} resolve={resolve} resolveField={resolveField} onShowClick={openShow} onBack={() => setPage('home')} />
   if (page === 'blackouts') return <Blackouts data={data} member={member} resolve={resolve} onBack={() => setPage('home')} />
   if (page === 'master-calendar') return <MasterCalendar data={data} resolve={resolve} resolveField={resolveField} onShowClick={openShow} onBack={() => member ? setPage('home') : setPage('select')} />
@@ -392,7 +394,7 @@ function ShowRow({ show, resolve, resolveField, onClick }) {
   )
 }
 
-function ShowDetail({ data, member, show, resolve, resolveField, onBack }) {
+function ShowDetail({ data, member, show, resolve, resolveField, onBack, onSetlist }) {
   useEffect(() => { window.scrollTo(0, 0) }, [])
   const [weather, setWeather] = useState(null)
 
@@ -478,9 +480,7 @@ function ShowDetail({ data, member, show, resolve, resolveField, onBack }) {
   const vf = venueRecs[0] ? venueRecs[0].fields : {}
   const address = f['Venue Address'] || vf['Address'] || ''
   const days = daysUntil(f['Date'])
-  // Try both 'Setlist' and 'Setlists' field names
-  const setlistField = f['Setlist'] || f['Setlists'] || f['SETLISTS'] || []
-  const setlistRecs = resolve(setlistField, 'SETLISTS')
+  const setlistRecs = resolve(f['Setlist'] || f['Setlists'] || [], 'SETLISTS')
   const setlist = setlistRecs[0]
   const songIds = setlist ? (setlist.fields['Songs'] || []) : []
   const songRecs = (Array.isArray(songIds) ? songIds : [songIds])
@@ -488,8 +488,7 @@ function ShowDetail({ data, member, show, resolve, resolveField, onBack }) {
     .filter(Boolean)
   const setName = setlist?.fields['Set Name'] || null
   const setLength = setlist?.fields['Set Length'] || null
-  // Debug
-  const _setlistDebug = `fields:${Object.keys(f).join(',')} | setlistField:${JSON.stringify(setlistField)} | setlistRecs:${setlistRecs.length} | songs:${songRecs.length} | allSetlists:${(data['SETLISTS']||[]).length} | allSongs:${(data['SONGS']||[]).length}`
+
 
   function openMaps(addr) {
     const encoded = encodeURIComponent(addr)
@@ -678,7 +677,7 @@ function ShowDetail({ data, member, show, resolve, resolveField, onBack }) {
           ) : (
             <div style={{ background:'#111118', border:'0.5px solid #2a2a3a', borderRadius:14, padding:20, textAlign:'center', color:'#6b7280', fontSize:13 }}>
               No setlist added yet — check back closer to the show.
-              <div style={{ fontSize:9, color:'#3a3a4a', marginTop:8, wordBreak:'break-all', textAlign:'left' }}>{_setlistDebug}</div>
+
             </div>
           )}
         </div>
@@ -1458,6 +1457,70 @@ function CrewShowCard({ show, crew, resolve, resolveField, soundShows, merchShow
       <div style={{ marginTop:12, fontSize:12, color:'#6b7280', display:'flex', justifyContent:'space-between' }}>
         <span>{fmt(f['Date'])}</span>
         <span style={{ color:'#7ecbcb' }}>View details →</span>
+      </div>
+    </div>
+  )
+}
+
+
+function SetlistPage({ data, setlistData, onBack }) {
+  useEffect(() => { window.scrollTo(0, 0) }, [])
+  const { setlist, songRecs, show } = setlistData || {}
+  const sf = show?.fields || {}
+  const bands = (sf['Band'] || []).map(id => (data['BANDS'] || []).find(b => b.id === id)?.fields['Band Name']).filter(Boolean)
+  const bandColor = BAND_COLORS[bands[0]]?.color || '#a78bfa'
+  const setName = setlist?.fields['Set Name'] || 'Setlist'
+  const setLength = setlist?.fields['Set Length'] || null
+  const notes = setlist?.fields['Notes'] || null
+
+  return (
+    <div style={{ minHeight:'100vh', background:'#0a0a0f', color:'#ffffff', fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif' }}>
+      <Head><title>EPL — Setlist</title></Head>
+      <div style={{ background:'#111118', borderBottom:'0.5px solid #1e1e2e', padding:'12px 20px', display:'flex', alignItems:'center', gap:14, position:'sticky', top:0, zIndex:50 }}>
+        <button onClick={onBack} style={{ background:'none', border:'none', color:'#a78bfa', fontSize:22, cursor:'pointer', padding:0, lineHeight:1 }}>‹</button>
+        <div style={{ flex:1 }}>
+          <div style={{ fontSize:15, fontWeight:600 }}>{setName}</div>
+          <div style={{ fontSize:12, color:'#6b7280' }}>{bands.join(', ')}{setLength ? ` · ${setLength} min` : ''}</div>
+        </div>
+        <img src="/logo.png" alt="EPL" onClick={onBack} style={{ width:30, height:30, objectFit:'contain', mixBlendMode:'screen', cursor:'pointer', opacity:0.7 }} />
+      </div>
+
+      <div style={{ padding:'16px 20px 80px' }}>
+        {notes && (
+          <div style={{ background:'#111118', border:'0.5px solid #2a2a3a', borderRadius:12, padding:'12px 16px', marginBottom:16 }}>
+            <div style={{ fontSize:11, fontWeight:600, color:'#6b7280', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:6 }}>Set notes</div>
+            <div style={{ fontSize:13, color:'#9ca3af', lineHeight:1.6 }}>{notes}</div>
+          </div>
+        )}
+
+        <div style={{ background:'#111118', border:'0.5px solid #2a2a3a', borderRadius:14, overflow:'hidden' }}>
+          {(songRecs || []).map((song, i) => {
+            const s = song.fields
+            return (
+              <div key={song.id} style={{ display:'flex', alignItems:'center', gap:12, padding:'14px 16px', borderBottom: i < songRecs.length-1 ? '0.5px solid #1a1a2a' : 'none' }}>
+                <div style={{ width:26, textAlign:'center', flexShrink:0, fontSize:13, fontWeight:700, color:'#3a3a5a' }}>{i+1}</div>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ fontSize:15, fontWeight:600, color:'#ffffff' }}>{s['Song Title'] || '—'}</div>
+                  <div style={{ fontSize:12, color:'#6b7280', marginTop:2 }}>{s['Artist'] || ''}{s['Duration'] ? ` · ${s['Duration']}` : ''}</div>
+                </div>
+                <div style={{ textAlign:'right', flexShrink:0, display:'flex', flexDirection:'column', gap:4 }}>
+                  {s['Guitar Tuning'] && (
+                    <div>
+                      <div style={{ fontSize:9, color:'#3a3a5a', textTransform:'uppercase', letterSpacing:'0.04em' }}>Guitar</div>
+                      <div style={{ fontSize:11, color:'#a78bfa', fontWeight:600 }}>{s['Guitar Tuning']}</div>
+                    </div>
+                  )}
+                  {s['Bass Tuning'] && (
+                    <div>
+                      <div style={{ fontSize:9, color:'#3a3a5a', textTransform:'uppercase', letterSpacing:'0.04em' }}>Bass</div>
+                      <div style={{ fontSize:11, color:bandColor, fontWeight:600 }}>{s['Bass Tuning']}</div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
       </div>
     </div>
   )
