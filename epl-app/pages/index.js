@@ -78,6 +78,64 @@ export default function Home() {
 
   useEffect(() => { loadData() }, [loadData])
 
+  // Pull to refresh
+  useEffect(() => {
+    let startY = 0
+    let pulling = false
+    let indicator = null
+    let refreshing = false
+
+    function getIndicator() {
+      if (!indicator) {
+        indicator = document.createElement('div')
+        indicator.className = 'ptr-indicator'
+        indicator.innerHTML = '<div style="width:16px;height:16px;border:2px solid #3a3a5a;border-top-color:#a78bfa;border-radius:50%;animation:spin 0.8s linear infinite"></div><span>Pull to refresh</span>'
+        document.body.appendChild(indicator)
+      }
+      return indicator
+    }
+
+    function onTouchStart(e) {
+      startY = e.touches[0].clientY
+      pulling = window.scrollY === 0 && !refreshing
+    }
+
+    function onTouchMove(e) {
+      if (!pulling) return
+      const dist = e.touches[0].clientY - startY
+      if (dist > 50) {
+        const ind = getIndicator()
+        ind.classList.add('visible')
+        ind.querySelector('span').textContent = dist > 80 ? 'Release to refresh' : 'Pull to refresh'
+      } else {
+        if (indicator) indicator.classList.remove('visible')
+      }
+    }
+
+    function onTouchEnd(e) {
+      if (!pulling) return
+      const dist = e.changedTouches[0].clientY - startY
+      if (indicator) indicator.classList.remove('visible')
+      if (dist > 80 && !refreshing) {
+        refreshing = true
+        loadData().finally(() => { refreshing = false })
+      }
+      pulling = false
+    }
+
+    document.addEventListener('touchstart', onTouchStart, { passive: true })
+    document.addEventListener('touchmove', onTouchMove, { passive: true })
+    document.addEventListener('touchend', onTouchEnd, { passive: true })
+
+    return () => {
+      document.removeEventListener('touchstart', onTouchStart)
+      document.removeEventListener('touchmove', onTouchMove)
+      document.removeEventListener('touchend', onTouchEnd)
+      if (indicator && indicator.parentNode) indicator.parentNode.removeChild(indicator)
+      indicator = null
+    }
+  }, [loadData])
+
   function resolve(ids, table) {
     if (!ids || !data) return []
     const arr = Array.isArray(ids) ? ids : [ids]
