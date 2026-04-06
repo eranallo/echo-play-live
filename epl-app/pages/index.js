@@ -348,59 +348,70 @@ function ShowDetail({ data, member, show, resolve, resolveField, onBack }) {
   useEffect(() => {
     async function fetchWeather() {
       try {
-        const f = show.fields
-        const venueRecs = (data['VENUES'] || []).filter(v =>
-          (f['Venue'] || []).includes(v.id)
+        const showDate = show.fields['Date']
+        if (!showDate) { setWeather('unavailable'); return }
+
+        // Check if date is within 16-day forecast window
+        const today = new Date(new Date().toDateString())
+        const showD = new Date(showDate + 'T00:00:00')
+        const daysAway = Math.ceil((showD - today) / (1000 * 60 * 60 * 24))
+        if (daysAway > 16) { setWeather('tooFar'); return }
+        if (daysAway < 0) { setWeather('past'); return }
+
+        // Use Fort Worth coords as default — reliable fallback
+        let lat = 32.7555, lon = -97.3308
+
+        // Try to get venue city coords
+        const venueIds = show.fields['Venue'] || []
+        const venueRec = (data['VENUES'] || []).find(v =>
+          Array.isArray(venueIds) ? venueIds.includes(v.id) : venueIds === v.id
         )
-        const vf = venueRecs[0] ? venueRecs[0].fields : {}
-        // Use venue city to get coordinates via Open-Meteo geocoding
-        const city = vf['City'] || 'Fort Worth'
-        const state = vf['State'] || 'TX'
-        const geoRes = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city + ' ' + state)}&count=1`)
-        const geoData = await geoRes.json()
-        if (!geoData.results || !geoData.results[0]) return
-        const { latitude, longitude } = geoData.results[0]
-        const date = f['Date']
-        if (!date) return
+        if (venueRec) {
+          const city = venueRec.fields['City'] || ''
+          const state = venueRec.fields['State'] || 'TX'
+          if (city) {
+            try {
+              const geoRes = await fetch(
+                `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city + ' ' + state + ' USA')}&count=1&language=en&format=json`
+              )
+              const geoData = await geoRes.json()
+              if (geoData.results && geoData.results[0]) {
+                lat = geoData.results[0].latitude
+                lon = geoData.results[0].longitude
+              }
+            } catch(e) {}
+          }
+        }
+
         const weatherRes = await fetch(
-          `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max,weathercode&temperature_unit=fahrenheit&timezone=America%2FChicago&start_date=${date}&end_date=${date}`
+          `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max,weathercode&temperature_unit=fahrenheit&timezone=America%2FChicago&start_date=${showDate}&end_date=${showDate}&forecast_days=16`
         )
         const wData = await weatherRes.json()
-        if (wData.daily && wData.daily.temperature_2m_max && wData.daily.temperature_2m_max[0] !== null) {
+
+        if (wData.daily && wData.daily.temperature_2m_max && wData.daily.temperature_2m_max.length > 0 && wData.daily.temperature_2m_max[0] !== null) {
           const code = wData.daily.weathercode[0]
           const conditions = {
-            0: { label: 'Clear sky', icon: '☀️' },
-            1: { label: 'Mainly clear', icon: '🌤️' },
-            2: { label: 'Partly cloudy', icon: '⛅' },
-            3: { label: 'Overcast', icon: '☁️' },
-            45: { label: 'Foggy', icon: '🌫️' },
-            48: { label: 'Foggy', icon: '🌫️' },
-            51: { label: 'Light drizzle', icon: '🌦️' },
-            53: { label: 'Drizzle', icon: '🌦️' },
-            55: { label: 'Heavy drizzle', icon: '🌧️' },
-            61: { label: 'Light rain', icon: '🌧️' },
-            63: { label: 'Rain', icon: '🌧️' },
-            65: { label: 'Heavy rain', icon: '🌧️' },
-            71: { label: 'Light snow', icon: '🌨️' },
-            73: { label: 'Snow', icon: '❄️' },
-            75: { label: 'Heavy snow', icon: '❄️' },
-            80: { label: 'Rain showers', icon: '🌦️' },
-            81: { label: 'Rain showers', icon: '🌧️' },
-            82: { label: 'Violent showers', icon: '⛈️' },
-            95: { label: 'Thunderstorm', icon: '⛈️' },
-            96: { label: 'Thunderstorm', icon: '⛈️' },
-            99: { label: 'Thunderstorm', icon: '⛈️' },
+            0:'☀️ Clear', 1:'🌤️ Mainly clear', 2:'⛅ Partly cloudy', 3:'☁️ Overcast',
+            45:'🌫️ Foggy', 48:'🌫️ Foggy',
+            51:'🌦️ Light drizzle', 53:'🌦️ Drizzle', 55:'🌧️ Heavy drizzle',
+            61:'🌧️ Light rain', 63:'🌧️ Rain', 65:'🌧️ Heavy rain',
+            71:'🌨️ Light snow', 73:'❄️ Snow', 75:'❄️ Heavy snow',
+            80:'🌦️ Showers', 81:'🌧️ Showers', 82:'⛈️ Violent showers',
+            95:'⛈️ Thunderstorm', 96:'⛈️ Thunderstorm', 99:'⛈️ Thunderstorm',
           }
-          const condition = conditions[code] || { label: 'Unknown', icon: '🌡️' }
           setWeather({
             high: Math.round(wData.daily.temperature_2m_max[0]),
             low: Math.round(wData.daily.temperature_2m_min[0]),
-            rain: wData.daily.precipitation_probability_max[0],
-            condition: condition.label,
-            icon: condition.icon,
+            rain: wData.daily.precipitation_probability_max[0] ?? 0,
+            label: conditions[code] || '🌡️ Unknown',
+            daysAway,
           })
+        } else {
+          setWeather('unavailable')
         }
-      } catch(e) {}
+      } catch(e) {
+        setWeather('unavailable')
+      }
     }
     fetchWeather()
   }, [show.id])
@@ -477,20 +488,25 @@ function ShowDetail({ data, member, show, resolve, resolveField, onBack }) {
               <span style={{ fontSize:13, fontWeight:600, color:'#ffffff' }}>{f['Indoor / Outdoor']}</span>
             </div>
           )}
-          {weather && (
-            <div style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 14px', background:'#0a0a1a', borderRadius:20, border:'0.5px solid #2a2a3a', flex:1 }}>
-              <span style={{ fontSize:18 }}>{weather.icon}</span>
+          {weather && weather !== 'unavailable' && weather !== 'tooFar' && weather !== 'past' && (
+            <div style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 14px', background:'#0a0a1a', borderRadius:20, border:`0.5px solid ${weather.rain > 50 ? '#3a2020' : '#2a2a3a'}`, flex:1 }}>
               <div>
-                <div style={{ fontSize:13, fontWeight:600, color:'#ffffff' }}>{weather.condition} · {weather.high}°/{weather.low}°F</div>
+                <div style={{ fontSize:13, fontWeight:600, color:'#ffffff' }}>{weather.label} · {weather.high}°/{weather.low}°F</div>
                 <div style={{ fontSize:11, color: weather.rain > 50 ? '#ff9f7f' : '#6b7280' }}>
-                  {weather.rain}% chance of rain{weather.rain > 50 ? ' ⚠️' : ''}
+                  {weather.rain}% rain{weather.rain > 50 ? ' ⚠️' : ''}{weather.daysAway > 7 ? ' · extended forecast' : ''}
                 </div>
               </div>
             </div>
           )}
+          {weather === 'tooFar' && (
+            <div style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 14px', background:'#0a0a1a', borderRadius:20, border:'0.5px solid #1a1a2a', flex:1 }}>
+              <span style={{ fontSize:13, color:'#3a3a4a' }}>📅 Weather available within 16 days</span>
+            </div>
+          )}
+          {weather === 'past' && null}
           {!weather && f['Date'] && (
-            <div style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 14px', background:'#0a0a1a', borderRadius:20, border:'0.5px solid #1a1a2a' }}>
-              <span style={{ fontSize:13, color:'#3a3a4a' }}>Loading weather...</span>
+            <div style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 14px', background:'#0a0a1a', borderRadius:20, border:'0.5px solid #1a1a2a', flex:1 }}>
+              <span style={{ fontSize:13, color:'#3a3a4a' }}>🌡️ Fetching forecast...</span>
             </div>
           )}
         </div>
