@@ -273,7 +273,10 @@ function NextShowCard({ show, resolve, resolveField, onClick }) {
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:14 }}>
         <div>
           <div style={{ fontSize:18, fontWeight:700, marginBottom:6 }}>{vf['Venue Name'] || '—'}</div>
-          <div style={{ display:'flex', gap:4, flexWrap:'wrap' }}>{bands.map((b, i) => <BandTag key={i} name={b} />)}</div>
+          <div style={{ display:'flex', gap:4, flexWrap:'wrap', alignItems:'center' }}>
+            {bands.map((b, i) => <BandTag key={i} name={b} />)}
+            {f['Indoor / Outdoor'] && <span style={{ fontSize:10, padding:'1px 7px', borderRadius:20, background:'#0a0a1a', color:'#6b7280', border:'0.5px solid #2a2a3a' }}>{f['Indoor / Outdoor'] === 'Outdoor' ? '🌿 Outdoor' : f['Indoor / Outdoor'] === 'Both' ? '🏟️ Both' : '🏠 Indoor'}</span>}
+          </div>
         </div>
         <div style={{ background:'#1a1a2e', borderRadius:10, padding:'6px 14px', textAlign:'center', flexShrink:0, marginLeft:12 }}>
           <div style={{ fontSize:22, fontWeight:700, color:'#a78bfa' }}>{days}</div>
@@ -340,6 +343,68 @@ function ShowRow({ show, resolve, resolveField, onClick }) {
 
 function ShowDetail({ data, member, show, resolve, resolveField, onBack }) {
   useEffect(() => { window.scrollTo(0, 0) }, [])
+  const [weather, setWeather] = useState(null)
+
+  useEffect(() => {
+    async function fetchWeather() {
+      try {
+        const f = show.fields
+        const venueRecs = (data['VENUES'] || []).filter(v =>
+          (f['Venue'] || []).includes(v.id)
+        )
+        const vf = venueRecs[0] ? venueRecs[0].fields : {}
+        // Use venue city to get coordinates via Open-Meteo geocoding
+        const city = vf['City'] || 'Fort Worth'
+        const state = vf['State'] || 'TX'
+        const geoRes = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city + ' ' + state)}&count=1`)
+        const geoData = await geoRes.json()
+        if (!geoData.results || !geoData.results[0]) return
+        const { latitude, longitude } = geoData.results[0]
+        const date = f['Date']
+        if (!date) return
+        const weatherRes = await fetch(
+          `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max,weathercode&temperature_unit=fahrenheit&timezone=America%2FChicago&start_date=${date}&end_date=${date}`
+        )
+        const wData = await weatherRes.json()
+        if (wData.daily && wData.daily.temperature_2m_max && wData.daily.temperature_2m_max[0] !== null) {
+          const code = wData.daily.weathercode[0]
+          const conditions = {
+            0: { label: 'Clear sky', icon: '☀️' },
+            1: { label: 'Mainly clear', icon: '🌤️' },
+            2: { label: 'Partly cloudy', icon: '⛅' },
+            3: { label: 'Overcast', icon: '☁️' },
+            45: { label: 'Foggy', icon: '🌫️' },
+            48: { label: 'Foggy', icon: '🌫️' },
+            51: { label: 'Light drizzle', icon: '🌦️' },
+            53: { label: 'Drizzle', icon: '🌦️' },
+            55: { label: 'Heavy drizzle', icon: '🌧️' },
+            61: { label: 'Light rain', icon: '🌧️' },
+            63: { label: 'Rain', icon: '🌧️' },
+            65: { label: 'Heavy rain', icon: '🌧️' },
+            71: { label: 'Light snow', icon: '🌨️' },
+            73: { label: 'Snow', icon: '❄️' },
+            75: { label: 'Heavy snow', icon: '❄️' },
+            80: { label: 'Rain showers', icon: '🌦️' },
+            81: { label: 'Rain showers', icon: '🌧️' },
+            82: { label: 'Violent showers', icon: '⛈️' },
+            95: { label: 'Thunderstorm', icon: '⛈️' },
+            96: { label: 'Thunderstorm', icon: '⛈️' },
+            99: { label: 'Thunderstorm', icon: '⛈️' },
+          }
+          const condition = conditions[code] || { label: 'Unknown', icon: '🌡️' }
+          setWeather({
+            high: Math.round(wData.daily.temperature_2m_max[0]),
+            low: Math.round(wData.daily.temperature_2m_min[0]),
+            rain: wData.daily.precipitation_probability_max[0],
+            condition: condition.label,
+            icon: condition.icon,
+          })
+        }
+      } catch(e) {}
+    }
+    fetchWeather()
+  }, [show.id])
+
   const f = show.fields
   const bands = resolveField(f['Band'], 'BANDS', 'Band Name')
   const venueRecs = resolve(f['Venue'], 'VENUES')
@@ -403,6 +468,31 @@ function ShowDetail({ data, member, show, resolve, resolveField, onBack }) {
               <div style={{ fontSize:18, fontWeight:700, color:'#ffffff' }}>{f['End Time'] || '—'}</div>
             </div>
           </div>
+        </div>
+
+        <div style={{ display:'flex', gap:10, marginBottom:20, flexWrap:'wrap' }}>
+          {f['Indoor / Outdoor'] && (
+            <div style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 14px', background:'#0a0a1a', borderRadius:20, border:'0.5px solid #2a2a3a' }}>
+              <span style={{ fontSize:16 }}>{f['Indoor / Outdoor'] === 'Outdoor' ? '🌿' : f['Indoor / Outdoor'] === 'Both' ? '🏟️' : '🏠'}</span>
+              <span style={{ fontSize:13, fontWeight:600, color:'#ffffff' }}>{f['Indoor / Outdoor']}</span>
+            </div>
+          )}
+          {weather && (
+            <div style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 14px', background:'#0a0a1a', borderRadius:20, border:'0.5px solid #2a2a3a', flex:1 }}>
+              <span style={{ fontSize:18 }}>{weather.icon}</span>
+              <div>
+                <div style={{ fontSize:13, fontWeight:600, color:'#ffffff' }}>{weather.condition} · {weather.high}°/{weather.low}°F</div>
+                <div style={{ fontSize:11, color: weather.rain > 50 ? '#ff9f7f' : '#6b7280' }}>
+                  {weather.rain}% chance of rain{weather.rain > 50 ? ' ⚠️' : ''}
+                </div>
+              </div>
+            </div>
+          )}
+          {!weather && f['Date'] && (
+            <div style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 14px', background:'#0a0a1a', borderRadius:20, border:'0.5px solid #1a1a2a' }}>
+              <span style={{ fontSize:13, color:'#3a3a4a' }}>Loading weather...</span>
+            </div>
+          )}
         </div>
 
         {(address || vf['Venue Name']) && (
