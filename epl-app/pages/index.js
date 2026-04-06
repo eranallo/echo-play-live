@@ -380,8 +380,9 @@ function ShowDetail({ data, member, show, resolve, resolveField, onBack }) {
           )}
         </div>
 
-        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8, marginBottom:20 }}>
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:8, marginBottom:20 }}>
           <TimeBlock label="Load in" value={f['Load-In Time']} />
+          <TimeBlock label="Sound check" value={f['Sound Check Confirmed'] ? 'Confirmed' : f['Set Time'] ? 'TBC' : null} />
           <TimeBlock label="Set time" value={f['Set Time']} />
           <TimeBlock label="End time" value={f['End Time']} />
         </div>
@@ -536,9 +537,6 @@ function ShowDetail({ data, member, show, resolve, resolveField, onBack }) {
           <div style={{ fontSize:11, fontWeight:600, color:'#6b7280', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:10 }}>Show info</div>
           <div style={{ background:'#111118', border:'0.5px solid #2a2a3a', borderRadius:14, overflow:'hidden' }}>
             {[
-              ['Deal type', f['Deal Type']],
-              ['Sound check', f['Sound Check Confirmed'] ? 'Confirmed ✓' : 'TBC'],
-              ['Contract', f['Contract Signed'] ? 'Signed ✓' : 'Pending'],
               ['Status', f['Status']],
             ].filter(([, val]) => val).map(([label, val], i, arr) => (
               <div key={label} style={{ display:'flex', justifyContent:'space-between', padding:'12px 16px', borderBottom: i < arr.length - 1 ? '0.5px solid #1a1a2a' : 'none' }}>
