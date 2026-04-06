@@ -1479,16 +1479,10 @@ function SetlistPage({ data, setlistData, onBack }) {
                     <div style={{ fontSize:12, color:'#6b7280', marginTop:2 }}>{s['Artist'] || ''}{s['Duration'] ? ` · ${s['Duration']}` : ''}</div>
                   </div>
                   <div style={{ textAlign:'right', flexShrink:0, display:'flex', flexDirection:'column', gap:4 }}>
-                    {s['Guitar Tuning'] && (
+                    {(s['Guitar Tuning'] || s['Bass Tuning']) && (
                       <div style={{ textAlign:'center' }}>
-                        <div style={{ fontSize:9, color:'#3a3a5a', textTransform:'uppercase', letterSpacing:'0.04em' }}>Gtr</div>
-                        <div style={{ fontSize:15, color:'#a78bfa', fontWeight:700 }}>{s['Guitar Tuning'].split('.')[0]}</div>
-                      </div>
-                    )}
-                    {s['Bass Tuning'] && (
-                      <div style={{ textAlign:'center' }}>
-                        <div style={{ fontSize:9, color:'#3a3a5a', textTransform:'uppercase', letterSpacing:'0.04em' }}>Bass</div>
-                        <div style={{ fontSize:15, color:bandColor, fontWeight:700 }}>{s['Bass Tuning'].split('.')[0]}</div>
+                        <div style={{ fontSize:9, color:'#3a3a5a', textTransform:'uppercase', letterSpacing:'0.04em' }}>Tuning</div>
+                        <div style={{ fontSize:15, color:'#a78bfa', fontWeight:700 }}>{(s['Guitar Tuning'] || s['Bass Tuning']).split('.')[0]}</div>
                       </div>
                     )}
                   </div>
