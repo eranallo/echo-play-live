@@ -277,15 +277,12 @@ function NextShowCard({ show, resolve, resolveField, onClick }) {
         <div style={{ position:'relative', height:140 }}>
           <img src={venuePhoto} alt={vf['Venue Name']} style={{ width:'100%', height:'100%', objectFit:'cover' }} />
           <div style={{ position:'absolute', inset:0, background:'linear-gradient(to bottom, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0.75) 100%)' }} />
-          <div style={{ position:'absolute', bottom:12, left:14, right:14, display:'flex', alignItems:'flex-end', justifyContent:'space-between' }}>
-            <div>
-              <div style={{ fontSize:17, fontWeight:700, color:'#ffffff', textShadow:'0 1px 3px rgba(0,0,0,0.8)' }}>{vf['Venue Name'] || '—'}</div>
-              <div style={{ display:'flex', gap:4, marginTop:4, flexWrap:'wrap', alignItems:'center' }}>
-                {bands.map((b, i) => <BandTag key={i} name={b} />)}
-                {f['Indoor / Outdoor'] && <span style={{ fontSize:10, padding:'1px 7px', borderRadius:20, background:'rgba(0,0,0,0.5)', color:'#cccccc', border:'0.5px solid rgba(255,255,255,0.2)' }}>{f['Indoor / Outdoor'] === 'Outdoor' ? '🌿 Outdoor' : f['Indoor / Outdoor'] === 'Both' ? '🏟️ Both' : '🏠 Indoor'}</span>}
-              </div>
+          <div style={{ position:'absolute', bottom:12, left:14, right:14 }}>
+            <div style={{ fontSize:17, fontWeight:700, color:'#ffffff', textShadow:'0 1px 3px rgba(0,0,0,0.8)' }}>{vf['Venue Name'] || '—'}</div>
+            <div style={{ display:'flex', gap:4, marginTop:4, flexWrap:'wrap', alignItems:'center' }}>
+              {bands.map((b, i) => <BandTag key={i} name={b} />)}
+              {f['Indoor / Outdoor'] && <span style={{ fontSize:10, padding:'1px 7px', borderRadius:20, background:'rgba(0,0,0,0.5)', color:'#cccccc', border:'0.5px solid rgba(255,255,255,0.2)' }}>{f['Indoor / Outdoor'] === 'Outdoor' ? '🌿 Outdoor' : f['Indoor / Outdoor'] === 'Both' ? '🏟️ Both' : '🏠 Indoor'}</span>}
             </div>
-            {bandLogo && <img src={bandLogo} alt="" style={{ width:50, height:50, objectFit:'contain', borderRadius:8, background:'rgba(0,0,0,0.5)', padding:5 }} />}
           </div>
           <div style={{ position:'absolute', top:10, right:12, background:'#1a1a2e', borderRadius:8, padding:'5px 12px', textAlign:'center' }}>
             <div style={{ fontSize:18, fontWeight:700, color:'#a78bfa' }}>{days}</div>
@@ -310,6 +307,12 @@ function NextShowCard({ show, resolve, resolveField, onClick }) {
         </div>
       )}
       <div style={{ padding: venuePhoto ? '14px 16px' : '0 16px' }}>
+        {bandLogo && (
+          <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:12 }}>
+            <img src={bandLogo} alt="" style={{ width:44, height:44, objectFit:'contain', borderRadius:8, background:'#1a1a2e', padding:4, flexShrink:0 }} />
+            <div style={{ fontSize:16, fontWeight:700, color:'#ffffff' }}>{bands[0]}</div>
+          </div>
+        )}
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8, marginBottom: address ? 14 : 0 }}>
         <TimeBlock label="Load in" value={f['Load-In Time']} />
         <TimeBlock label="Set time" value={f['Set Time']} />
@@ -449,6 +452,8 @@ function ShowDetail({ data, member, show, resolve, resolveField, onBack }) {
 
   const f = show.fields
   const bands = resolveField(f['Band'], 'BANDS', 'Band Name')
+  const bandRecs = resolve(f['Band'], 'BANDS')
+  const bandLogo = bandRecs[0]?.fields['Logo/Photo'] && Array.isArray(bandRecs[0].fields['Logo/Photo']) ? bandRecs[0].fields['Logo/Photo'][0]?.url : null
   const venueRecs = resolve(f['Venue'], 'VENUES')
   const vf = venueRecs[0] ? venueRecs[0].fields : {}
   const address = f['Venue Address'] || vf['Address'] || ''
@@ -469,8 +474,6 @@ function ShowDetail({ data, member, show, resolve, resolveField, onBack }) {
       <Head><title>EPL — Show Details</title></Head>
       {(() => {
         const venuePhoto = vf['Photo'] && Array.isArray(vf['Photo']) && vf['Photo'][0] ? vf['Photo'][0].url : null
-        const bandRecs = resolve(f['Band'], 'BANDS')
-        const bandLogo = bandRecs[0]?.fields['Logo/Photo'] && Array.isArray(bandRecs[0].fields['Logo/Photo']) ? bandRecs[0].fields['Logo/Photo'][0]?.url : null
 
         return venuePhoto ? (
           <div style={{ position:'relative', width:'100%', height:220 }}>
@@ -478,14 +481,9 @@ function ShowDetail({ data, member, show, resolve, resolveField, onBack }) {
             <div style={{ position:'absolute', inset:0, background:'linear-gradient(to bottom, rgba(0,0,0,0.35) 0%, rgba(0,0,0,0.7) 100%)' }} />
             <button onClick={onBack} style={{ position:'absolute', top:16, left:16, background:'rgba(0,0,0,0.5)', border:'none', color:'#ffffff', fontSize:22, cursor:'pointer', padding:'4px 10px', borderRadius:20, backdropFilter:'blur(4px)' }}>‹</button>
             <img src="/logo.png" alt="EPL" onClick={onBack} style={{ position:'absolute', top:14, right:14, width:32, height:32, objectFit:'contain', mixBlendMode:'screen', cursor:'pointer', opacity:0.8 }} />
-            <div style={{ position:'absolute', bottom:14, left:16, right:16, display:'flex', alignItems:'flex-end', justifyContent:'space-between' }}>
-              <div>
-                <div style={{ fontSize:20, fontWeight:700, color:'#ffffff', textShadow:'0 1px 4px rgba(0,0,0,0.8)' }}>{vf['Venue Name'] || '—'}</div>
-                <div style={{ fontSize:13, color:'rgba(255,255,255,0.75)', marginTop:2 }}>{fmt(f['Date'])}</div>
-              </div>
-              {bandLogo && (
-                <img src={bandLogo} alt={bandRecs[0]?.fields['Band Name']} style={{ width:64, height:64, objectFit:'contain', borderRadius:10, background:'rgba(0,0,0,0.4)', padding:6 }} />
-              )}
+            <div style={{ position:'absolute', bottom:14, left:16, right:16 }}>
+              <div style={{ fontSize:22, fontWeight:700, color:'#ffffff', textShadow:'0 1px 4px rgba(0,0,0,0.8)' }}>{vf['Venue Name'] || '—'}</div>
+              <div style={{ fontSize:13, color:'rgba(255,255,255,0.75)', marginTop:2 }}>{fmt(f['Date'])}</div>
             </div>
           </div>
         ) : (
@@ -502,9 +500,18 @@ function ShowDetail({ data, member, show, resolve, resolveField, onBack }) {
 
       <div style={{ padding:'20px 20px 80px' }}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20 }}>
-          <div style={{ display:'flex', gap:4, flexWrap:'wrap' }}>{bands.map((b, i) => <BandTag key={i} name={b} />)}</div>
+          <div style={{ display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
+            {bandLogo && (
+              <img src={bandLogo} alt="" style={{ width:52, height:52, objectFit:'contain', borderRadius:10, background:'#1a1a2e', padding:4, flexShrink:0 }} />
+            )}
+            <div>
+              {bands.map((b, i) => (
+                <div key={i} style={{ fontSize:22, fontWeight:700, color:'#ffffff', lineHeight:1.2 }}>{b}</div>
+              ))}
+            </div>
+          </div>
           {days != null && days >= 0 && (
-            <div style={{ background:'#1a1a2e', borderRadius:10, padding:'6px 14px', textAlign:'center' }}>
+            <div style={{ background:'#1a1a2e', borderRadius:10, padding:'6px 14px', textAlign:'center', flexShrink:0, marginLeft:12 }}>
               <div style={{ fontSize:20, fontWeight:700, color:'#a78bfa' }}>{days}</div>
               <div style={{ fontSize:10, color:'#6b7280' }}>{days === 1 ? 'day away' : 'days away'}</div>
             </div>
