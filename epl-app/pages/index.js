@@ -489,14 +489,20 @@ function ShowDetail({ data, member, show, resolve, resolveField, onBack }) {
             </div>
           )}
           {weather && weather !== 'unavailable' && weather !== 'tooFar' && weather !== 'past' && (
-            <div style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 14px', background:'#0a0a1a', borderRadius:20, border:`0.5px solid ${weather.rain > 50 ? '#3a2020' : '#2a2a3a'}`, flex:1 }}>
-              <div>
+            <a
+              href={`https://forecast.weather.gov/MapClick.php?CityName=${encodeURIComponent((resolve(show.fields['Venue'], 'VENUES')[0]?.fields['City'] || 'Fort Worth'))}&state=TX&site=FWD`}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={e => e.stopPropagation()}
+              style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 14px', background:'#0a0a1a', borderRadius:20, border:`0.5px solid ${weather.rain > 50 ? '#3a2020' : '#2a2a3a'}`, flex:1, textDecoration:'none' }}
+            >
+              <div style={{ flex:1 }}>
                 <div style={{ fontSize:13, fontWeight:600, color:'#ffffff' }}>{weather.label} · {weather.high}°/{weather.low}°F</div>
                 <div style={{ fontSize:11, color: weather.rain > 50 ? '#ff9f7f' : '#6b7280' }}>
-                  {weather.rain}% rain{weather.rain > 50 ? ' ⚠️' : ''}{weather.daysAway > 7 ? ' · extended forecast' : ''}
+                  {weather.rain}% rain{weather.rain > 50 ? ' ⚠️' : ''}{weather.daysAway > 7 ? ' · extended forecast' : ''} · tap for full forecast ↗
                 </div>
               </div>
-            </div>
+            </a>
           )}
           {weather === 'tooFar' && (
             <div style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 14px', background:'#0a0a1a', borderRadius:20, border:'0.5px solid #1a1a2a', flex:1 }}>
