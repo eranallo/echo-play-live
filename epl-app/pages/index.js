@@ -905,20 +905,29 @@ function MasterCalendar({ data, resolve, resolveField, onShowClick, onBack }) {
                     </div>
                     <div style={{ width:'0.5px', alignSelf:'stretch', background:'#2a2a3a', flexShrink:0 }} />
                     <div style={{ flex:1, minWidth:0 }}>
-                      {isBooked ? shows.map((s, i) => {
-                        const venueRecs = resolve(s.fields['Venue'], 'VENUES')
+                      {isBooked && shows.length === 1 ? (() => {
+                        const venueRecs = resolve(shows[0].fields['Venue'], 'VENUES')
                         const vf = venueRecs[0] ? venueRecs[0].fields : {}
-                        const bands = resolveField(s.fields['Band'], 'BANDS', 'Band Name')
+                        const bands = resolveField(shows[0].fields['Band'], 'BANDS', 'Band Name')
                         return (
-                          <div key={i} style={{ marginBottom: i < shows.length-1 ? 8 : 0, paddingBottom: i < shows.length-1 ? 8 : 0, borderBottom: i < shows.length-1 ? '0.5px solid rgba(255,255,255,0.08)' : 'none' }}>
+                          <div>
                             <div style={{ fontSize:13, fontWeight:600, color:'#ffffff', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{vf['Venue Name'] || '—'}</div>
                             <div style={{ display:'flex', gap:4, marginTop:2, alignItems:'center', flexWrap:'wrap' }}>
                               {bands.map((b, bi) => <span key={bi} style={{ fontSize:10, padding:'1px 6px', borderRadius:20, background:BAND_COLORS[b]?.bg||'#1a1a2e', color:BAND_COLORS[b]?.color||'#a78bfa', fontWeight:600 }}>{b}</span>)}
-                              {s.fields['Set Time'] && <span style={{ fontSize:10, color:'#6b7280' }}>{s.fields['Set Time']}</span>}
+                              {shows[0].fields['Set Time'] && <span style={{ fontSize:10, color:'#6b7280' }}>{shows[0].fields['Set Time']}</span>}
                             </div>
                           </div>
                         )
-                      }) : isBlackedOut ? (
+                      })() : isBooked && shows.length > 1 ? (
+                        <div>
+                          <div style={{ fontSize:13, fontWeight:600, color:'#6bcb77' }}>{shows.length} shows — tap to select</div>
+                          <div style={{ display:'flex', gap:4, marginTop:4, flexWrap:'wrap' }}>
+                            {shows.flatMap(s => resolveField(s.fields['Band'], 'BANDS', 'Band Name')).filter((b,i,a) => a.indexOf(b)===i).map((b, bi) => (
+                              <span key={bi} style={{ fontSize:10, padding:'1px 6px', borderRadius:20, background:BAND_COLORS[b]?.bg||'#1a1a2e', color:BAND_COLORS[b]?.color||'#a78bfa', fontWeight:600 }}>{b}</span>
+                            ))}
+                          </div>
+                        </div>
+                      ) : isBlackedOut ? (
                         <div style={{ fontSize:13, color:'#ff9f7f' }}>
                           {blackouts.reduce((a, b) => a + (Array.isArray(b.fields['Member']) ? b.fields['Member'].length : 1), 0)} member conflict{blackouts.length > 1 ? 's' : ''} — tap for details
                         </div>
@@ -942,15 +951,20 @@ function MasterCalendar({ data, resolve, resolveField, onShowClick, onBack }) {
                         const sVenue = resolve(sf['Venue'], 'VENUES')
                         const svf = sVenue[0] ? sVenue[0].fields : {}
                         return (
-                          <div key={s.id} onClick={e => { e.stopPropagation(); onShowClick(s) }} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'10px 0', borderBottom: i < shows.length-1 ? '0.5px solid #1a2a1a' : 'none', cursor:'pointer' }}>
-                            <div>
+                          <div key={s.id} onClick={e => { e.stopPropagation(); onShowClick(s) }} style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 0', borderBottom: i < shows.length-1 ? '0.5px solid #1a2a1a' : 'none', cursor:'pointer' }}>
+                            {sBands.map((b, bi) => {
+                              const bRec = (data['BANDS'] || []).find(br => br.fields['Band Name'] === b)
+                              const logo = bRec?.fields['Logo/Photo']?.[0]?.url
+                              return logo ? <img key={bi} src={logo} alt={b} style={{ width:38, height:38, objectFit:'contain', borderRadius:8, background:'#0a1a0a', padding:3, flexShrink:0 }} /> : null
+                            })}
+                            <div style={{ flex:1 }}>
                               <div style={{ fontSize:13, fontWeight:600, color:'#ffffff' }}>{svf['Venue Name'] || '—'}</div>
-                              <div style={{ display:'flex', gap:4, marginTop:3 }}>
+                              <div style={{ display:'flex', gap:4, marginTop:3, flexWrap:'wrap', alignItems:'center' }}>
                                 {sBands.map((b, bi) => <span key={bi} style={{ fontSize:10, padding:'1px 6px', borderRadius:20, background:BAND_COLORS[b]?.bg||'#1a1a2e', color:BAND_COLORS[b]?.color||'#a78bfa', fontWeight:600 }}>{b}</span>)}
                                 {sf['Set Time'] && <span style={{ fontSize:10, color:'#6b7280' }}>{sf['Set Time']}</span>}
                               </div>
                             </div>
-                            <span style={{ color:'#6bcb77', fontSize:16 }}>›</span>
+                            <span style={{ color:'#6bcb77', fontSize:16, flexShrink:0 }}>›</span>
                           </div>
                         )
                       })}
