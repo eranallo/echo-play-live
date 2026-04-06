@@ -3,10 +3,10 @@ import Head from 'next/head'
 import Image from 'next/image'
 
 const BAND_COLORS = {
-  'So Long Goodnight': { bg: '#1a2e1a', color: '#6bcb77' },
-  'The Dick Beldings': { bg: '#1a1a2e', color: '#a78bfa' },
-  'Jambi':             { bg: '#2e1a1a', color: '#ff9f7f' },
-  'Elite':             { bg: '#1a2a2e', color: '#7ecbcb' },
+  'So Long Goodnight': { bg: '#1a0a12', color: '#f72585' },
+  'The Dick Beldings': { bg: '#001a1f', color: '#00d4ff' },
+  'Jambi':             { bg: '#111111', color: '#ffffff' },
+  'Elite':             { bg: '#0a1f0a', color: '#4ade80' },
 }
 
 const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December']
