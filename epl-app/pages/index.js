@@ -107,7 +107,14 @@ export default function Home() {
 
   if (loading) return (
     <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', flexDirection:'column', gap:20, background:'#0a0a0f' }}>
-      <Head><title>Echo Play Live</title></Head>
+      <Head>
+        <title>Echo Play Live</title>
+        <link rel="apple-touch-icon" href="/logo.png" />
+        <link rel="icon" href="/logo.png" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="apple-mobile-web-app-title" content="Echo Play Live" />
+      </Head>
       <img src="/logo.png" alt="Echo Play Live" style={{ width:120, height:120, objectFit:'contain', opacity:0.9 }} />
       <div style={{ color:'#6b7280', fontSize:13 }}>Loading...</div>
     </div>
@@ -139,7 +146,14 @@ function MemberSelect({ data, onSelect, onBooking, onCalendar, onCrew }) {
   const totalShows = (data['SHOWS'] || []).filter(s => s.fields['Date'] && new Date(s.fields['Date']) >= today).length
   return (
     <div style={{ minHeight:'100vh', background:'#0a0a0f', display:'flex', flexDirection:'column', alignItems:'center', padding:'2.5rem 1.5rem 2rem' }}>
-      <Head><title>Echo Play Live</title></Head>
+      <Head>
+        <title>Echo Play Live</title>
+        <link rel="apple-touch-icon" href="/logo.png" />
+        <link rel="icon" href="/logo.png" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="apple-mobile-web-app-title" content="Echo Play Live" />
+      </Head>
       <div style={{ marginBottom:'1.75rem', textAlign:'center' }}>
         <img src="/logo.png" alt="Echo Play Live" style={{ width:120, height:120, objectFit:'contain', marginBottom:14, mixBlendMode:'screen' }} />
         <div style={{ fontSize:13, color:'#6b7280' }}>Select your name to continue</div>
@@ -197,7 +211,13 @@ function MemberHome({ data, member, resolve, resolveField, onShowClick, onBack, 
 
   return (
     <div style={{ minHeight:'100vh', background:'#0a0a0f', color:'#ffffff', fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif' }}>
-      <Head><title>EPL — {name}</title></Head>
+      <Head>
+        <title>EPL — {name}</title>
+        <link rel="apple-touch-icon" href="/logo.png" />
+        <link rel="icon" href="/logo.png" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-title" content="Echo Play Live" />
+      </Head>
 
       <div style={{ background:'#111118', borderBottom:'0.5px solid #1e1e2e', padding:'12px 20px', display:'flex', alignItems:'center', justifyContent:'space-between', position:'sticky', top:0, zIndex:50 }}>
         <img src="/logo.png" alt="EPL" onClick={onBack} style={{ width:36, height:36, objectFit:'contain', mixBlendMode:'screen', cursor:'pointer' }} />
@@ -471,7 +491,13 @@ function ShowDetail({ data, member, show, resolve, resolveField, onBack }) {
 
   return (
     <div style={{ minHeight:'100vh', background:'#0a0a0f', color:'#ffffff', fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif' }}>
-      <Head><title>EPL — Show Details</title></Head>
+      <Head>
+        <title>EPL — Show Details</title>
+        <link rel="apple-touch-icon" href="/logo.png" />
+        <link rel="icon" href="/logo.png" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-title" content="Echo Play Live" />
+      </Head>
       {(() => {
         const venuePhoto = vf['Photo'] && Array.isArray(vf['Photo']) && vf['Photo'][0] ? vf['Photo'][0].url : null
 
@@ -823,7 +849,13 @@ function MasterCalendar({ data, resolve, resolveField, onShowClick, onBack }) {
 
   return (
     <div style={{ minHeight:'100vh', background:'#0a0a0f', color:'#ffffff', fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif' }}>
-      <Head><title>EPL — Show Calendar {year}</title></Head>
+      <Head>
+        <title>EPL — Show Calendar {year}</title>
+        <link rel="apple-touch-icon" href="/logo.png" />
+        <link rel="icon" href="/logo.png" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-title" content="Echo Play Live" />
+      </Head>
       <div style={{ background:'#111118', borderBottom:'0.5px solid #1e1e2e', padding:'12px 20px', display:'flex', alignItems:'center', gap:14, position:'sticky', top:0, zIndex:50 }}>
         <button onClick={onBack} style={{ background:'none', border:'none', color:'#a78bfa', fontSize:22, cursor:'pointer', padding:0 }}>‹</button>
         <div style={{ flex:1 }}>
@@ -1021,7 +1053,13 @@ function FullSchedule({ data, member, resolve, resolveField, onShowClick, onBack
 
   return (
     <div style={{ minHeight:'100vh', background:'#0a0a0f', color:'#ffffff', fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif' }}>
-      <Head><title>EPL — My Schedule</title></Head>
+      <Head>
+        <title>EPL — My Schedule</title>
+        <link rel="apple-touch-icon" href="/logo.png" />
+        <link rel="icon" href="/logo.png" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-title" content="Echo Play Live" />
+      </Head>
       <div style={{ background:'#111118', borderBottom:'0.5px solid #1e1e2e', padding:'12px 20px', display:'flex', alignItems:'center', gap:14, position:'sticky', top:0, zIndex:50 }}>
         <button onClick={onBack} style={{ background:'none', border:'none', color:'#a78bfa', fontSize:22, cursor:'pointer', padding:0 }}>‹</button>
         <div style={{ flex:1 }}>
@@ -1094,7 +1132,13 @@ function Blackouts({ data, member, resolve, onBack }) {
 
   return (
     <div style={{ minHeight:'100vh', background:'#0a0a0f', color:'#ffffff', fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif' }}>
-      <Head><title>EPL - Blackout Dates</title></Head>
+      <Head>
+        <title>EPL - Blackout Dates</title>
+        <link rel="apple-touch-icon" href="/logo.png" />
+        <link rel="icon" href="/logo.png" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-title" content="Echo Play Live" />
+      </Head>
       <div style={{ background:'#111118', borderBottom:'0.5px solid #1e1e2e', padding:'12px 20px', display:'flex', alignItems:'center', justifyContent:'space-between', position:'sticky', top:0, zIndex:50 }}>
         <div style={{ display:'flex', alignItems:'center', gap:10 }}>
           <button onClick={onBack} style={{ background:'none', border:'none', color:'#a78bfa', fontSize:22, cursor:'pointer', padding:0 }}>{String.fromCharCode(8249)}</button>
@@ -1205,7 +1249,13 @@ function CrewSelect({ data, onSelect, onBack }) {
   const active = crew.filter(c => c.fields['Active'] !== false)
   return (
     <div style={{ minHeight:'100vh', background:'#0a0a0f', display:'flex', flexDirection:'column', alignItems:'center', padding:'2.5rem 1.5rem 2rem', fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif' }}>
-      <Head><title>EPL — Crew</title></Head>
+      <Head>
+        <title>EPL — Crew</title>
+        <link rel="apple-touch-icon" href="/logo.png" />
+        <link rel="icon" href="/logo.png" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-title" content="Echo Play Live" />
+      </Head>
       <div style={{ marginBottom:'1.75rem', textAlign:'center' }}>
         <img src="/logo.png" alt="Echo Play Live" onClick={onBack} style={{ width:100, height:100, objectFit:'contain', marginBottom:14, mixBlendMode:'screen', cursor:'pointer' }} />
         <div style={{ fontSize:15, fontWeight:700, color:'#ffffff', marginBottom:4 }}>Crew Portal</div>
@@ -1265,7 +1315,13 @@ function CrewHome({ data, crew, resolve, resolveField, onShowClick, onBack }) {
 
   return (
     <div style={{ minHeight:'100vh', background:'#0a0a0f', color:'#ffffff', fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif' }}>
-      <Head><title>EPL — {name}</title></Head>
+      <Head>
+        <title>EPL — {name}</title>
+        <link rel="apple-touch-icon" href="/logo.png" />
+        <link rel="icon" href="/logo.png" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-title" content="Echo Play Live" />
+      </Head>
       <div style={{ background:'#111118', borderBottom:'0.5px solid #1e1e2e', padding:'12px 20px', display:'flex', alignItems:'center', justifyContent:'space-between', position:'sticky', top:0, zIndex:50 }}>
         <div style={{ display:'flex', alignItems:'center', gap:10 }}>
           <img src="/logo.png" alt="EPL" onClick={onBack} style={{ width:32, height:32, objectFit:'contain', mixBlendMode:'screen', cursor:'pointer' }} />
@@ -1420,7 +1476,13 @@ function BookingPage({ data, onBack }) {
 
   return (
     <div style={{ minHeight:'100vh', background:'#0a0a0f', color:'#ffffff', fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif' }}>
-      <Head><title>EPL — Book a Show</title></Head>
+      <Head>
+        <title>EPL — Book a Show</title>
+        <link rel="apple-touch-icon" href="/logo.png" />
+        <link rel="icon" href="/logo.png" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-title" content="Echo Play Live" />
+      </Head>
       <div style={{ background:'#111118', borderBottom:'0.5px solid #1e1e2e', padding:'12px 20px', display:'flex', alignItems:'center', gap:14, position:'sticky', top:0, zIndex:50 }}>
         <button onClick={onBack} style={{ background:'none', border:'none', color:'#a78bfa', fontSize:22, cursor:'pointer', padding:0 }}>‹</button>
         <div style={{ fontSize:15, fontWeight:600 }}>Book a show</div>
