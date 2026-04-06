@@ -194,6 +194,7 @@ function MemberSelect({ data, onSelect, onBooking, onCalendar, onCrew }) {
 }
 
 function MemberHome({ data, member, resolve, resolveField, onShowClick, onBack, onNav }) {
+  useEffect(() => { window.scrollTo(0, 0) }, [member?.id])
   const f = member.fields
   const name = f['Member Name'] || '—'
   const today = new Date(new Date().toDateString())
