@@ -405,6 +405,9 @@ function ShowDetail({ data, member, show, resolve, resolveField, onBack }) {
             rain: wData.daily.precipitation_probability_max[0] ?? 0,
             label: conditions[code] || '🌡️ Unknown',
             daysAway,
+            lat,
+            lon,
+            date: showDate,
           })
         } else {
           setWeather('unavailable')
@@ -490,7 +493,7 @@ function ShowDetail({ data, member, show, resolve, resolveField, onBack }) {
           )}
           {weather && weather !== 'unavailable' && weather !== 'tooFar' && weather !== 'past' && (
             <a
-              href={`https://forecast.weather.gov/MapClick.php?CityName=${encodeURIComponent((resolve(show.fields['Venue'], 'VENUES')[0]?.fields['City'] || 'Fort Worth'))}&state=TX&site=FWD`}
+              href={`https://forecast.weather.gov/MapClick.php?lat=${weather.lat}&lon=${weather.lon}&TextType=1`}
               target="_blank"
               rel="noopener noreferrer"
               onClick={e => e.stopPropagation()}
@@ -506,7 +509,7 @@ function ShowDetail({ data, member, show, resolve, resolveField, onBack }) {
           )}
           {weather === 'tooFar' && (
             <div style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 14px', background:'#0a0a1a', borderRadius:20, border:'0.5px solid #1a1a2a', flex:1 }}>
-              <span style={{ fontSize:13, color:'#3a3a4a' }}>📅 Weather available within 16 days</span>
+              <span style={{ fontSize:13, color:'#3a3a4a' }}>📅 Show is too far out for a forecast</span>
             </div>
           )}
           {weather === 'past' && null}
