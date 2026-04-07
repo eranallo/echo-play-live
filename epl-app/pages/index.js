@@ -191,7 +191,7 @@ export default function Home() {
   if (page === 'crew-select') return <CrewSelect data={data} onSelect={(c) => { setCrewMember(c); setPage('crew-home') }} onBack={() => setPage('select')} />
   if (page === 'crew-home') return <CrewHome data={data} crew={crewMember} resolve={resolve} resolveField={resolveField} onShowClick={openShow} onBack={() => setPage('crew-select')} />
   if (page === 'home') return <MemberHome data={data} member={member} resolve={resolve} resolveField={resolveField} onShowClick={openShow} onBack={goToSelect} onNav={setPage} />
-  if (page === 'show-detail') return <ShowDetail data={data} member={member} show={selectedShow} resolve={resolve} resolveField={resolveField} onBack={() => setPage(previousPage)} onSetlist={(d) => { setSetlistData(d); setPage('setlist') }} />
+  if (page === 'show-detail') return <ShowDetail data={data} member={member} show={selectedShow} resolve={resolve} resolveField={resolveField} onBack={() => setPage(previousPage)} onSetlist={(d) => { setSetlistData(d); setPage('setlist') }} onMemberSelect={(m) => { setMember(m); setPage('home') }} />
   if (page === 'setlist') return <SetlistPage data={data} setlistData={setlistData} onBack={() => setPage('show-detail')} />
   if (page === 'schedule') return <FullSchedule data={data} member={member} resolve={resolve} resolveField={resolveField} onShowClick={openShow} onBack={() => setPage('home')} />
   if (page === 'blackouts') return <Blackouts data={data} member={member} resolve={resolve} onBack={() => setPage('home')} />
@@ -452,7 +452,7 @@ function ShowRow({ show, resolve, resolveField, onClick }) {
   )
 }
 
-function ShowDetail({ data, member, show, resolve, resolveField, onBack, onSetlist }) {
+function ShowDetail({ data, member, show, resolve, resolveField, onBack, onSetlist, onMemberSelect }) {
   useEffect(() => { window.scrollTo(0, 0) }, [])
   const [weather, setWeather] = useState(null)
 
@@ -740,15 +740,16 @@ function ShowDetail({ data, member, show, resolve, resolveField, onBack, onSetli
                   const initials = name.split(' ').map(x => x[0]).join('').toUpperCase().slice(0,2)
                   const photo = mf['Photo'] && Array.isArray(mf['Photo']) && mf['Photo'][0] ? mf['Photo'][0].url : null
                   return (
-                    <div key={m.id} style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 16px', borderBottom: i < memberRecs.length-1 ? '0.5px solid #1a1a2a' : 'none' }}>
+                    <div key={m.id} onClick={() => onMemberSelect(m)} style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 16px', borderBottom: i < memberRecs.length-1 ? '0.5px solid #1a1a2a' : 'none', cursor:'pointer' }}>
                       {photo
                         ? <img src={photo} alt={name} style={{ width:36, height:36, borderRadius:'50%', objectFit:'cover', flexShrink:0 }} />
                         : <div style={{ width:36, height:36, borderRadius:'50%', background:'#1a1a2e', display:'flex', alignItems:'center', justifyContent:'center', fontSize:12, fontWeight:700, color:'#a78bfa', flexShrink:0 }}>{initials}</div>
                       }
-                      <div>
+                      <div style={{ flex:1 }}>
                         <div style={{ fontSize:14, fontWeight:600, color:'#ffffff' }}>{name}</div>
                         <div style={{ fontSize:12, color:'#6b7280', marginTop:1 }}>{instruments}</div>
                       </div>
+                      <div style={{ color:'#2a2a3a', fontSize:18 }}>›</div>
                     </div>
                   )
                 })}
