@@ -1075,9 +1075,15 @@ function MasterCalendar({ data, resolve, resolveField, onShowClick, onBack }) {
                         return names.map((n, ni) => (
                           <div key={bi + '-' + ni} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'8px 0', borderBottom:'0.5px solid #2a1a1a' }}>
                             <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-                              <div style={{ width:28, height:28, borderRadius:'50%', background:'#2e1a1a', display:'flex', alignItems:'center', justifyContent:'center', fontSize:10, fontWeight:700, color:'#ff9f7f' }}>
-                                {n.split(' ').map(x => x[0]).join('').toUpperCase().slice(0,2)}
-                              </div>
+                              {(() => {
+                                const mRec = (data['MEMBERS'] || []).find(m => m.fields['Member Name'] === n)
+                                const mPhoto = mRec?.fields['Photo']?.[0]?.url
+                                return mPhoto
+                                  ? <img src={mPhoto} alt={n} style={{ width:28, height:28, borderRadius:'50%', objectFit:'cover', flexShrink:0 }} />
+                                  : <div style={{ width:28, height:28, borderRadius:'50%', background:'#2e1a1a', display:'flex', alignItems:'center', justifyContent:'center', fontSize:10, fontWeight:700, color:'#ff9f7f' }}>
+                                      {n.split(' ').map(x => x[0]).join('').toUpperCase().slice(0,2)}
+                                    </div>
+                              })()}
                               <div>
                                 <div style={{ fontSize:13, fontWeight:600, color:'#ffffff' }}>{n}</div>
                                 {b.fields['Reason'] && <div style={{ fontSize:11, color:'#6b7280' }}>{b.fields['Reason']}</div>}
