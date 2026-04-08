@@ -187,7 +187,7 @@ export default function Home() {
     </div>
   )
 
-  if (page === 'select') return <MemberSelect data={data} onSelect={selectMember} onBooking={() => setPage('booking')} onCalendar={() => setPage('master-calendar')} onCrew={() => setPage('crew-select')} />
+  if (page === 'select') return <MemberSelect data={data} onSelect={selectMember} onBooking={() => setPage('booking')} onCalendar={() => setPage('master-calendar')} onCrew={() => setPage('crew-select')} onBuilder={() => setPage('setlist-builder')} />
   if (page === 'crew-select') return <CrewSelect data={data} onSelect={(c) => { setCrewMember(c); setPage('crew-home') }} onBack={() => setPage('select')} />
   if (page === 'crew-home') return <CrewHome data={data} crew={crewMember} resolve={resolve} resolveField={resolveField} onShowClick={openShow} onBack={() => setPage('crew-select')} />
   if (page === 'home') return <MemberHome data={data} member={member} resolve={resolve} resolveField={resolveField} onShowClick={openShow} onBack={goToSelect} onNav={setPage} />
@@ -197,10 +197,11 @@ export default function Home() {
   if (page === 'blackouts') return <Blackouts data={data} member={member} resolve={resolve} onBack={() => setPage('home')} />
   if (page === 'master-calendar') return <MasterCalendar data={data} resolve={resolve} resolveField={resolveField} onShowClick={openShow} onBack={() => member ? setPage('home') : setPage('select')} />
   if (page === 'booking') return <BookingPage data={data} onBack={() => setPage('select')} />
+  if (page === 'setlist-builder') return <SetlistBuilder data={data} onBack={() => setPage('select')} />
   return null
 }
 
-function MemberSelect({ data, onSelect, onBooking, onCalendar, onCrew }) {
+function MemberSelect({ data, onSelect, onBooking, onCalendar, onCrew, onBuilder }) {
   const members = data['MEMBERS'] || []
   const today = new Date()
   const totalShows = (data['SHOWS'] || []).filter(s => s.fields['Date'] && new Date(s.fields['Date']) >= today).length
@@ -247,6 +248,10 @@ function MemberSelect({ data, onSelect, onBooking, onCalendar, onCrew }) {
         <button onClick={onCrew} style={{ width:'100%', padding:'14px', background:'transparent', border:'0.5px solid #1a2a2e', borderRadius:14, cursor:'pointer', fontFamily:'inherit', textAlign:'center' }}>
           <div style={{ fontSize:13, fontWeight:600, color:'#7ecbcb' }}>Not a band member?</div>
           <div style={{ fontSize:11, color:'#6b7280', marginTop:3 }}>Sound engineers & merch crew →</div>
+        </button>
+        <button onClick={onBuilder} style={{ width:'100%', padding:'14px', background:'transparent', border:'0.5px solid #2a1a2e', borderRadius:14, cursor:'pointer', fontFamily:'inherit', textAlign:'center' }}>
+          <div style={{ fontSize:13, fontWeight:600, color:'#c084fc' }}>🎛 Setlist Builder</div>
+          <div style={{ fontSize:11, color:'#6b7280', marginTop:3 }}>Management only →</div>
         </button>
       </div>
     </div>
@@ -1608,6 +1613,358 @@ function SetlistPage({ data, setlistData, onBack }) {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+
+const BUILDER_PASSWORD = 'EPL2026'
+
+function SetlistBuilder({ data, onBack }) {
+  const [authed, setAuthed] = useState(false)
+  const [pass, setPass] = useState('')
+  const [passErr, setPassErr] = useState(false)
+
+  if (!authed) {
+    return (
+      <div style={{ minHeight:'100vh', background:'#0a0a0f', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:24, fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif' }}>
+        <Head><title>EPL — Setlist Builder</title></Head>
+        <img src="/logo.png" alt="EPL" style={{ width:80, height:80, objectFit:'contain', mixBlendMode:'screen', marginBottom:24 }} />
+        <div style={{ fontSize:18, fontWeight:700, color:'#ffffff', marginBottom:6 }}>Setlist Builder</div>
+        <div style={{ fontSize:13, color:'#6b7280', marginBottom:28 }}>Management access only</div>
+        <div style={{ width:'100%', maxWidth:300 }}>
+          <input type="password" placeholder="Enter passcode" value={pass}
+            onChange={e => { setPass(e.target.value); setPassErr(false) }}
+            onKeyDown={e => e.key === 'Enter' && (pass === BUILDER_PASSWORD ? setAuthed(true) : setPassErr(true))}
+            style={{ width:'100%', padding:'14px 16px', background:'#111118', border: passErr ? '1px solid #ff4444' : '0.5px solid #2a2a3a', borderRadius:12, color:'#ffffff', fontSize:16, fontFamily:'inherit', boxSizing:'border-box', marginBottom:10, outline:'none' }} />
+          {passErr && <div style={{ color:'#ff4444', fontSize:12, marginBottom:10, textAlign:'center' }}>Incorrect passcode</div>}
+          <button onClick={() => pass === BUILDER_PASSWORD ? setAuthed(true) : setPassErr(true)}
+            style={{ width:'100%', padding:'14px', background:'#c084fc', border:'none', borderRadius:12, color:'#0a0a0f', fontSize:15, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>
+            Enter
+          </button>
+          <button onClick={onBack} style={{ width:'100%', padding:'12px', background:'transparent', border:'none', color:'#6b7280', fontSize:13, cursor:'pointer', fontFamily:'inherit', marginTop:8 }}>← Back</button>
+        </div>
+      </div>
+    )
+  }
+
+  return <SetlistBuilderMain data={data} onBack={onBack} />
+}
+
+function SetlistBuilderMain({ data, onBack }) {
+  const songs = (data['SONGS'] || []).sort((a,b) => (a.fields['Song Title']||'').localeCompare(b.fields['Song Title']||''))
+  const bands = data['BANDS'] || []
+  const shows = (data['SHOWS'] || []).sort((a,b) => a.fields['Date'] > b.fields['Date'] ? 1 : -1)
+
+  const [items, setItems] = useState([])
+  const [filter, setFilter] = useState('')
+  const [setName, setSetName] = useState('')
+  const [selectedBand, setSelectedBand] = useState('')
+  const [selectedShow, setSelectedShow] = useState('')
+  const [dragIdx, setDragIdx] = useState(null)
+  const [dragOverIdx, setDragOverIdx] = useState(null)
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const [showPrint, setShowPrint] = useState(false)
+  const [activeTab, setActiveTab] = useState('songs') // songs | setlist
+
+  const filteredSongs = songs.filter(s => {
+    const f = s.fields
+    const q = filter.toLowerCase()
+    return !q || (f['Song Title']||'').toLowerCase().includes(q) ||
+      (f['Artist']||'').toLowerCase().includes(q) ||
+      (f['Guitar Tuning']||'').toLowerCase().startsWith(q)
+  })
+
+  const totalMins = items.filter(i => i.type === 'song').reduce((acc, i) => {
+    const dur = i.fields['Duration'] || '0:00'
+    const parts = dur.split(':')
+    return acc + (parseInt(parts[0]||0)*60 + parseInt(parts[1]||0))
+  }, 0)
+  const totalDisplay = `${Math.floor(totalMins/60)}h ${totalMins%60}m`
+
+  function addSong(song) {
+    setItems(prev => [...prev, { type:'song', id: song.id, fields: song.fields }])
+  }
+
+  function addBlock(type, text='') {
+    setItems(prev => [...prev, { type, text, id: Date.now() + Math.random() }])
+  }
+
+  function removeItem(idx) { setItems(prev => prev.filter((_,i) => i !== idx)) }
+
+  function moveItem(idx, dir) {
+    setItems(prev => {
+      const arr = [...prev]
+      const target = idx + dir
+      if (target < 0 || target >= arr.length) return arr
+      ;[arr[idx], arr[target]] = [arr[target], arr[idx]]
+      return arr
+    })
+  }
+
+  function onDragStart(e, idx) {
+    setDragIdx(idx)
+    e.dataTransfer.effectAllowed = 'move'
+  }
+
+  function onDragOver(e, idx) {
+    e.preventDefault()
+    setDragOverIdx(idx)
+  }
+
+  function onDrop(e, idx) {
+    e.preventDefault()
+    if (dragIdx === null || dragIdx === idx) { setDragIdx(null); setDragOverIdx(null); return }
+    setItems(prev => {
+      const arr = [...prev]
+      const [moved] = arr.splice(dragIdx, 1)
+      arr.splice(idx, 0, moved)
+      return arr
+    })
+    setDragIdx(null)
+    setDragOverIdx(null)
+  }
+
+  async function saveToAirtable() {
+    setSaving(true)
+    setSaved(false)
+    const songIds = items.filter(i => i.type === 'song').map(i => i.id)
+    const builderData = items.map(i => i.type === 'song' ? { type:'song', id:i.id } : { type:i.type, text:i.text||'' })
+    const body = {
+      setName: setName || 'New Setlist',
+      bandId: selectedBand || null,
+      showId: selectedShow || null,
+      songIds,
+      builderData,
+      setLength: Math.floor(totalMins / 60) * 60 + totalMins % 60
+    }
+    await fetch('/api/setlist-save', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) })
+    setSaving(false)
+    setSaved(true)
+    setTimeout(() => setSaved(false), 3000)
+  }
+
+  if (showPrint) {
+    return <SetlistPrintView items={items} setName={setName} onClose={() => setShowPrint(false)} />
+  }
+
+  const blockTypes = [
+    { type:'break', label:'⏸ Break', color:'#6b7280' },
+    { type:'tuning', label:'🎸 Tuning', color:'#a78bfa' },
+    { type:'merch', label:'👕 Merch', color:'#f5a623' },
+    { type:'instagram', label:'📸 Instagram', color:'#e1306c' },
+    { type:'custom', label:'✏️ Custom', color:'#7ecbcb' },
+  ]
+
+  return (
+    <div style={{ minHeight:'100vh', background:'#0a0a0f', color:'#ffffff', fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif' }}>
+      <Head><title>EPL — Setlist Builder</title></Head>
+
+      {/* Header */}
+      <div style={{ background:'#111118', borderBottom:'0.5px solid #1e1e2e', padding:'10px 16px', display:'flex', alignItems:'center', gap:10, position:'sticky', top:0, zIndex:50 }}>
+        <button onClick={onBack} style={{ background:'none', border:'none', color:'#a78bfa', fontSize:22, cursor:'pointer', padding:0 }}>‹</button>
+        <div style={{ flex:1 }}>
+          <input value={setName} onChange={e => setSetName(e.target.value)} placeholder="Set name..."
+            style={{ background:'transparent', border:'none', color:'#ffffff', fontSize:15, fontWeight:600, fontFamily:'inherit', outline:'none', width:'100%' }} />
+        </div>
+        <div style={{ fontSize:12, color:'#6b7280', marginRight:8 }}>{items.filter(i=>i.type==='song').length} songs · {totalDisplay}</div>
+        <button onClick={saveToAirtable} disabled={saving}
+          style={{ padding:'7px 14px', background: saved ? '#1a3a1a' : '#c084fc', border:'none', borderRadius:10, color: saved ? '#6bcb77' : '#0a0a0f', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>
+          {saving ? '...' : saved ? '✓ Saved' : 'Save'}
+        </button>
+        <button onClick={() => setShowPrint(true)}
+          style={{ padding:'7px 12px', background:'#1a1a2e', border:'none', borderRadius:10, color:'#a78bfa', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>
+          Print
+        </button>
+      </div>
+
+      {/* Band / Show selectors */}
+      <div style={{ padding:'10px 16px', background:'#0d0d18', borderBottom:'0.5px solid #1a1a2a', display:'flex', gap:8 }}>
+        <select value={selectedBand} onChange={e => setSelectedBand(e.target.value)}
+          style={{ flex:1, padding:'8px', background:'#111118', border:'0.5px solid #2a2a3a', borderRadius:8, color:selectedBand ? '#ffffff' : '#6b7280', fontSize:12, fontFamily:'inherit', outline:'none' }}>
+          <option value=''>Select band...</option>
+          {bands.map(b => <option key={b.id} value={b.id}>{b.fields['Band Name']}</option>)}
+        </select>
+        <select value={selectedShow} onChange={e => setSelectedShow(e.target.value)}
+          style={{ flex:1, padding:'8px', background:'#111118', border:'0.5px solid #2a2a3a', borderRadius:8, color:selectedShow ? '#ffffff' : '#6b7280', fontSize:12, fontFamily:'inherit', outline:'none' }}>
+          <option value=''>Link to show...</option>
+          {shows.filter(s => !selectedBand || (s.fields['Band']||[]).includes(selectedBand)).map(s => (
+            <option key={s.id} value={s.id}>{s.fields['Show Name'] || s.fields['Date']}</option>
+          ))}
+        </select>
+      </div>
+
+      {/* Mobile tabs */}
+      <div style={{ display:'flex', background:'#111118', borderBottom:'0.5px solid #1a1a2a' }}>
+        {['songs','setlist'].map(tab => (
+          <button key={tab} onClick={() => setActiveTab(tab)}
+            style={{ flex:1, padding:'10px', background:'transparent', border:'none', borderBottom: activeTab===tab ? '2px solid #c084fc' : '2px solid transparent', color: activeTab===tab ? '#c084fc' : '#6b7280', fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:'inherit', textTransform:'capitalize' }}>
+            {tab === 'songs' ? '🎵 Song Library' : `📋 Setlist (${items.length})`}
+          </button>
+        ))}
+      </div>
+
+      <div style={{ display:'flex', height:'calc(100vh - 160px)', overflow:'hidden' }}>
+
+        {/* Song Library */}
+        <div style={{ flex:1, display: activeTab === 'songs' ? 'flex' : 'none', flexDirection:'column', borderRight:'0.5px solid #1a1a2a', overflow:'hidden' }}>
+          <div style={{ padding:'10px 12px', borderBottom:'0.5px solid #1a1a2a' }}>
+            <input value={filter} onChange={e => setFilter(e.target.value)} placeholder="Search songs, artist, tuning..."
+              style={{ width:'100%', padding:'9px 12px', background:'#111118', border:'0.5px solid #2a2a3a', borderRadius:10, color:'#ffffff', fontSize:13, fontFamily:'inherit', outline:'none', boxSizing:'border-box' }} />
+          </div>
+          <div style={{ overflowY:'auto', flex:1 }}>
+            {filteredSongs.map(song => {
+              const sf = song.fields
+              const alreadyIn = items.some(i => i.type === 'song' && i.id === song.id)
+              const tuning = sf['Guitar Tuning'] ? sf['Guitar Tuning'].split('.')[0] : ''
+              return (
+                <div key={song.id} onClick={() => !alreadyIn && addSong(song)}
+                  style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 12px', borderBottom:'0.5px solid #111118', cursor: alreadyIn ? 'default' : 'pointer', opacity: alreadyIn ? 0.4 : 1, background: alreadyIn ? 'transparent' : undefined }}>
+                  {tuning && <div style={{ width:26, height:26, borderRadius:6, background:'#1a1a2e', display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:800, color:'#a78bfa', flexShrink:0 }}>{tuning}</div>}
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ fontSize:13, fontWeight:600, color:'#ffffff', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{sf['Song Title']}</div>
+                    <div style={{ fontSize:11, color:'#6b7280' }}>{sf['Artist']}{sf['Duration'] ? ` · ${sf['Duration']}` : ''}</div>
+                  </div>
+                  {!alreadyIn && <div style={{ color:'#c084fc', fontSize:18, flexShrink:0 }}>+</div>}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+
+        {/* Setlist */}
+        <div style={{ flex:1, display: activeTab === 'setlist' ? 'flex' : 'none', flexDirection:'column', overflow:'hidden' }}>
+          {/* Block type buttons */}
+          <div style={{ padding:'8px 10px', borderBottom:'0.5px solid #1a1a2a', display:'flex', gap:6, overflowX:'auto' }}>
+            {blockTypes.map(bt => (
+              <button key={bt.type} onClick={() => {
+                if (bt.type === 'tuning') {
+                  const t = window.prompt('Tuning (e.g. E, D, C, Eb):')
+                  if (t) addBlock('tuning', t.toUpperCase())
+                } else if (bt.type === 'custom') {
+                  const t = window.prompt('Custom text:')
+                  if (t) addBlock('custom', t)
+                } else {
+                  addBlock(bt.type, bt.label.split(' ').slice(1).join(' '))
+                }
+              }} style={{ padding:'6px 10px', background:'#111118', border:`0.5px solid ${bt.color}40`, borderRadius:20, color:bt.color, fontSize:11, fontWeight:600, cursor:'pointer', fontFamily:'inherit', whiteSpace:'nowrap' }}>
+                {bt.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Setlist items */}
+          <div style={{ overflowY:'auto', flex:1, padding:'8px' }}>
+            {items.length === 0 && (
+              <div style={{ textAlign:'center', color:'#3a3a4a', fontSize:13, marginTop:40 }}>
+                ← Add songs from the library{'
+'}or add special blocks above
+              </div>
+            )}
+            {items.map((item, idx) => {
+              const isDragging = dragIdx === idx
+              const isOver = dragOverIdx === idx
+              if (item.type === 'song') {
+                const sf = item.fields
+                const tuning = sf['Guitar Tuning'] ? sf['Guitar Tuning'].split('.')[0] : ''
+                return (
+                  <div key={item.id || idx} draggable
+                    onDragStart={e => onDragStart(e, idx)}
+                    onDragOver={e => onDragOver(e, idx)}
+                    onDrop={e => onDrop(e, idx)}
+                    onDragEnd={() => { setDragIdx(null); setDragOverIdx(null) }}
+                    style={{ display:'flex', alignItems:'center', gap:8, padding:'9px 10px', marginBottom:4, background: isDragging ? '#1a1a2e' : '#111118', border: isOver ? '1px solid #c084fc' : '0.5px solid #2a2a3a', borderRadius:10, opacity: isDragging ? 0.5 : 1, cursor:'grab' }}>
+                    <div style={{ color:'#3a3a4a', fontSize:16, cursor:'grab' }}>⠿</div>
+                    <div style={{ width:22, textAlign:'center', fontSize:12, fontWeight:700, color:'#3a3a5a', flexShrink:0 }}>{idx+1}</div>
+                    {tuning && <div style={{ width:24, height:24, borderRadius:5, background:'#1a1a2e', display:'flex', alignItems:'center', justifyContent:'center', fontSize:10, fontWeight:800, color:'#a78bfa', flexShrink:0 }}>{tuning}</div>}
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <div style={{ fontSize:13, fontWeight:600, color:'#ffffff', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{sf['Song Title']}</div>
+                      <div style={{ fontSize:11, color:'#6b7280' }}>{sf['Artist']}{sf['Duration'] ? ` · ${sf['Duration']}` : ''}</div>
+                    </div>
+                    <div style={{ display:'flex', gap:2 }}>
+                      <button onClick={() => moveItem(idx, -1)} style={{ background:'none', border:'none', color:'#3a3a4a', cursor:'pointer', fontSize:14, padding:'2px 4px' }}>↑</button>
+                      <button onClick={() => moveItem(idx, 1)} style={{ background:'none', border:'none', color:'#3a3a4a', cursor:'pointer', fontSize:14, padding:'2px 4px' }}>↓</button>
+                      <button onClick={() => removeItem(idx)} style={{ background:'none', border:'none', color:'#3a3a4a', cursor:'pointer', fontSize:14, padding:'2px 4px' }}>×</button>
+                    </div>
+                  </div>
+                )
+              }
+              // Special block
+              const blockColors = { break:'#6b7280', tuning:'#a78bfa', merch:'#f5a623', instagram:'#e1306c', custom:'#7ecbcb' }
+              const blockIcons = { break:'⏸', tuning:'🎸', merch:'👕', instagram:'📸', custom:'✏️' }
+              const color = blockColors[item.type] || '#6b7280'
+              return (
+                <div key={item.id || idx} draggable
+                  onDragStart={e => onDragStart(e, idx)}
+                  onDragOver={e => onDragOver(e, idx)}
+                  onDrop={e => onDrop(e, idx)}
+                  onDragEnd={() => { setDragIdx(null); setDragOverIdx(null) }}
+                  style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 10px', marginBottom:4, background:`${color}15`, border:`0.5px solid ${color}40`, borderRadius:10, opacity: isDragging ? 0.5 : 1, cursor:'grab' }}>
+                  <div style={{ color:'#3a3a4a', fontSize:16 }}>⠿</div>
+                  <div style={{ fontSize:13 }}>{blockIcons[item.type]}</div>
+                  <div style={{ flex:1, fontSize:13, fontWeight:600, color, textTransform: item.type !== 'custom' && item.type !== 'instagram' ? 'uppercase' : 'none' }}>
+                    {item.text || item.type}
+                  </div>
+                  <button onClick={() => removeItem(idx)} style={{ background:'none', border:'none', color:'#3a3a4a', cursor:'pointer', fontSize:14, padding:'2px 4px' }}>×</button>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function SetlistPrintView({ items, setName, onClose }) {
+  useEffect(() => {
+    setTimeout(() => window.print(), 300)
+  }, [])
+
+  const songs = items.filter(i => i.type === 'song')
+  const half = Math.ceil(items.length / 2)
+  const left = items.slice(0, half)
+  const right = items.slice(half)
+
+  const blockColors = { break:'#888', tuning:'#000', merch:'#888', instagram:'#888', custom:'#888' }
+
+  function renderItem(item, num) {
+    if (item.type === 'song') {
+      const sf = item.fields
+      const tuning = sf['Guitar Tuning'] ? sf['Guitar Tuning'].split('.')[0] : ''
+      return (
+        <div key={item.id} style={{ display:'flex', alignItems:'center', gap:6, padding:'3px 0', borderBottom:'0.5px solid #eee' }}>
+          <div style={{ width:16, fontSize:9, color:'#aaa', flexShrink:0 }}>{tuning}</div>
+          <div style={{ fontSize:11, fontWeight:700, textTransform:'uppercase', flex:1 }}>{sf['Song Title']}</div>
+        </div>
+      )
+    }
+    const icons = { break:'— BREAK —', tuning:`[${item.text}]`, merch:'👕 MERCH TABLE', instagram:'📸 INSTAGRAM', custom: item.text }
+    return (
+      <div key={item.id} style={{ padding:'3px 0', fontSize:10, color:'#888', fontWeight:600, fontStyle:'italic', borderBottom:'0.5px solid #eee' }}>
+        {icons[item.type] || item.type.toUpperCase()}
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ background:'#ffffff', minHeight:'100vh', color:'#000', fontFamily:'Arial, sans-serif', padding:20 }}>
+      <div className="no-print" style={{ marginBottom:16, display:'flex', gap:10 }}>
+        <button onClick={() => window.print()} style={{ padding:'8px 16px', background:'#c084fc', border:'none', borderRadius:8, fontSize:13, fontWeight:700, cursor:'pointer' }}>🖨 Print</button>
+        <button onClick={onClose} style={{ padding:'8px 16px', background:'#f1f1f1', border:'none', borderRadius:8, fontSize:13, cursor:'pointer' }}>← Back</button>
+      </div>
+      <div style={{ border:'2px solid #000', padding:16, maxWidth:700, margin:'0 auto' }}>
+        <div style={{ textAlign:'center', borderBottom:'2px solid #000', paddingBottom:10, marginBottom:10 }}>
+          <div style={{ fontSize:24, fontWeight:900, textTransform:'uppercase', letterSpacing:2 }}>{setName || 'Setlist'}</div>
+          <div style={{ fontSize:10, color:'#888', marginTop:4 }}>{songs.length} songs</div>
+        </div>
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16 }}>
+          <div>{left.map((item, i) => renderItem(item, i+1))}</div>
+          <div>{right.map((item, i) => renderItem(item, half+i+1))}</div>
+        </div>
+      </div>
+      <style>{`@media print { .no-print { display: none !important; } }`}</style>
     </div>
   )
 }
