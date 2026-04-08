@@ -1857,10 +1857,7 @@ function SetlistBuilderMain({ data, onBack }) {
           {/* Setlist items */}
           <div style={{ overflowY:'auto', flex:1, padding:'8px' }}>
             {items.length === 0 && (
-              <div style={{ textAlign:'center', color:'#3a3a4a', fontSize:13, marginTop:40 }}>
-                ← Add songs from the library{'
-'}or add special blocks above
-              </div>
+              <div style={{ textAlign:'center', color:'#3a3a4a', fontSize:13, marginTop:40, lineHeight:2 }}><div>← Add songs from the library</div><div>or add special blocks above</div></div>
             )}
             {items.map((item, idx) => {
               const isDragging = dragIdx === idx
