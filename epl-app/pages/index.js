@@ -1796,11 +1796,16 @@ function SetlistBuilderMain({ data, onBack }) {
       </div>
 
       {/* Mobile tabs */}
-      <div style={{ display:'flex', background:'#111118', borderBottom:'0.5px solid #1a1a2a' }}>
-        {['songs','setlist'].map(tab => (
-          <button key={tab} onClick={() => setActiveTab(tab)}
-            style={{ flex:1, padding:'10px', background:'transparent', border:'none', borderBottom: activeTab===tab ? '2px solid #c084fc' : '2px solid transparent', color: activeTab===tab ? '#c084fc' : '#6b7280', fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:'inherit', textTransform:'capitalize' }}>
-            {tab === 'songs' ? '🎵 Song Library' : `📋 Setlist (${items.length})`}
+      <div style={{ display:'flex', background:'#111118', borderBottom:'0.5px solid #1a1a2a', overflowX:'auto' }}>
+        {[
+          { key:'songs', label:'🎵 Library' },
+          { key:'setlist', label:`📋 Build (${items.length})` },
+          { key:'load', label:'📂 Load' },
+          { key:'preview', label:'👁 Preview' },
+        ].map(tab => (
+          <button key={tab.key} onClick={() => setActiveTab(tab.key)}
+            style={{ flex:1, padding:'10px 8px', background:'transparent', border:'none', borderBottom: activeTab===tab.key ? '2px solid #c084fc' : '2px solid transparent', color: activeTab===tab.key ? '#c084fc' : '#6b7280', fontSize:12, fontWeight:600, cursor:'pointer', fontFamily:'inherit', whiteSpace:'nowrap' }}>
+            {tab.label}
           </button>
         ))}
       </div>
@@ -1909,6 +1914,100 @@ function SetlistBuilderMain({ data, onBack }) {
             })}
           </div>
         </div>
+        {/* Load existing setlists */}
+        <div style={{ flex:1, display: activeTab === 'load' ? 'flex' : 'none', flexDirection:'column', overflow:'hidden' }}>
+          <div style={{ padding:'12px 16px', borderBottom:'0.5px solid #1a1a2a' }}>
+            <div style={{ fontSize:13, fontWeight:600, color:'#ffffff', marginBottom:4 }}>Saved Setlists</div>
+            <div style={{ fontSize:12, color:'#6b7280' }}>Tap to load into builder</div>
+          </div>
+          <div style={{ overflowY:'auto', flex:1 }}>
+            {(data['SETLISTS'] || []).map(sl => {
+              const sf = sl.fields
+              const songCount = (sf['Songs'] || []).length
+              const bandNames = (sf['Band'] || []).map(id => (data['BANDS'] || []).find(b => b.id === id)?.fields['Band Name']).filter(Boolean)
+              return (
+                <div key={sl.id} onClick={() => {
+                  // Load songs from this setlist into the builder
+                  const songIds = sf['Songs'] || []
+                  const loadedItems = songIds.map(id => {
+                    const song = (data['SONGS'] || []).find(s => s.id === id)
+                    return song ? { type:'song', id:song.id, fields:song.fields } : null
+                  }).filter(Boolean)
+
+                  // Try to parse builder data from Notes
+                  let builderItems = loadedItems
+                  if (sf['Notes'] && sf['Notes'].startsWith('%%BUILDER%%')) {
+                    try {
+                      const bd = JSON.parse(sf['Notes'].replace('%%BUILDER%%',''))
+                      builderItems = bd.map(b => {
+                        if (b.type === 'song') {
+                          const song = (data['SONGS'] || []).find(s => s.id === b.id)
+                          return song ? { type:'song', id:song.id, fields:song.fields } : null
+                        }
+                        return { ...b, id: Date.now() + Math.random() }
+                      }).filter(Boolean)
+                    } catch(e) {}
+                  }
+
+                  setItems(builderItems)
+                  setSetName(sf['Set Name'] || '')
+                  setActiveTab('setlist')
+                }} style={{ padding:'14px 16px', borderBottom:'0.5px solid #111118', cursor:'pointer' }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
+                    <div>
+                      <div style={{ fontSize:14, fontWeight:600, color:'#ffffff', marginBottom:4 }}>{sf['Set Name'] || 'Untitled'}</div>
+                      <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+                        {bandNames.map((b,i) => <span key={i} style={{ fontSize:10, padding:'1px 6px', borderRadius:20, background:BAND_COLORS[b]?.bg||'#1a1a2e', color:BAND_COLORS[b]?.color||'#a78bfa', fontWeight:600 }}>{b}</span>)}
+                        <span style={{ fontSize:11, color:'#6b7280' }}>{songCount} songs{sf['Set Length'] ? ` · ${sf['Set Length']} min` : ''}</span>
+                      </div>
+                    </div>
+                    <div style={{ color:'#2a2a3a', fontSize:18 }}>›</div>
+                  </div>
+                </div>
+              )
+            })}
+            {!(data['SETLISTS'] || []).length && (
+              <div style={{ textAlign:'center', color:'#3a3a4a', fontSize:13, marginTop:40 }}>No setlists saved yet</div>
+            )}
+          </div>
+        </div>
+
+        {/* Preview panel */}
+        <div style={{ flex:1, display: activeTab === 'preview' ? 'flex' : 'none', flexDirection:'column', overflow:'hidden' }}>
+          <div style={{ padding:'10px 16px', borderBottom:'0.5px solid #1a1a2a', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+            <div style={{ fontSize:13, fontWeight:600, color:'#ffffff' }}>Preview</div>
+            <div style={{ fontSize:12, color:'#6b7280' }}>{items.filter(i=>i.type==='song').length} songs · {totalDisplay}</div>
+          </div>
+          <div style={{ overflowY:'auto', flex:1, padding:'12px 16px' }}>
+            {items.length === 0 && (
+              <div style={{ textAlign:'center', color:'#3a3a4a', fontSize:13, marginTop:40 }}>Build your setlist first</div>
+            )}
+            {items.map((item, i) => {
+              if (item.type === 'song') {
+                const sf = item.fields
+                const tuning = sf['Guitar Tuning'] ? sf['Guitar Tuning'].split('.')[0] : ''
+                return (
+                  <div key={item.id||i} style={{ display:'flex', alignItems:'center', gap:10, padding:'9px 0', borderBottom:'0.5px solid #1a1a2a' }}>
+                    <div style={{ width:22, textAlign:'center', fontSize:12, fontWeight:700, color:'#3a3a5a', flexShrink:0 }}>{items.slice(0,i).filter(x=>x.type==='song').length+1}</div>
+                    <div style={{ flex:1 }}>
+                      <div style={{ fontSize:14, fontWeight:600, color:'#ffffff' }}>{sf['Song Title']}</div>
+                      <div style={{ fontSize:11, color:'#6b7280' }}>{sf['Artist']}{sf['Duration'] ? ` · ${sf['Duration']}` : ''}</div>
+                    </div>
+                    {tuning && <div style={{ fontSize:18, fontWeight:800, color:'#a78bfa' }}>{tuning}</div>}
+                  </div>
+                )
+              }
+              const blockStyles = { break:{color:'#6b7280',label:'— BREAK —'}, tuning:{color:'#a78bfa',label:`[ ${item.text} ]`}, merch:{color:'#f5a623',label:'👕 MERCH'}, instagram:{color:'#e1306c',label:`📸 ${item.text||'INSTAGRAM'}`}, custom:{color:'#7ecbcb',label:item.text} }
+              const bs = blockStyles[item.type] || { color:'#6b7280', label: item.type }
+              return (
+                <div key={item.id||i} style={{ padding:'6px 0 6px 32px', borderBottom:'0.5px solid #111118' }}>
+                  <span style={{ fontSize:12, fontWeight:700, color:bs.color, textTransform:'uppercase', letterSpacing:'0.05em' }}>{bs.label}</span>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+
       </div>
     </div>
   )
