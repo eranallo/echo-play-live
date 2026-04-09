@@ -1,4 +1,15 @@
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow:wght@300;400;500;600;700&family=Barlow+Condensed:wght@300;400;500;600;700&display=swap');
+
 * { box-sizing: border-box; margin: 0; padding: 0; }
+
+::selection {
+  background: #F5C518;
+  color: #080808;
+}
+
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: #0a0a0a; }
+::-webkit-scrollbar-thumb { background: rgba(245,197,24,0.4); border-radius: 0; }
 
 :root {
   --epl-purple: #a78bfa;
@@ -298,10 +309,11 @@ tr:hover td { background: #fafafa; }
 
 /* iPhone safe area / Dynamic Island fix */
 html {
-  background-color: #0a0a0f;
+  background-color: #080808;
 }
 body {
-  background-color: #0a0a0f;
+  background-color: #080808;
+  font-family: 'Barlow', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   padding-top: env(safe-area-inset-top);
   padding-bottom: env(safe-area-inset-bottom);
 }
