@@ -40,6 +40,18 @@ function daysUntil(dateStr) {
 
 function fmtTime(t) {
   if (!t) return ''
+  // Handle full ISO datetime string from Airtable time fields e.g. "2026-04-19T02:00:00.000Z"
+  if (t.includes('T')) {
+    const d = new Date(t)
+    if (!isNaN(d)) {
+      let h = d.getHours(), min = d.getMinutes()
+      const ap = h >= 12 ? 'pm' : 'am'
+      if (h > 12) h -= 12
+      if (h === 0) h = 12
+      return min === 0 ? h + ap : h + ':' + String(min).padStart(2,'0') + ap
+    }
+  }
+  // Handle plain HH:MM:SS
   const m = t.match(/^(\d{1,2}):(\d{2})/)
   if (!m) return t
   let h = parseInt(m[1]), min = parseInt(m[2])
