@@ -38,6 +38,17 @@ function daysUntil(dateStr) {
   return Math.ceil(diff / (1000 * 60 * 60 * 24))
 }
 
+function fmtTime(t) {
+  if (!t) return ''
+  const m = t.match(/^(\d{1,2}):(\d{2})/)
+  if (!m) return t
+  let h = parseInt(m[1]), min = parseInt(m[2])
+  const ap = h >= 12 ? 'pm' : 'am'
+  if (h > 12) h -= 12
+  if (h === 0) h = 12
+  return min === 0 ? h + ap : h + ':' + String(min).padStart(2,'0') + ap
+}
+
 function MemberAvatar({ member, size = 42 }) {
   const f = member.fields
   const name = f['Member Name'] || '—'
@@ -400,9 +411,9 @@ function NextShowCard({ show, resolve, resolveField, onClick }) {
           </div>
         )}
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8, marginBottom: address ? 14 : 0 }}>
-        <TimeBlock label="Load in" value={f['Load-In Time']} />
-        <TimeBlock label="Set time" value={f['Set Time']} />
-        <TimeBlock label="End time" value={f['End Time']} />
+        <TimeBlock label="Load in" value={fmtTime(f['Load-In Time'])} />
+        <TimeBlock label="Set time" value={fmtTime(f['Start Time'])} />
+        <TimeBlock label="End time" value={fmtTime(f['End Time'])} />
       </div>
       {address && (
         <a href={`https://maps.apple.com/?q=${encodeURIComponent(address)}`} onClick={e => e.stopPropagation()} style={{ display:'flex', alignItems:'center', gap:8, padding:'10px 12px', background:'#0a0a0f', borderRadius:10, textDecoration:'none', marginTop:4 }}>
@@ -450,7 +461,7 @@ function ShowRow({ show, resolve, resolveField, onClick }) {
         <div>{bands.map((b, i) => <BandTag key={i} name={b} />)}</div>
       </div>
       <div style={{ textAlign:'right', flexShrink:0 }}>
-        <div style={{ fontSize:13, color:'#ffffff', fontWeight:500 }}>{f['Set Time'] || '—'}</div>
+        <div style={{ fontSize:13, color:'#ffffff', fontWeight:500 }}>{fmtTime(f['Start Time']) || '—'}</div>
         <div style={{ fontSize:10, color:'#6b7280' }}>set time</div>
       </div>
       <div style={{ color:'#2a2a3a', fontSize:18 }}>›</div>
@@ -620,23 +631,23 @@ function ShowDetail({ data, member, show, resolve, resolveField, onBack, onSetli
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:8 }}>
             <div style={{ background:'#0a0a0f', borderRadius:10, padding:'12px 14px' }}>
               <div style={{ fontSize:10, color:'#6b7280', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:4 }}>Load in</div>
-              <div style={{ fontSize:18, fontWeight:700, color:'#ffffff' }}>{f['Load-In Time'] || '—'}</div>
+              <div style={{ fontSize:18, fontWeight:700, color:'#ffffff' }}>{fmtTime(f['Load-In Time']) || '—'}</div>
             </div>
             <div style={{ background:'#0a0a0f', borderRadius:10, padding:'12px 14px' }}>
               <div style={{ fontSize:10, color:'#6b7280', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:4 }}>Sound check</div>
               <div style={{ fontSize:18, fontWeight:700, color:'#ffffff' }}>
-                {f['Sound Check Time'] || '—'}
+                {fmtTime(f['Sound Check Time']) || '—'}
               </div>
             </div>
           </div>
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
             <div style={{ background:'#0a0a0f', borderRadius:10, padding:'12px 14px' }}>
               <div style={{ fontSize:10, color:'#6b7280', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:4 }}>Set time</div>
-              <div style={{ fontSize:18, fontWeight:700, color:'#a78bfa' }}>{f['Set Time'] || '—'}</div>
+              <div style={{ fontSize:18, fontWeight:700, color:'#a78bfa' }}>{fmtTime(f['Start Time']) || '—'}</div>
             </div>
             <div style={{ background:'#0a0a0f', borderRadius:10, padding:'12px 14px' }}>
               <div style={{ fontSize:10, color:'#6b7280', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:4 }}>End time</div>
-              <div style={{ fontSize:18, fontWeight:700, color:'#ffffff' }}>{f['End Time'] || '—'}</div>
+              <div style={{ fontSize:18, fontWeight:700, color:'#ffffff' }}>{fmtTime(f['End Time']) || '—'}</div>
             </div>
           </div>
         </div>
@@ -1020,7 +1031,7 @@ function MasterCalendar({ data, resolve, resolveField, onShowClick, onBack }) {
                               <div style={{ fontSize:13, fontWeight:600, color:'#ffffff', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{vf['Venue Name'] || '—'}</div>
                               <div style={{ display:'flex', gap:4, marginTop:2, alignItems:'center', flexWrap:'wrap' }}>
                                 {bands.map((b, bi) => <span key={bi} style={{ fontSize:10, padding:'1px 6px', borderRadius:20, background:BAND_COLORS[b]?.bg||'#1a1a2e', color:BAND_COLORS[b]?.color||'#a78bfa', fontWeight:600 }}>{b}</span>)}
-                                {shows[0].fields['Set Time'] && <span style={{ fontSize:10, color:'#6b7280' }}>{shows[0].fields['Set Time']}</span>}
+                                {shows[0].fields['Start Time'] && <span style={{ fontSize:10, color:'#6b7280' }}>{fmtTime(shows[0].fields['Start Time'])}</span>}
                               </div>
                             </div>
                           </div>
@@ -1072,7 +1083,7 @@ function MasterCalendar({ data, resolve, resolveField, onShowClick, onBack }) {
                               <div style={{ fontSize:13, fontWeight:600, color:'#ffffff' }}>{svf['Venue Name'] || '—'}</div>
                               <div style={{ display:'flex', gap:4, marginTop:3, flexWrap:'wrap', alignItems:'center' }}>
                                 {sBands.map((b, bi) => <span key={bi} style={{ fontSize:10, padding:'1px 6px', borderRadius:20, background:BAND_COLORS[b]?.bg||'#1a1a2e', color:BAND_COLORS[b]?.color||'#a78bfa', fontWeight:600 }}>{b}</span>)}
-                                {sf['Set Time'] && <span style={{ fontSize:10, color:'#6b7280' }}>{sf['Set Time']}</span>}
+                                {sf['Start Time'] && <span style={{ fontSize:10, color:'#6b7280' }}>{fmtTime(sf['Start Time'])}</span>}
                               </div>
                             </div>
                             <span style={{ color:'#a78bfa', fontSize:16, flexShrink:0 }}>›</span>
@@ -1661,9 +1672,9 @@ function CrewShowCard({ show, crew, resolve, resolveField, soundShows, merchShow
         </div>
       </div>
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8, marginBottom: address ? 14 : 0 }}>
-        <TimeBlock label="Load in" value={f['Load-In Time']} />
-        <TimeBlock label="Set time" value={f['Set Time']} />
-        <TimeBlock label="End time" value={f['End Time']} />
+        <TimeBlock label="Load in" value={fmtTime(f['Load-In Time'])} />
+        <TimeBlock label="Set time" value={fmtTime(f['Start Time'])} />
+        <TimeBlock label="End time" value={fmtTime(f['End Time'])} />
       </div>
       {address && (
         <a href={`https://maps.apple.com/?q=${encodeURIComponent(address)}`} onClick={e => e.stopPropagation()} style={{ display:'flex', alignItems:'center', gap:8, padding:'10px 12px', background:'#0a0a0f', borderRadius:10, textDecoration:'none', marginTop:4 }}>
