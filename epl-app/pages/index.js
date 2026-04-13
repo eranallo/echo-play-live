@@ -1376,6 +1376,55 @@ function CrewHome({ data, crew, resolve, resolveField, onShowClick, onBack }) {
   const role = f['Role'] || '—'
   const today = new Date(new Date().toDateString())
   const initials = name.split(' ').map(x => x[0]).join('').toUpperCase().slice(0,2)
+  const [showBlackoutForm, setShowBlackoutForm] = useState(false)
+  const [currentDate, setCurrentDate] = useState('')
+  const [currentEndDate, setCurrentEndDate] = useState('')
+  const [currentReason, setCurrentReason] = useState('Personal')
+  const [pendingDates, setPendingDates] = useState([])
+  const [submitting, setSubmitting] = useState(false)
+  const [submitted, setSubmitted] = useState(false)
+  const [localBlackouts, setLocalBlackouts] = useState([])
+  const REASONS = ['Personal', 'Other Gig', 'Vacation', 'Illness', 'Family', 'Other']
+
+  const myBlackouts = [...(data['BLACKOUT DATES'] || []).filter(b => {
+    const bc = b.fields['Crew'] || []
+    return Array.isArray(bc) ? bc.includes(crew.id) : bc === crew.id
+  }), ...localBlackouts].sort((a, b) => a.fields['Date'] > b.fields['Date'] ? 1 : -1)
+
+  function addToPending() {
+    if (!currentDate) return
+    if (pendingDates.find(p => p.date === currentDate)) return
+    setPendingDates(prev => [...prev, { date: currentDate, endDate: currentEndDate || currentDate, reason: currentReason }])
+    setCurrentDate('')
+    setCurrentEndDate('')
+    setCurrentReason('Personal')
+  }
+
+  async function submitBlackouts() {
+    if (pendingDates.length === 0) return
+    setSubmitting(true)
+    try {
+      const results = []
+      for (const p of pendingDates) {
+        const body = { 'Crew': [crew.id], 'Date': p.date, 'Reason': p.reason }
+        if (p.endDate && p.endDate !== p.date) body['End Date'] = p.endDate
+        const res = await fetch('/api/blackout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        })
+        const json = await res.json()
+        if (json.error) throw new Error(json.error)
+        results.push({ id: json.id, fields: { Date: p.date, 'End Date': p.endDate, Reason: p.reason, Crew: [crew.id] } })
+      }
+      setLocalBlackouts(prev => [...prev, ...results])
+      setPendingDates([])
+      setShowBlackoutForm(false)
+      setSubmitted(true)
+      setTimeout(() => setSubmitted(false), 3000)
+    } catch(e) { alert('Error: ' + e.message) }
+    setSubmitting(false)
+  }
 
   const soundShows = (data['SHOWS'] || []).filter(s => {
     const sr = s.fields['Sound Engineer'] || []
