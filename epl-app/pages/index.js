@@ -1512,6 +1512,95 @@ function CrewHome({ data, crew, resolve, resolveField, onShowClick, onBack }) {
             })}
           </div>
         )}
+
+        {/* Blackout dates section */}
+        <div style={{ marginTop:24 }}>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 }}>
+            <div style={{ fontSize:11, fontWeight:600, color:'#6b7280', textTransform:'uppercase', letterSpacing:'0.08em' }}>My unavailable dates</div>
+            <button onClick={() => { setShowBlackoutForm(f => !f); setPendingDates([]); setCurrentDate(''); setCurrentEndDate(''); setCurrentReason('Personal') }}
+              style={{ fontSize:12, padding:'5px 12px', borderRadius:20, background: showBlackoutForm ? '#2a2a3a' : '#1a1a2e', border:'none', color:'#a78bfa', cursor:'pointer', fontFamily:'inherit', fontWeight:600 }}>
+              {showBlackoutForm ? 'Cancel' : '+ Add dates'}
+            </button>
+          </div>
+
+          {submitted && (
+            <div style={{ background:'#0f2a0f', border:'0.5px solid #2a4a2a', borderRadius:10, padding:'12px 16px', marginBottom:12, fontSize:13, color:'#6bcb77' }}>
+              Dates submitted successfully!
+            </div>
+          )}
+
+          {showBlackoutForm && (
+            <div style={{ background:'#111118', border:'0.5px solid #2a2a3a', borderRadius:12, padding:16, marginBottom:14 }}>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:10 }}>
+                <div>
+                  <div style={{ fontSize:12, color:'#6b7280', marginBottom:6 }}>Start date</div>
+                  <input type="date" value={currentDate} onChange={e => setCurrentDate(e.target.value)}
+                    style={{ width:'100%', padding:'10px 8px', background:'#1a1a2a', border:'0.5px solid #3a3a4a', borderRadius:8, color:'#ffffff', fontSize:13, fontFamily:'inherit', boxSizing:'border-box' }} />
+                </div>
+                <div>
+                  <div style={{ fontSize:12, color:'#6b7280', marginBottom:6 }}>End date <span style={{ color:'#3a3a4a' }}>(optional)</span></div>
+                  <input type="date" value={currentEndDate} min={currentDate} onChange={e => setCurrentEndDate(e.target.value)}
+                    style={{ width:'100%', padding:'10px 8px', background:'#1a1a2a', border:'0.5px solid #3a3a4a', borderRadius:8, color:'#ffffff', fontSize:13, fontFamily:'inherit', boxSizing:'border-box' }} />
+                </div>
+              </div>
+              <div style={{ marginBottom:12 }}>
+                <div style={{ fontSize:12, color:'#6b7280', marginBottom:6 }}>Reason</div>
+                <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+                  {REASONS.map(r => (
+                    <button key={r} onClick={() => setCurrentReason(r)}
+                      style={{ padding:'5px 12px', borderRadius:20, background: currentReason===r ? '#1a1a2e' : 'transparent', border: currentReason===r ? '1px solid #a78bfa' : '0.5px solid #2a2a3a', color: currentReason===r ? '#a78bfa' : '#6b7280', fontSize:12, cursor:'pointer', fontFamily:'inherit' }}>
+                      {r}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <button onClick={addToPending} disabled={!currentDate}
+                style={{ width:'100%', padding:'10px', background: currentDate ? '#1a1a2e' : '#0d0d1a', border:'none', borderRadius:8, color: currentDate ? '#a78bfa' : '#3a3a4a', fontSize:13, fontWeight:600, cursor: currentDate ? 'pointer' : 'default', fontFamily:'inherit' }}>
+                + Add to list
+              </button>
+
+              {pendingDates.length > 0 && (
+                <div style={{ marginTop:12 }}>
+                  {pendingDates.map((p, i) => (
+                    <div key={i} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'8px 0', borderBottom:'0.5px solid #1a1a2a' }}>
+                      <div>
+                        <span style={{ fontSize:13, fontWeight:600 }}>{p.endDate && p.endDate !== p.date ? `${fmt(p.date)} → ${fmt(p.endDate)}` : fmt(p.date)}</span>
+                        <span style={{ fontSize:12, color:'#6b7280', marginLeft:8 }}>{p.reason}</span>
+                      </div>
+                      <button onClick={() => setPendingDates(prev => prev.filter((_,j) => j !== i))}
+                        style={{ background:'none', border:'none', color:'#6b7280', cursor:'pointer', fontSize:16 }}>×</button>
+                    </div>
+                  ))}
+                  <button onClick={submitBlackouts} disabled={submitting}
+                    style={{ width:'100%', marginTop:12, padding:'12px', background:'#a78bfa', border:'none', borderRadius:8, color:'#0a0a0f', fontSize:14, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>
+                    {submitting ? 'Submitting...' : `Submit ${pendingDates.length} date${pendingDates.length > 1 ? 's' : ''}`}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {myBlackouts.length > 0 ? (
+            <div style={{ background:'#111118', border:'0.5px solid #2a2a3a', borderRadius:12, overflow:'hidden' }}>
+              {myBlackouts.map((b, i) => {
+                const hasEnd = b.fields['End Date'] && b.fields['End Date'] !== b.fields['Date']
+                const dateDisplay = hasEnd ? `${fmt(b.fields['Date'])} → ${fmt(b.fields['End Date'])}` : fmt(b.fields['Date'])
+                return (
+                  <div key={i} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'12px 16px', borderBottom: i < myBlackouts.length-1 ? '0.5px solid #1a1a2a' : 'none' }}>
+                    <div>
+                      <div style={{ fontSize:13, fontWeight:600 }}>{dateDisplay}</div>
+                      <div style={{ fontSize:12, color:'#6b7280', marginTop:2 }}>{b.fields['Reason'] || 'No reason listed'}</div>
+                    </div>
+                    <div style={{ fontSize:11, color:'#ff9f7f' }}>Unavailable</div>
+                  </div>
+                )
+              })}
+            </div>
+          ) : (
+            <div style={{ fontSize:13, color:'#6b7280', textAlign:'center', padding:'16px 0' }}>No unavailable dates on record.</div>
+          )}
+        </div>
+
       </div>
     </div>
   )
