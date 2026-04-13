@@ -863,6 +863,10 @@ function MasterCalendar({ data, resolve, resolveField, onShowClick, onBack }) {
     const startStr = b.fields['Date']
     const endStr = b.fields['End Date'] || startStr
     if (!startStr) return
+    // Only include if has members OR crew linked
+    const hasMembers = (b.fields['Member'] || []).length > 0
+    const hasCrew = (b.fields['Crew'] || []).length > 0
+    if (!hasMembers && !hasCrew) return
     const start = new Date(startStr + 'T00:00:00')
     const end = new Date(endStr + 'T00:00:00')
     const cur = new Date(start)
@@ -877,6 +881,8 @@ function MasterCalendar({ data, resolve, resolveField, onShowClick, onBack }) {
   // Build member lookup
   const memberById = {}
   ;(data['MEMBERS'] || []).forEach(m => { memberById[m.id] = m.fields['Member Name'] || '?' })
+  const crewById = {}
+  ;(data['CREW'] || []).forEach(c => { crewById[c.id] = c.fields['Name'] || '?' })
 
   // Group by month
   const grouped = {}
@@ -1029,7 +1035,11 @@ function MasterCalendar({ data, resolve, resolveField, onShowClick, onBack }) {
                         </div>
                       ) : isBlackedOut ? (
                         <div style={{ fontSize:13, color:'#ff9f7f' }}>
-                          {blackouts.reduce((a, b) => a + (Array.isArray(b.fields['Member']) ? b.fields['Member'].length : 1), 0)} member conflict{blackouts.length > 1 ? 's' : ''} — tap for details
+                          {blackouts.reduce((a, b) => {
+                            const mCount = Array.isArray(b.fields['Member']) ? b.fields['Member'].length : (b.fields['Member'] ? 1 : 0)
+                            const cCount = Array.isArray(b.fields['Crew']) ? b.fields['Crew'].length : (b.fields['Crew'] ? 1 : 0)
+                            return a + mCount + cCount
+                          }, 0)} conflict{blackouts.length > 1 ? 's' : ''} — tap for details
                         </div>
                       ) : isPast ? (
                         <div style={{ fontSize:13, color:'#3a3a4a' }}>Past date</div>
