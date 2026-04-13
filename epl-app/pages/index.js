@@ -1377,6 +1377,7 @@ function CrewHome({ data, crew, resolve, resolveField, onShowClick, onBack, onBl
   const role = f['Role'] || '—'
   const today = new Date(new Date().toDateString())
   const initials = name.split(' ').map(x => x[0]).join('').toUpperCase().slice(0,2)
+  const [showAllShows, setShowAllShows] = useState(false)
   const [showBlackoutForm, setShowBlackoutForm] = useState(false)
   const [currentDate, setCurrentDate] = useState('')
   const [currentEndDate, setCurrentEndDate] = useState('')
