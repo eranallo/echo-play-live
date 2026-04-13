@@ -1372,61 +1372,18 @@ function CrewSelect({ data, onSelect, onBack }) {
 }
 
 function CrewHome({ data, crew, resolve, resolveField, onShowClick, onBack, onBlackouts }) {
+  useEffect(() => { window.scrollTo(0, 0) }, [crew?.id])
   const f = crew.fields
   const name = f['Name'] || '—'
   const role = f['Role'] || '—'
   const today = new Date(new Date().toDateString())
   const initials = name.split(' ').map(x => x[0]).join('').toUpperCase().slice(0,2)
   const [showAllShows, setShowAllShows] = useState(false)
-  const [showBlackoutForm, setShowBlackoutForm] = useState(false)
-  const [currentDate, setCurrentDate] = useState('')
-  const [currentEndDate, setCurrentEndDate] = useState('')
-  const [currentReason, setCurrentReason] = useState('Personal')
-  const [pendingDates, setPendingDates] = useState([])
-  const [submitting, setSubmitting] = useState(false)
-  const [submitted, setSubmitted] = useState(false)
-  const [localBlackouts, setLocalBlackouts] = useState([])
-  const REASONS = ['Personal', 'Other Gig', 'Vacation', 'Illness', 'Family', 'Other']
 
-  const myBlackouts = [...(data['BLACKOUT DATES'] || []).filter(b => {
+  const myBlackouts = (data['BLACKOUT DATES'] || []).filter(b => {
     const bc = b.fields['Crew'] || []
     return Array.isArray(bc) ? bc.includes(crew.id) : bc === crew.id
-  }), ...localBlackouts].sort((a, b) => a.fields['Date'] > b.fields['Date'] ? 1 : -1)
-
-  function addToPending() {
-    if (!currentDate) return
-    if (pendingDates.find(p => p.date === currentDate)) return
-    setPendingDates(prev => [...prev, { date: currentDate, endDate: currentEndDate || currentDate, reason: currentReason }])
-    setCurrentDate('')
-    setCurrentEndDate('')
-    setCurrentReason('Personal')
-  }
-
-  async function submitBlackouts() {
-    if (pendingDates.length === 0) return
-    setSubmitting(true)
-    try {
-      const results = []
-      for (const p of pendingDates) {
-        const body = { 'Crew': [crew.id], 'Date': p.date, 'Reason': p.reason }
-        if (p.endDate && p.endDate !== p.date) body['End Date'] = p.endDate
-        const res = await fetch('/api/blackout', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body)
-        })
-        const json = await res.json()
-        if (json.error) throw new Error(json.error)
-        results.push({ id: json.id, fields: { Date: p.date, 'End Date': p.endDate, Reason: p.reason, Crew: [crew.id] } })
-      }
-      setLocalBlackouts(prev => [...prev, ...results])
-      setPendingDates([])
-      setShowBlackoutForm(false)
-      setSubmitted(true)
-      setTimeout(() => setSubmitted(false), 3000)
-    } catch(e) { alert('Error: ' + e.message) }
-    setSubmitting(false)
-  }
+  })
 
   const soundShows = (data['SHOWS'] || []).filter(s => {
     const sr = s.fields['Sound Engineer'] || []
@@ -1445,34 +1402,21 @@ function CrewHome({ data, crew, resolve, resolveField, onShowClick, onBack, onBl
 
   return (
     <div style={{ minHeight:'100vh', background:'#0a0a0f', color:'#ffffff', fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif' }}>
-      <Head>
-        <title>EPL — {name}</title>
-        <link rel="apple-touch-icon" href="/logo.png" />
-        <link rel="icon" href="/logo.png" />
-        <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-title" content="Echo Play Live" />
-      </Head>
+      <Head><title>EPL — {name}</title></Head>
       <div style={{ background:'#0a0a0f', borderBottom:'0.5px solid #1e1e2e', padding:'12px 20px', display:'flex', alignItems:'center', justifyContent:'space-between', position:'sticky', top:0, zIndex:50 }}>
-        <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-          <img src="/logo.png" alt="EPL" onClick={onBack} style={{ width:32, height:32, objectFit:'contain', mixBlendMode:'screen', cursor:'pointer' }} />
-          <span style={{ fontSize:14, fontWeight:600 }}>Echo Play Live</span>
-        </div>
+        <img src="/logo.png" alt="EPL" onClick={onBack} style={{ width:36, height:36, objectFit:'contain', mixBlendMode:'screen', cursor:'pointer' }} />
         <button onClick={onBack} style={{ fontSize:12, color:'#6b7280', background:'none', border:'none', cursor:'pointer', fontFamily:'inherit' }}>Switch ›</button>
       </div>
 
-      <div style={{ padding:'20px 20px 60px' }}>
+      <div style={{ padding:'20px 20px 40px' }}>
         <div style={{ display:'flex', alignItems:'center', gap:14, marginBottom:24 }}>
-          <div style={{ width:52, height:52, borderRadius:'50%', background:'#1a1a2e', display:'flex', alignItems:'center', justifyContent:'center', fontSize:17, fontWeight:700, color:'#a78bfa' }}>{initials}</div>
+          <div style={{ width:54, height:54, borderRadius:'50%', background:'#1a1a2e', display:'flex', alignItems:'center', justifyContent:'center', fontSize:17, fontWeight:700, color:'#a78bfa' }}>{initials}</div>
           <div>
             <div style={{ fontSize:20, fontWeight:700 }}>{name}</div>
-            <div style={{ fontSize:13, color:'#a78bfa', marginTop:2 }}>{role}</div>
+            <div style={{ display:'flex', gap:4, marginTop:4 }}>
+              <span style={{ fontSize:12, padding:'2px 8px', borderRadius:20, background:'#1a1a2e', color:'#a78bfa', fontWeight:600 }}>{role}</span>
+            </div>
           </div>
-        </div>
-
-        {/* Quick stat cards */}
-        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:20 }}>
-          <QuickCard label="My schedule" value={allShows.length} sub="upcoming shows" onClick={() => {}} color="#a78bfa" icon="🎸" />
-          <QuickCard label="Unavailable dates" value={myBlackouts.length} sub="on record" onClick={onBlackouts} color="#ff9f7f" icon="🚫" />
         </div>
 
         {nextShow && (
@@ -1483,15 +1427,20 @@ function CrewHome({ data, crew, resolve, resolveField, onShowClick, onBack, onBl
         )}
 
         {!nextShow && (
-          <div style={{ padding:20, background:'#0a0a0f', border:'0.5px solid #2a2a3a', borderRadius:10, textAlign:'center', color:'#6b7280', fontSize:14, marginBottom:20 }}>
+          <div style={{ marginBottom:20, padding:20, background:'#0a0a0f', border:'0.5px solid #2a2a3a', borderRadius:10, textAlign:'center', color:'#6b7280', fontSize:14 }}>
             No upcoming assignments yet.
           </div>
         )}
 
-        {allShows.length > 1 && (
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:16 }}>
+          <QuickCard label="My schedule" value={allShows.length} sub="upcoming shows" onClick={() => setShowAllShows(true)} color="#a78bfa" icon="🎸" />
+          <QuickCard label="Unavailable dates" value={myBlackouts.length} sub="on record" onClick={onBlackouts} color="#ff9f7f" icon="🚫" />
+        </div>
+
+        {allShows.length > 0 && (
           <div>
-            <div style={{ fontSize:11, fontWeight:600, color:'#6b7280', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:10 }}>All upcoming ({allShows.length})</div>
-            {allShows.map(s => {
+            <div style={{ fontSize:11, fontWeight:600, color:'#6b7280', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:10 }}>Upcoming shows</div>
+            {(showAllShows ? allShows : allShows.slice(0, 5)).map(s => {
               const sf = s.fields
               const venueRecs = resolve(sf['Venue'], 'VENUES')
               const vf = venueRecs[0] ? venueRecs[0].fields : {}
@@ -1508,7 +1457,7 @@ function CrewHome({ data, crew, resolve, resolveField, onShowClick, onBack, onBl
                   <div style={{ flex:1, minWidth:0 }}>
                     <div style={{ fontSize:14, fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{vf['Venue Name'] || '—'}</div>
                     <div style={{ fontSize:12, color:'#6b7280', marginBottom:4 }}>{fmt(sf['Date'])}</div>
-                    <div style={{ display:'flex', gap:4 }}>
+                    <div style={{ display:'flex', gap:4, flexWrap:'wrap' }}>
                       {bands.map((b,i) => <BandTag key={i} name={b} />)}
                       {isSound && <span style={{ fontSize:10, padding:'1px 6px', borderRadius:20, background:'#1a1a2e', color:'#a78bfa', fontWeight:600 }}>Sound</span>}
                       {isMerch && <span style={{ fontSize:10, padding:'1px 6px', borderRadius:20, background:'#1a1a2e', color:'#a78bfa', fontWeight:600 }}>Merch</span>}
@@ -1518,11 +1467,13 @@ function CrewHome({ data, crew, resolve, resolveField, onShowClick, onBack, onBl
                 </div>
               )
             })}
+            {!showAllShows && allShows.length > 5 && (
+              <button onClick={() => setShowAllShows(true)} style={{ width:'100%', padding:'12px', marginTop:8, background:'transparent', border:'0.5px solid #2a2a3a', borderRadius:10, color:'#a78bfa', fontSize:13, cursor:'pointer', fontFamily:'inherit' }}>
+                View all {allShows.length} shows →
+              </button>
+            )}
           </div>
         )}
-
-
-
       </div>
     </div>
   )
