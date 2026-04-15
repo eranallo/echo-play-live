@@ -872,6 +872,17 @@ function MasterCalendar({ data, resolve, resolveField, onShowClick, onBack }) {
     }
     d.setDate(d.getDate() + 1)
   }
+  // Also include any booked show dates that fall outside Fri/Sat
+  Object.keys(showsByDate).forEach(ds => {
+    const dt = new Date(ds + 'T00:00:00')
+    if (dt.getDay() !== 5 && dt.getDay() !== 6 && dt.getFullYear() === year) {
+      const wds = `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,"0")}-${String(dt.getDate()).padStart(2,"0")}`
+      if (!weekendDates.find(w => `${w.getFullYear()}-${String(w.getMonth()+1).padStart(2,"0")}-${String(w.getDate()).padStart(2,"0")}` === wds)) {
+        weekendDates.push(dt)
+      }
+    }
+  })
+  weekendDates.sort((a, b) => a - b)
 
   const showsByDate = {}
   ;(data['SHOWS'] || []).forEach(s => {
