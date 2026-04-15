@@ -872,6 +872,15 @@ function MasterCalendar({ data, resolve, resolveField, onShowClick, onBack }) {
     }
     d.setDate(d.getDate() + 1)
   }
+  const showsByDate = {}
+  ;(data['SHOWS'] || []).forEach(s => {
+    const dt = s.fields['Date']
+    if (dt) {
+      if (!showsByDate[dt]) showsByDate[dt] = []
+      showsByDate[dt].push(s)
+    }
+  })
+
   // Also include any booked show dates that fall outside Fri/Sat
   Object.keys(showsByDate).forEach(ds => {
     const dt = new Date(ds + 'T00:00:00')
@@ -883,15 +892,6 @@ function MasterCalendar({ data, resolve, resolveField, onShowClick, onBack }) {
     }
   })
   weekendDates.sort((a, b) => a - b)
-
-  const showsByDate = {}
-  ;(data['SHOWS'] || []).forEach(s => {
-    const dt = s.fields['Date']
-    if (dt) {
-      if (!showsByDate[dt]) showsByDate[dt] = []
-      showsByDate[dt].push(s)
-    }
-  })
 
   const blackoutsByDate = {}
   ;(data['BLACKOUT DATES'] || []).forEach(b => {
