@@ -1469,9 +1469,13 @@ function CrewSelect({ data, onSelect, onBack }) {
           const name = f['Name'] || '—'
           const role = f['Role'] || '—'
           const initials = name.split(' ').map(x => x[0]).join('').toUpperCase().slice(0,2)
+          const photo = f['Photo'] && Array.isArray(f['Photo']) && f['Photo'][0] ? f['Photo'][0].url : null
           return (
             <button key={c.id} onClick={() => onSelect(c)} style={{ display:'flex', alignItems:'center', gap:14, padding:'14px 16px', background:'#0a0a0f', border:'0.5px solid #1a2a2e', borderRadius:10, cursor:'pointer', textAlign:'left', width:'100%', fontFamily:'inherit' }}>
-              <div style={{ width:44, height:44, borderRadius:'50%', background:'#1a1a2e', display:'flex', alignItems:'center', justifyContent:'center', fontSize:14, fontWeight:700, color:'#a78bfa', flexShrink:0 }}>{initials}</div>
+              {photo
+                ? <img src={photo} alt={name} style={{ width:44, height:44, borderRadius:'50%', objectFit:'cover', flexShrink:0 }} />
+                : <div style={{ width:44, height:44, borderRadius:'50%', background:'#1a1a2e', display:'flex', alignItems:'center', justifyContent:'center', fontSize:14, fontWeight:700, color:'#a78bfa', flexShrink:0 }}>{initials}</div>
+              }
               <div style={{ flex:1 }}>
                 <div style={{ fontSize:15, fontWeight:600, color:'#ffffff' }}>{name}</div>
                 <div style={{ fontSize:12, color:'#a78bfa', marginTop:2 }}>{role}</div>
@@ -1532,7 +1536,10 @@ function CrewHome({ data, crew, resolve, resolveField, onShowClick, onBack, onBl
 
       <div style={{ padding:'20px 20px 40px' }}>
         <div style={{ display:'flex', alignItems:'center', gap:14, marginBottom:24 }}>
-          <div style={{ width:54, height:54, borderRadius:'50%', background:'#1a1a2e', display:'flex', alignItems:'center', justifyContent:'center', fontSize:17, fontWeight:700, color:'#a78bfa' }}>{initials}</div>
+          {f['Photo'] && Array.isArray(f['Photo']) && f['Photo'][0]
+            ? <img src={f['Photo'][0].url} alt={name} style={{ width:54, height:54, borderRadius:'50%', objectFit:'cover', flexShrink:0 }} />
+            : <div style={{ width:54, height:54, borderRadius:'50%', background:'#1a1a2e', display:'flex', alignItems:'center', justifyContent:'center', fontSize:17, fontWeight:700, color:'#a78bfa' }}>{initials}</div>
+          }
           <div>
             <div style={{ fontSize:20, fontWeight:700 }}>{name}</div>
             <div style={{ display:'flex', gap:4, marginTop:4 }}>
