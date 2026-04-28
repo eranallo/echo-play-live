@@ -2050,10 +2050,79 @@ function SetlistBuilderMain({ data, onBack }) {
     setTimeout(() => setSaved(false), 3000)
   }
 
+  // Band logo stored in localStorage per band
+  const [bandLogo, setBandLogo] = useState(null)
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    if (selectedBand) {
+      const stored = localStorage.getItem(`epl_logo_${selectedBand}`)
+      setBandLogo(stored || null)
+    } else {
+      setBandLogo(null)
+    }
+  }, [selectedBand])
+
+  function handleLogoUpload(e) {
+    const file = e.target.files[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = ev => {
+      const b64 = ev.target.result
+      setBandLogo(b64)
+      if (selectedBand && typeof window !== 'undefined') {
+        localStorage.setItem(`epl_logo_${selectedBand}`, b64)
+      }
+    }
+    reader.readAsDataURL(file)
+  }
+
   // Resolve band + show info for print
   const printBand = bands.find(b => b.id === selectedBand)
   const printShow = shows.find(s => s.id === selectedShow)
   const printVenue = printShow ? (data['VENUES'] || []).find(v => (printShow.fields['Venue'] || []).includes(v.id)) : null
+
+  function emailSetlist() {
+    const bName = printBand?.fields['Band Name'] || ''
+    const vName = printVenue?.fields['Venue Name'] || ''
+    const sDate = printShow?.fields['Date'] || ''
+    const subject = `Setlist: ${setName || bName}${sDate ? ` — ${sDate}` : ''}`
+    let body = `${bName.toUpperCase()}
+`
+    if (vName) body += `${vName}
+`
+    if (sDate) body += `${sDate}
+`
+    body += `
+`
+    let num = 1
+    items.forEach(item => {
+      if (item.type === 'song') {
+        body += `${num}. ${item.fields['Song Title']}${item.fields['Artist'] ? ` — ${item.fields['Artist']}` : ''}
+`
+        num++
+      } else {
+        const labels = { break:'
+--- BREAK ---
+', tuning:`
+[ ${item.text} TUNING ]
+`, merch:'
+[ MERCH TABLE ]
+', instagram:'
+[ INSTAGRAM CALLOUT ]
+', custom:`
+[ ${item.text} ]
+` }
+        body += labels[item.type] || `
+[ ${item.type.toUpperCase()} ]
+`
+      }
+    })
+    body += `
+${items.filter(i=>i.type==='song').length} songs · ${totalDisplay}`
+    if (typeof window !== 'undefined') {
+      window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
+    }
+  }
 
   if (showPrint) {
     return <SetlistPrintView
