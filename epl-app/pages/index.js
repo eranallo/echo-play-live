@@ -2050,8 +2050,23 @@ function SetlistBuilderMain({ data, onBack }) {
     setTimeout(() => setSaved(false), 3000)
   }
 
+  // Resolve band + show info for print
+  const printBand = bands.find(b => b.id === selectedBand)
+  const printShow = shows.find(s => s.id === selectedShow)
+  const printVenue = printShow ? (data['VENUES'] || []).find(v => (printShow.fields['Venue'] || []).includes(v.id)) : null
+
   if (showPrint) {
-    return <SetlistPrintView items={items} setName={setName} onClose={() => setShowPrint(false)} />
+    return <SetlistPrintView
+      items={items}
+      setName={setName}
+      bandName={printBand?.fields['Band Name'] || ''}
+      bandId={selectedBand}
+      venueName={printVenue?.fields['Venue Name'] || ''}
+      showDate={printShow?.fields['Date'] || ''}
+      totalDisplay={totalDisplay}
+      songCount={items.filter(i=>i.type==='song').length}
+      onClose={() => setShowPrint(false)}
+    />
   }
 
   const blockTypes = [
@@ -2078,9 +2093,13 @@ function SetlistBuilderMain({ data, onBack }) {
           style={{ padding:'7px 14px', background: saved ? '#1a3a1a' : '#c084fc', border:'none', borderRadius:10, color: saved ? '#6bcb77' : '#0a0a0f', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>
           {saving ? '...' : saved ? '✓ Saved' : 'Save'}
         </button>
+        <button onClick={emailSetlist}
+          style={{ padding:'7px 12px', background:'#1a1a2e', border:'none', borderRadius:10, color:'#a78bfa', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>
+          ✉ Email
+        </button>
         <button onClick={() => setShowPrint(true)}
           style={{ padding:'7px 12px', background:'#1a1a2e', border:'none', borderRadius:10, color:'#a78bfa', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>
-          Print
+          🖨 Print
         </button>
       </div>
 
@@ -2099,6 +2118,21 @@ function SetlistBuilderMain({ data, onBack }) {
           ))}
         </select>
       </div>
+
+      {/* Logo upload row */}
+      {selectedBand && (
+        <div style={{ padding:'8px 16px', background:'#0a0a0f', borderBottom:'0.5px solid #1e1e2e', display:'flex', alignItems:'center', gap:10 }}>
+          {bandLogo
+            ? <img src={bandLogo} alt="logo" style={{ width:32, height:32, objectFit:'contain', borderRadius:6, background:'#1a1a2e' }} />
+            : <div style={{ width:32, height:32, borderRadius:6, background:'#1a1a2e', display:'flex', alignItems:'center', justifyContent:'center', fontSize:10, color:'#6b7280' }}>🎸</div>
+          }
+          <div style={{ fontSize:12, color:'#6b7280' }}>{bandLogo ? 'Band logo uploaded' : 'No logo — upload for print template'}</div>
+          <label style={{ marginLeft:'auto', padding:'5px 12px', background:'#1a1a2e', border:'0.5px solid #a78bfa40', borderRadius:20, color:'#a78bfa', fontSize:11, fontWeight:600, cursor:'pointer' }}>
+            {bandLogo ? 'Replace Logo' : '+ Upload Logo'}
+            <input type="file" accept="image/*" onChange={handleLogoUpload} style={{ display:'none' }} />
+          </label>
+        </div>
+      )}
 
       {/* Mobile tabs */}
       <div style={{ display:'flex', background:'#0a0a0f', borderBottom:'0.5px solid #1e1e2e', overflowX:'auto' }}>
@@ -2318,54 +2352,153 @@ function SetlistBuilderMain({ data, onBack }) {
   )
 }
 
-function SetlistPrintView({ items, setName, onClose }) {
+function SetlistPrintView({ items, setName, bandName, bandId, venueName, showDate, totalDisplay, songCount, onClose }) {
+  const [logo, setLogo] = useState(null)
+
   useEffect(() => {
-    setTimeout(() => window.print(), 300)
-  }, [])
+    if (bandId) {
+      const stored = localStorage.getItem(`epl_logo_${bandId}`)
+      if (stored) setLogo(stored)
+    }
+  }, [bandId])
 
-  const songs = items.filter(i => i.type === 'song')
+  // Split items into two columns, keeping breaks as full-width markers
   const half = Math.ceil(items.length / 2)
-  const left = items.slice(0, half)
-  const right = items.slice(half)
+  const leftItems = items.slice(0, half)
+  const rightItems = items.slice(half)
 
-  const blockColors = { break:'#888', tuning:'#000', merch:'#888', instagram:'#888', custom:'#888' }
-
-  function renderItem(item, num) {
-    if (item.type === 'song') {
-      const sf = item.fields
-      const tuning = sf['Guitar Tuning'] ? sf['Guitar Tuning'].split('.')[0] : ''
+  // Track tuning changes per column
+  function renderColumn(colItems, startSongNum) {
+    let songNum = startSongNum
+    let lastTuning = null
+    return colItems.map((item, i) => {
+      if (item.type === 'song') {
+        const sf = item.fields
+        const tuning = sf['Guitar Tuning'] ? sf['Guitar Tuning'].split('.')[0] : ''
+        const tuningChanged = tuning && tuning !== lastTuning
+        if (tuning) lastTuning = tuning
+        const num = songNum++
+        return (
+          <div key={item.id || i} style={{ display:'flex', alignItems:'stretch', minHeight:22 }}>
+            {/* Tuning marker box */}
+            <div style={{ width:20, display:'flex', alignItems:'center', justifyContent:'center', marginRight:4, flexShrink:0 }}>
+              {tuningChanged && (
+                <div style={{ background:'#000', color:'#fff', fontSize:9, fontWeight:900, width:18, minHeight:18, display:'flex', alignItems:'center', justifyContent:'center', letterSpacing:0 }}>
+                  {tuning}
+                </div>
+              )}
+            </div>
+            {/* Song name */}
+            <div style={{ flex:1, fontSize:11, fontWeight:800, textTransform:'uppercase', letterSpacing:0.3, padding:'3px 0', borderBottom:'0.5px solid #ddd', display:'flex', alignItems:'center' }}>
+              {sf['Song Title']}
+            </div>
+          </div>
+        )
+      }
+      // Special blocks
+      if (item.type === 'tuning') {
+        lastTuning = item.text
+        return (
+          <div key={item.id || i} style={{ display:'flex', alignItems:'stretch', minHeight:22 }}>
+            <div style={{ width:20, display:'flex', alignItems:'center', justifyContent:'center', marginRight:4, flexShrink:0 }}>
+              <div style={{ background:'#000', color:'#fff', fontSize:9, fontWeight:900, width:18, minHeight:18, display:'flex', alignItems:'center', justifyContent:'center' }}>
+                {item.text}
+              </div>
+            </div>
+            <div style={{ flex:1, borderBottom:'0.5px solid #ddd' }} />
+          </div>
+        )
+      }
+      if (item.type === 'break') {
+        return (
+          <div key={item.id || i} style={{ padding:'4px 0 4px 24px', fontSize:9, fontStyle:'italic', color:'#888', letterSpacing:1, borderBottom:'0.5px solid #ccc' }}>
+            — BREAK —
+          </div>
+        )
+      }
+      const icons = { merch:'👕', instagram:'📸', custom:'✦' }
       return (
-        <div key={item.id} style={{ display:'flex', alignItems:'center', gap:6, padding:'3px 0', borderBottom:'0.5px solid #eee' }}>
-          <div style={{ width:16, fontSize:9, color:'#aaa', flexShrink:0 }}>{tuning}</div>
-          <div style={{ fontSize:11, fontWeight:700, textTransform:'uppercase', flex:1 }}>{sf['Song Title']}</div>
+        <div key={item.id || i} style={{ padding:'3px 0 3px 24px', fontSize:9, fontWeight:700, color:'#555', letterSpacing:0.5, borderBottom:'0.5px solid #ddd', display:'flex', alignItems:'center', gap:4 }}>
+          <span>{icons[item.type] || '•'}</span>
+          <span style={{ textTransform:'uppercase' }}>{item.text || item.type}</span>
         </div>
       )
-    }
-    const icons = { break:'— BREAK —', tuning:`[${item.text}]`, merch:'👕 MERCH TABLE', instagram:'📸 INSTAGRAM', custom: item.text }
-    return (
-      <div key={item.id} style={{ padding:'3px 0', fontSize:10, color:'#888', fontWeight:600, fontStyle:'italic', borderBottom:'0.5px solid #eee' }}>
-        {icons[item.type] || item.type.toUpperCase()}
-      </div>
-    )
+    })
+  }
+
+  const fmtDate = (d) => {
+    if (!d) return ''
+    try { return new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month:'long', day:'numeric', year:'numeric' }) }
+    catch { return d }
   }
 
   return (
-    <div style={{ background:'#ffffff', minHeight:'100vh', color:'#000', fontFamily:'Arial, sans-serif', padding:20 }}>
-      <div className="no-print" style={{ marginBottom:16, display:'flex', gap:10 }}>
-        <button onClick={() => window.print()} style={{ padding:'8px 16px', background:'#c084fc', border:'none', borderRadius:8, fontSize:13, fontWeight:700, cursor:'pointer' }}>🖨 Print</button>
-        <button onClick={onClose} style={{ padding:'8px 16px', background:'#f1f1f1', border:'none', borderRadius:8, fontSize:13, cursor:'pointer' }}>← Back</button>
+    <div style={{ background:'#fff', minHeight:'100vh', fontFamily:'Arial Black, Arial, sans-serif', color:'#000' }}>
+      {/* Toolbar - hidden on print */}
+      <div className="no-print" style={{ padding:'12px 20px', background:'#0a0a0f', display:'flex', gap:10, alignItems:'center' }}>
+        <button onClick={onClose} style={{ padding:'8px 16px', background:'#1a1a2e', border:'none', borderRadius:8, color:'#a78bfa', fontSize:13, fontWeight:700, cursor:'pointer' }}>← Back</button>
+        <button onClick={() => window.print()} style={{ padding:'8px 16px', background:'#c084fc', border:'none', borderRadius:8, color:'#000', fontSize:13, fontWeight:700, cursor:'pointer' }}>🖨 Print / Save PDF</button>
+        <div style={{ fontSize:12, color:'#6b7280', marginLeft:'auto' }}>{songCount} songs · {totalDisplay}</div>
       </div>
-      <div style={{ border:'2px solid #000', padding:16, maxWidth:700, margin:'0 auto' }}>
-        <div style={{ textAlign:'center', borderBottom:'2px solid #000', paddingBottom:10, marginBottom:10 }}>
-          <div style={{ fontSize:24, fontWeight:900, textTransform:'uppercase', letterSpacing:2 }}>{setName || 'Setlist'}</div>
-          <div style={{ fontSize:10, color:'#888', marginTop:4 }}>{songs.length} songs</div>
-        </div>
-        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16 }}>
-          <div>{left.map((item, i) => renderItem(item, i+1))}</div>
-          <div>{right.map((item, i) => renderItem(item, half+i+1))}</div>
+
+      {/* Print page */}
+      <div className="print-page" style={{ maxWidth:720, margin:'0 auto', padding:'24px 28px 20px', position:'relative', minHeight:'90vh', boxSizing:'border-box' }}>
+
+        {/* Watermark logo */}
+        {logo && (
+          <div style={{ position:'absolute', top:'50%', left:'50%', transform:'translate(-50%, -50%)', opacity:0.06, pointerEvents:'none', zIndex:0, width:340, height:340, display:'flex', alignItems:'center', justifyContent:'center' }}>
+            <img src={logo} alt="" style={{ width:'100%', height:'100%', objectFit:'contain' }} />
+          </div>
+        )}
+
+        {/* Content above watermark */}
+        <div style={{ position:'relative', zIndex:1 }}>
+
+          {/* Header */}
+          <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', marginBottom:6 }}>
+            {logo
+              ? <img src={logo} alt={bandName} style={{ width:52, height:52, objectFit:'contain' }} />
+              : <div style={{ width:52 }} />
+            }
+            <div style={{ textAlign:'center', flex:1, padding:'0 12px' }}>
+              <div style={{ fontSize:32, fontWeight:900, textTransform:'uppercase', letterSpacing:2, lineHeight:1 }}>{bandName || setName || 'SETLIST'}</div>
+              {(venueName || showDate) && (
+                <div style={{ fontSize:10, fontWeight:700, marginTop:4, letterSpacing:1 }}>
+                  {fmtDate(showDate)}{venueName && showDate ? ' // ' : ''}{venueName}
+                </div>
+              )}
+            </div>
+            <div style={{ width:52, textAlign:'right', fontSize:9, lineHeight:1.5, paddingTop:4 }}>
+              {showDate && <div>{fmtDate(showDate)}</div>}
+              {venueName && <div>@ {venueName}</div>}
+            </div>
+          </div>
+
+          {/* Divider line */}
+          <div style={{ borderTop:'2px solid #000', marginBottom:8 }} />
+
+          {/* Two-column song list */}
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0 20px' }}>
+            <div>{renderColumn(leftItems, 1)}</div>
+            <div>{renderColumn(rightItems, leftItems.filter(i=>i.type==='song').length + 1)}</div>
+          </div>
+
+          {/* Footer */}
+          <div style={{ borderTop:'1.5px solid #000', marginTop:10, paddingTop:6, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+            <div style={{ fontSize:9, fontWeight:700, letterSpacing:1.5, textTransform:'uppercase' }}>{songCount} songs · {totalDisplay}</div>
+            {bandName && <div style={{ fontSize:9, fontWeight:900, letterSpacing:2, textTransform:'uppercase' }}>{bandName}</div>}
+          </div>
+
         </div>
       </div>
-      <style>{`@media print { .no-print { display: none !important; } }`}</style>
+
+      <style>{`
+        @media print {
+          .no-print { display: none !important; }
+          body { margin: 0; }
+          .print-page { max-width: 100%; padding: 16px 20px; }
+        }
+      `}</style>
     </div>
   )
 }
