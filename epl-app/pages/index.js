@@ -2101,17 +2101,7 @@ function SetlistBuilderMain({ data, onBack }) {
 `
         num++
       } else {
-        const labels = { break:'
---- BREAK ---
-', tuning:`
-[ ${item.text} TUNING ]
-`, merch:'
-[ MERCH TABLE ]
-', instagram:'
-[ INSTAGRAM CALLOUT ]
-', custom:`
-[ ${item.text} ]
-` }
+        const labels = { break: String.fromCharCode(10)+'--- BREAK ---'+String.fromCharCode(10), tuning: String.fromCharCode(10)+'[ '+item.text+' TUNING ]'+String.fromCharCode(10), merch: String.fromCharCode(10)+'[ MERCH TABLE ]'+String.fromCharCode(10), instagram: String.fromCharCode(10)+'[ INSTAGRAM CALLOUT ]'+String.fromCharCode(10), custom: String.fromCharCode(10)+'[ '+item.text+' ]'+String.fromCharCode(10) }
         body += labels[item.type] || `
 [ ${item.type.toUpperCase()} ]
 `
