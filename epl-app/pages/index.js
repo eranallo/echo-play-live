@@ -2001,9 +2001,10 @@ function SetlistBuilderMain({ data, onBack }) {
   const [songFilter, setSongFilter] = useState('')
   const [tuningFilter, setTuningFilter] = useState('')
 
-  // Drag
+  // Touch drag
   const [dragIdx, setDragIdx] = useState(null)
   const [dragOverIdx, setDragOverIdx] = useState(null)
+  const touchDragRef = { startY: 0, startIdx: null }
 
   // Logo
   const [bandLogo, setBandLogo] = useState(null)
@@ -2064,7 +2065,7 @@ function SetlistBuilderMain({ data, onBack }) {
       return arr
     })
   }
-  function onDragStart(e, idx) { setDragIdx(idx); e.dataTransfer.effectAllowed = 'move' }
+  function onDragStart(e, idx) { setDragIdx(idx); if(e.dataTransfer) e.dataTransfer.effectAllowed = 'move' }
   function onDragOver(e, idx) { e.preventDefault(); setDragOverIdx(idx) }
   function onDrop(e, idx) {
     e.preventDefault()
@@ -2073,6 +2074,30 @@ function SetlistBuilderMain({ data, onBack }) {
       const arr = [...prev]; const [m] = arr.splice(dragIdx,1); arr.splice(idx,0,m); return arr
     })
     setDragIdx(null); setDragOverIdx(null)
+  }
+  function onTouchStart(e, idx) {
+    touchDragRef.startY = e.touches[0].clientY
+    touchDragRef.startIdx = idx
+    setDragIdx(idx)
+  }
+  function onTouchMove(e) {
+    e.preventDefault()
+    const y = e.touches[0].clientY
+    const el = document.elementFromPoint(e.touches[0].clientX, y)
+    const row = el?.closest('[data-drag-idx]')
+    if (row) {
+      const overIdx = parseInt(row.getAttribute('data-drag-idx'))
+      if (!isNaN(overIdx)) setDragOverIdx(overIdx)
+    }
+  }
+  function onTouchEnd() {
+    if (dragIdx !== null && dragOverIdx !== null && dragIdx !== dragOverIdx) {
+      setItems(prev => {
+        const arr = [...prev]; const [m] = arr.splice(dragIdx,1); arr.splice(dragOverIdx,0,m); return arr
+      })
+    }
+    setDragIdx(null); setDragOverIdx(null)
+    touchDragRef.startIdx = null
   }
 
   async function saveToAirtable() {
@@ -2165,6 +2190,22 @@ function SetlistBuilderMain({ data, onBack }) {
 
   // Unique tunings for filter chips
   const allTunings = [...new Set(songs.filter(s=>s&&s.fields).map(s => (s.fields['Guitar Tuning']||'').split('.')[0]).filter(Boolean))].sort()
+
+  // Tuning color map
+  const TUNING_COLORS = {
+    'E':  { bg:'rgba(167,139,250,0.2)', color:'#a78bfa' },  // purple - E standard
+    'D':  { bg:'rgba(96,165,250,0.2)',  color:'#60a5fa' },  // blue - Drop D
+    'Eb': { bg:'rgba(244,114,182,0.2)', color:'#f472b6' },  // pink - Eb standard
+    'C':  { bg:'rgba(52,211,153,0.2)',  color:'#34d399' },  // green - Drop C
+    'B':  { bg:'rgba(251,146,60,0.2)',  color:'#fb923c' },  // orange - Drop B
+    'A':  { bg:'rgba(239,68,68,0.2)',   color:'#ef4444' },  // red
+    'Db': { bg:'rgba(244,114,182,0.2)', color:'#f472b6' },  // pink - Db
+    'F':  { bg:'rgba(234,179,8,0.2)',   color:'#eab308' },  // yellow
+    'G':  { bg:'rgba(20,184,166,0.2)',  color:'#14b8a6' },  // teal
+  }
+  function getTuningStyle(t) {
+    return TUNING_COLORS[t] || { bg:'rgba(167,139,250,0.15)', color:'#a78bfa' }
+  }
 
   // Filtered songs for library and picker
   const filterSongs = (q, t) => songs.filter(s => {
@@ -2368,7 +2409,7 @@ function SetlistBuilderMain({ data, onBack }) {
       </div>
 
       {/* Setlist items */}
-      <div style={{ padding:'6px 0 160px', overflowY:'auto' }}>
+      <div style={{ padding:'0 0 160px', overflowY:'auto', touchAction:'pan-y' }}>
         {items.length === 0 && (
           <div style={{ textAlign:'center', padding:'60px 20px' }}>
             <div style={{ fontSize:52, marginBottom:16 }}>🎸</div>
@@ -2382,22 +2423,34 @@ function SetlistBuilderMain({ data, onBack }) {
           if (item.type === 'song') {
             const sf = item.fields
             const tuning = (sf['Guitar Tuning']||'').split('.')[0]
+            const tStyle = getTuningStyle(tuning)
+            const durSecs = sf['Duration']
+            const durDisplay = durSecs ? (typeof durSecs === 'number' ? Math.floor(durSecs/60)+':'+(durSecs%60).toString().padStart(2,'0') : durSecs) : ''
             return (
-              <div key={item.id||idx} draggable
-                onDragStart={e => onDragStart(e,idx)} onDragOver={e => onDragOver(e,idx)}
-                onDrop={e => onDrop(e,idx)} onDragEnd={() => { setDragIdx(null); setDragOverIdx(null) }}
-                style={{ display:'flex', alignItems:'center', gap:12, padding:'16px 16px', borderBottom: isOver?'2px solid #a78bfa':'0.5px solid rgba(255,255,255,0.04)', background: isDragging?'rgba(167,139,250,0.08)':'transparent', cursor:'grab', transition:'background 0.15s', animation:'fadeIn 0.2s ease' }}>
-                <div style={{ color:'rgba(255,255,255,0.15)', fontSize:14, flexShrink:0, userSelect:'none' }}>⠿</div>
-                <div style={{ fontSize:14, color:'rgba(255,255,255,0.25)', width:26, textAlign:'center', flexShrink:0, fontWeight:700 }}>{items.slice(0,idx).filter(x=>x.type==='song').length+1}</div>
-                {tuning && <div style={{ width:32, height:32, borderRadius:8, background:'rgba(167,139,250,0.15)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:12, fontWeight:800, color:'#a78bfa', flexShrink:0 }}>{tuning}</div>}
+              <div key={item.id||idx}
+                data-drag-idx={idx}
+                draggable
+                onDragStart={e => onDragStart(e,idx)}
+                onDragOver={e => onDragOver(e,idx)}
+                onDrop={e => onDrop(e,idx)}
+                onDragEnd={() => { setDragIdx(null); setDragOverIdx(null) }}
+                onTouchStart={e => onTouchStart(e,idx)}
+                onTouchMove={onTouchMove}
+                onTouchEnd={onTouchEnd}
+                style={{ display:'flex', alignItems:'center', gap:12, padding:'14px 16px', borderBottom: isOver?'2px solid #a78bfa':'0.5px solid rgba(255,255,255,0.05)', background: isDragging?'rgba(167,139,250,0.1)':'transparent', cursor:'grab', transition:'background 0.15s', animation:'fadeIn 0.2s ease' }}>
+                <div style={{ color:'rgba(255,255,255,0.2)', fontSize:16, flexShrink:0, userSelect:'none', touchAction:'none' }}>⠿</div>
+                <div style={{ fontSize:14, color:'rgba(255,255,255,0.3)', width:24, textAlign:'center', flexShrink:0, fontWeight:700 }}>{items.slice(0,idx).filter(x=>x.type==='song').length+1}</div>
+                {tuning
+                  ? <div style={{ width:34, height:34, borderRadius:8, background:tStyle.bg, display:'flex', alignItems:'center', justifyContent:'center', fontSize:12, fontWeight:800, color:tStyle.color, flexShrink:0 }}>{tuning}</div>
+                  : <div style={{ width:34, flexShrink:0 }} />}
                 <div style={{ flex:1, minWidth:0 }}>
                   <div style={{ fontSize:16, fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{sf['Song Title']}</div>
-                  <div style={{ fontSize:12, color:'rgba(255,255,255,0.4)', marginTop:3 }}>{sf['Artist']}{sf['Duration']?' · '+sf['Duration']:''}</div>
+                  <div style={{ fontSize:12, color:'rgba(255,255,255,0.4)', marginTop:3 }}>{sf['Artist']}{durDisplay?' · '+durDisplay:''}</div>
                 </div>
-                <div style={{ display:'flex', gap:2 }}>
-                  <button onClick={() => moveItem(idx,-1)} style={{ background:'none', border:'none', color:'rgba(255,255,255,0.25)', cursor:'pointer', fontSize:18, padding:'4px 8px' }}>↑</button>
-                  <button onClick={() => moveItem(idx,1)} style={{ background:'none', border:'none', color:'rgba(255,255,255,0.25)', cursor:'pointer', fontSize:18, padding:'4px 8px' }}>↓</button>
-                  <button onClick={() => removeItem(idx)} style={{ background:'none', border:'none', color:'rgba(255,255,255,0.25)', cursor:'pointer', fontSize:20, padding:'4px 8px' }}>×</button>
+                <div style={{ display:'flex', alignItems:'center', gap:0 }}>
+                  <button onClick={e => { e.stopPropagation(); moveItem(idx,-1) }} style={{ background:'none', border:'none', color:'rgba(255,255,255,0.3)', cursor:'pointer', fontSize:20, padding:'6px 8px', lineHeight:1 }}>↑</button>
+                  <button onClick={e => { e.stopPropagation(); moveItem(idx,1) }} style={{ background:'none', border:'none', color:'rgba(255,255,255,0.3)', cursor:'pointer', fontSize:20, padding:'6px 8px', lineHeight:1 }}>↓</button>
+                  <button onClick={e => { e.stopPropagation(); removeItem(idx) }} style={{ background:'none', border:'none', color:'rgba(255,255,255,0.25)', cursor:'pointer', fontSize:22, padding:'6px 8px', lineHeight:1 }}>×</button>
                 </div>
               </div>
             )
