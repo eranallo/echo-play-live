@@ -2429,17 +2429,24 @@ function SetlistBuilderMain({ data, onBack }) {
             return (
               <div key={item.id||idx}
                 data-drag-idx={idx}
-                draggable
-                onDragStart={e => onDragStart(e,idx)}
                 onDragOver={e => onDragOver(e,idx)}
                 onDrop={e => onDrop(e,idx)}
-                onDragEnd={() => { setDragIdx(null); setDragOverIdx(null) }}
-                onTouchStart={e => onTouchStart(e,idx)}
-                onTouchMove={onTouchMove}
-                onTouchEnd={onTouchEnd}
-                style={{ display:'flex', alignItems:'center', gap:12, padding:'14px 16px', borderBottom: isOver?'2px solid #a78bfa':'0.5px solid rgba(255,255,255,0.05)', background: isDragging?'rgba(167,139,250,0.1)':'transparent', cursor:'grab', transition:'background 0.15s', animation:'fadeIn 0.2s ease' }}>
-                <div style={{ color:'rgba(255,255,255,0.2)', fontSize:16, flexShrink:0, userSelect:'none', touchAction:'none' }}>⠿</div>
-                <div style={{ fontSize:14, color:'rgba(255,255,255,0.3)', width:24, textAlign:'center', flexShrink:0, fontWeight:700 }}>{items.slice(0,idx).filter(x=>x.type==='song').length+1}</div>
+                style={{ display:'flex', alignItems:'center', borderBottom: isOver?'2px solid #a78bfa':'0.5px solid rgba(255,255,255,0.05)', background: isDragging?'rgba(167,139,250,0.1)':'transparent', transition:'background 0.15s', animation:'fadeIn 0.2s ease' }}>
+                {/* Large grab handle zone */}
+                <div
+                  data-drag-idx={idx}
+                  onTouchStart={e => onTouchStart(e,idx)}
+                  onTouchMove={onTouchMove}
+                  onTouchEnd={onTouchEnd}
+                  draggable
+                  onDragStart={e => onDragStart(e,idx)}
+                  onDragOver={e => onDragOver(e,idx)}
+                  onDrop={e => onDrop(e,idx)}
+                  onDragEnd={() => { setDragIdx(null); setDragOverIdx(null) }}
+                  style={{ width:48, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', cursor:'grab', touchAction:'none', userSelect:'none', flexShrink:0, alignSelf:'stretch', gap:2 }}>
+                  <span style={{ fontSize:18, color:'rgba(255,255,255,0.18)', lineHeight:1 }}>⠿</span>
+                  <span style={{ fontSize:12, color:'rgba(255,255,255,0.25)', fontWeight:700, lineHeight:1 }}>{items.slice(0,idx).filter(x=>x.type==='song').length+1}</span>
+                </div>
                 {tuning
                   ? <div style={{ width:34, height:34, borderRadius:8, background:tStyle.bg, display:'flex', alignItems:'center', justifyContent:'center', fontSize:12, fontWeight:800, color:tStyle.color, flexShrink:0 }}>{tuning}</div>
                   : <div style={{ width:34, flexShrink:0 }} />}
