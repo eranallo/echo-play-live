@@ -1956,110 +1956,52 @@ function SetlistBuilder({ data, onBack }) {
   return <SetlistBuilderMain data={data} onBack={onBack} />
 }
 
+
 function SetlistBuilderMain({ data, onBack }) {
   const songs = (data['SONGS'] || []).sort((a,b) => (a.fields['Song Title']||'').localeCompare(b.fields['Song Title']||''))
   const bands = data['BANDS'] || []
   const shows = (data['SHOWS'] || []).sort((a,b) => a.fields['Date'] > b.fields['Date'] ? 1 : -1)
+  const setlists = (data['SETLISTS'] || []).sort((a,b) => a.fields['Set Name'] > b.fields['Set Name'] ? 1 : -1)
 
+  // Navigation
+  const [screen, setScreen] = useState('home') // home | songs | setlists | builder
+  const [slideDir, setSlideDir] = useState('forward')
+  const [animKey, setAnimKey] = useState(0)
+
+  // Builder state
   const [items, setItems] = useState([])
-  const [filter, setFilter] = useState('')
   const [setName, setSetName] = useState('')
   const [selectedBand, setSelectedBand] = useState('')
   const [selectedShow, setSelectedShow] = useState('')
-  const [dragIdx, setDragIdx] = useState(null)
-  const [dragOverIdx, setDragOverIdx] = useState(null)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [showPrint, setShowPrint] = useState(false)
-  const [activeTab, setActiveTab] = useState('songs') // songs | setlist
 
-  const filteredSongs = songs.filter(s => {
-    const f = s.fields
-    const q = filter.toLowerCase()
-    return !q || (f['Song Title']||'').toLowerCase().includes(q) ||
-      (f['Artist']||'').toLowerCase().includes(q) ||
-      (f['Guitar Tuning']||'').toLowerCase().startsWith(q)
-  })
+  // Song picker overlay
+  const [showSongPicker, setShowSongPicker] = useState(false)
+  const [pickerFilter, setPickerFilter] = useState('')
 
-  const totalMins = items.filter(i => i.type === 'song').reduce((acc, i) => {
-    const dur = i.fields['Duration'] || '0:00'
-    const parts = dur.split(':')
-    return acc + (parseInt(parts[0]||0)*60 + parseInt(parts[1]||0))
-  }, 0)
-  const totalDisplay = `${Math.floor(totalMins/60)}h ${totalMins%60}m`
+  // Block inserter overlay
+  const [showBlockPicker, setShowBlockPicker] = useState(false)
+  const [customBlockText, setCustomBlockText] = useState('')
+  const [tuningBlockText, setTuningBlockText] = useState('')
 
-  function addSong(song) {
-    setItems(prev => [...prev, { type:'song', id: song.id, fields: song.fields }])
-  }
+  // Song list filter
+  const [songFilter, setSongFilter] = useState('')
+  const [tuningFilter, setTuningFilter] = useState('')
 
-  function addBlock(type, text='') {
-    setItems(prev => [...prev, { type, text, id: Date.now() + Math.random() }])
-  }
+  // Drag
+  const [dragIdx, setDragIdx] = useState(null)
+  const [dragOverIdx, setDragOverIdx] = useState(null)
 
-  function removeItem(idx) { setItems(prev => prev.filter((_,i) => i !== idx)) }
-
-  function moveItem(idx, dir) {
-    setItems(prev => {
-      const arr = [...prev]
-      const target = idx + dir
-      if (target < 0 || target >= arr.length) return arr
-      ;[arr[idx], arr[target]] = [arr[target], arr[idx]]
-      return arr
-    })
-  }
-
-  function onDragStart(e, idx) {
-    setDragIdx(idx)
-    e.dataTransfer.effectAllowed = 'move'
-  }
-
-  function onDragOver(e, idx) {
-    e.preventDefault()
-    setDragOverIdx(idx)
-  }
-
-  function onDrop(e, idx) {
-    e.preventDefault()
-    if (dragIdx === null || dragIdx === idx) { setDragIdx(null); setDragOverIdx(null); return }
-    setItems(prev => {
-      const arr = [...prev]
-      const [moved] = arr.splice(dragIdx, 1)
-      arr.splice(idx, 0, moved)
-      return arr
-    })
-    setDragIdx(null)
-    setDragOverIdx(null)
-  }
-
-  async function saveToAirtable() {
-    setSaving(true)
-    setSaved(false)
-    const songIds = items.filter(i => i.type === 'song').map(i => i.id)
-    const builderData = items.map(i => i.type === 'song' ? { type:'song', id:i.id } : { type:i.type, text:i.text||'' })
-    const body = {
-      setName: setName || 'New Setlist',
-      bandId: selectedBand || null,
-      showId: selectedShow || null,
-      songIds,
-      builderData,
-      setLength: Math.floor(totalMins / 60) * 60 + totalMins % 60
-    }
-    await fetch('/api/setlist-save', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) })
-    setSaving(false)
-    setSaved(true)
-    setTimeout(() => setSaved(false), 3000)
-  }
-
-  // Band logo stored in localStorage per band
+  // Logo
   const [bandLogo, setBandLogo] = useState(null)
   useEffect(() => {
     if (typeof window === 'undefined') return
     if (selectedBand) {
-      const stored = localStorage.getItem(`epl_logo_${selectedBand}`)
+      const stored = localStorage.getItem('epl_logo_' + selectedBand)
       setBandLogo(stored || null)
-    } else {
-      setBandLogo(null)
-    }
+    } else setBandLogo(null)
   }, [selectedBand])
 
   function handleLogoUpload(e) {
@@ -2069,347 +2011,480 @@ function SetlistBuilderMain({ data, onBack }) {
     reader.onload = ev => {
       const b64 = ev.target.result
       setBandLogo(b64)
-      if (selectedBand && typeof window !== 'undefined') {
-        localStorage.setItem(`epl_logo_${selectedBand}`, b64)
-      }
+      if (selectedBand && typeof window !== 'undefined') localStorage.setItem('epl_logo_' + selectedBand, b64)
     }
     reader.readAsDataURL(file)
   }
 
-  // Resolve band + show info for print
-  const printBand = bands.find(b => b.id === selectedBand)
-  const printShow = shows.find(s => s.id === selectedShow)
-  const printVenue = printShow ? (data['VENUES'] || []).find(v => (printShow.fields['Venue'] || []).includes(v.id)) : null
+  // Navigation helper
+  function goTo(s, dir='forward') {
+    setSlideDir(dir)
+    setAnimKey(k => k+1)
+    setScreen(s)
+  }
+
+  // Totals
+  const totalMins = items.filter(i => i.type === 'song').reduce((acc, i) => {
+    const dur = i.fields['Duration'] || '0:00'
+    const parts = dur.split(':')
+    return acc + (parseInt(parts[0]||0)*60 + parseInt(parts[1]||0))
+  }, 0)
+  const totalDisplay = Math.floor(totalMins/60) + 'h ' + (totalMins%60) + 'm'
+
+  // Item manipulation
+  function addSong(song) {
+    setItems(prev => [...prev, { type:'song', id:song.id, fields:song.fields }])
+  }
+  function addBlock(type, text='') {
+    setItems(prev => [...prev, { type, text, id: Date.now() + Math.random() }])
+  }
+  function removeItem(idx) { setItems(prev => prev.filter((_,i) => i !== idx)) }
+  function moveItem(idx, dir) {
+    setItems(prev => {
+      const arr = [...prev]
+      const t = idx + dir
+      if (t < 0 || t >= arr.length) return arr
+      ;[arr[idx], arr[t]] = [arr[t], arr[idx]]
+      return arr
+    })
+  }
+  function onDragStart(e, idx) { setDragIdx(idx); e.dataTransfer.effectAllowed = 'move' }
+  function onDragOver(e, idx) { e.preventDefault(); setDragOverIdx(idx) }
+  function onDrop(e, idx) {
+    e.preventDefault()
+    if (dragIdx === null || dragIdx === idx) { setDragIdx(null); setDragOverIdx(null); return }
+    setItems(prev => {
+      const arr = [...prev]; const [m] = arr.splice(dragIdx,1); arr.splice(idx,0,m); return arr
+    })
+    setDragIdx(null); setDragOverIdx(null)
+  }
+
+  async function saveToAirtable() {
+    setSaving(true); setSaved(false)
+    const songIds = items.filter(i => i.type==='song').map(i => i.id)
+    const builderData = items.map(i => i.type==='song' ? {type:'song',id:i.id} : {type:i.type,text:i.text||''})
+    await fetch('/api/setlist-save', { method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ setName: setName||'New Setlist', bandId: selectedBand||null, showId: selectedShow||null, songIds, builderData, setLength: totalMins }) })
+    setSaving(false); setSaved(true); setTimeout(() => setSaved(false), 3000)
+  }
+
+  function loadSetlist(sl) {
+    const sf = sl.fields
+    const songIds = sf['Songs'] || []
+    let builderItems = songIds.map(id => {
+      const s = songs.find(x => x.id === id)
+      return s ? { type:'song', id:s.id, fields:s.fields } : null
+    }).filter(Boolean)
+    if (sf['Notes'] && sf['Notes'].startsWith('%%BUILDER%%')) {
+      try {
+        const bd = JSON.parse(sf['Notes'].replace('%%BUILDER%%',''))
+        builderItems = bd.map(b => {
+          if (b.type === 'song') { const s = songs.find(x => x.id === b.id); return s ? {type:'song',id:s.id,fields:s.fields} : null }
+          return { ...b, id: Date.now()+Math.random() }
+        }).filter(Boolean)
+      } catch(e) {}
+    }
+    setItems(builderItems)
+    setSetName(sf['Set Name'] || '')
+    const bandId = (sf['Band'] || [])[0] || ''
+    setSelectedBand(bandId)
+    setSelectedShow((sf['Show'] || [])[0] || '')
+    goTo('builder')
+  }
 
   function emailSetlist() {
-    const bName = printBand?.fields['Band Name'] || ''
-    const vName = printVenue?.fields['Venue Name'] || ''
-    const sDate = printShow?.fields['Date'] || ''
-    const subject = `Setlist: ${setName || bName}${sDate ? ` — ${sDate}` : ''}`
-    let body = `${bName.toUpperCase()}
-`
-    if (vName) body += `${vName}
-`
-    if (sDate) body += `${sDate}
-`
-    body += `
-`
+    const bRec = bands.find(b => b.id === selectedBand)
+    const bName = bRec?.fields['Band Name'] || ''
+    const sRec = shows.find(s => s.id === selectedShow)
+    const vRec = sRec ? (data['VENUES']||[]).find(v => (sRec.fields['Venue']||[]).includes(v.id)) : null
+    const vName = vRec?.fields['Venue Name'] || ''
+    const sDate = sRec?.fields['Date'] || ''
+    const subject = 'Setlist: ' + (setName || bName) + (sDate ? ' — ' + sDate : '')
+    let body = bName.toUpperCase() + '\n'
+    if (vName) body += vName + '\n'
+    if (sDate) body += sDate + '\n'
+    body += '\n'
     let num = 1
     items.forEach(item => {
-      if (item.type === 'song') {
-        body += `${num}. ${item.fields['Song Title']}${item.fields['Artist'] ? ` — ${item.fields['Artist']}` : ''}
-`
-        num++
-      } else {
-        const labels = { break: String.fromCharCode(10)+'--- BREAK ---'+String.fromCharCode(10), tuning: String.fromCharCode(10)+'[ '+item.text+' TUNING ]'+String.fromCharCode(10), merch: String.fromCharCode(10)+'[ MERCH TABLE ]'+String.fromCharCode(10), instagram: String.fromCharCode(10)+'[ INSTAGRAM CALLOUT ]'+String.fromCharCode(10), custom: String.fromCharCode(10)+'[ '+item.text+' ]'+String.fromCharCode(10) }
-        body += labels[item.type] || `
-[ ${item.type.toUpperCase()} ]
-`
-      }
+      if (item.type === 'song') { body += num + '. ' + item.fields['Song Title'] + (item.fields['Artist'] ? ' — ' + item.fields['Artist'] : '') + '\n'; num++ }
+      else { const map = { break:'\n--- BREAK ---\n', tuning:'\n[ '+item.text+' TUNING ]\n', merch:'\n[ MERCH TABLE ]\n', instagram:'\n[ INSTAGRAM CALLOUT ]\n', custom:'\n[ '+item.text+' ]\n' }; body += map[item.type] || '\n[ '+item.type.toUpperCase()+' ]\n' }
     })
-    body += `
-${items.filter(i=>i.type==='song').length} songs · ${totalDisplay}`
-    if (typeof window !== 'undefined') {
-      window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
-    }
+    body += '\n' + items.filter(i=>i.type==='song').length + ' songs · ' + totalDisplay
+    if (typeof window !== 'undefined') window.location.href = 'mailto:?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body)
   }
+
+  // Resolve for print
+  const printBand = bands.find(b => b.id === selectedBand)
+  const printShow = shows.find(s => s.id === selectedShow)
+  const printVenue = printShow ? (data['VENUES']||[]).find(v => (printShow.fields['Venue']||[]).includes(v.id)) : null
 
   if (showPrint) {
     return <SetlistPrintView
-      items={items}
-      setName={setName}
-      bandName={printBand?.fields['Band Name'] || ''}
+      items={items} setName={setName}
+      bandName={printBand?.fields['Band Name']||''}
       bandId={selectedBand}
-      venueName={printVenue?.fields['Venue Name'] || ''}
-      showDate={printShow?.fields['Date'] || ''}
+      venueName={printVenue?.fields['Venue Name']||''}
+      showDate={printShow?.fields['Date']||''}
       totalDisplay={totalDisplay}
       songCount={items.filter(i=>i.type==='song').length}
       onClose={() => setShowPrint(false)}
     />
   }
 
-  const blockTypes = [
-    { type:'break', label:'⏸ Break', color:'#6b7280' },
-    { type:'tuning', label:'🎸 Tuning', color:'#a78bfa' },
-    { type:'merch', label:'👕 Merch', color:'#f5a623' },
-    { type:'instagram', label:'📸 Instagram', color:'#e1306c' },
-    { type:'custom', label:'✏️ Custom', color:'#a78bfa' },
-  ]
+  // Unique tunings for filter chips
+  const allTunings = [...new Set(songs.map(s => (s.fields['Guitar Tuning']||'').split('.')[0]).filter(Boolean))]
 
-  return (
-    <div style={{ minHeight:'100vh', background:'#0a0a0f', color:'#ffffff', fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif' }}>
+  // Filtered songs for library and picker
+  const filterSongs = (q, t) => songs.filter(s => {
+    const f = s.fields
+    const matchQ = !q || (f['Song Title']||'').toLowerCase().includes(q.toLowerCase()) || (f['Artist']||'').toLowerCase().includes(q.toLowerCase())
+    const matchT = !t || (f['Guitar Tuning']||'').split('.')[0] === t
+    return matchQ && matchT
+  })
+
+  const fontFamily = "'-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif'"
+
+  // Slide animation style
+  const slideStyle = {
+    animation: slideDir === 'forward' ? 'slideInRight 0.28s cubic-bezier(.25,.46,.45,.94)' : 'slideInLeft 0.28s cubic-bezier(.25,.46,.45,.94)',
+  }
+
+  // ── SHARED TOPBAR ────────────────────────────────────────────────────────
+  function TopBar({ title, onBackPress, right }) {
+    return (
+      <div style={{ background:'#0a0a0f', borderBottom:'0.5px solid #1e1e2e', padding:'12px 16px', display:'flex', alignItems:'center', gap:10, position:'sticky', top:0, zIndex:50 }}>
+        <button onClick={onBackPress} style={{ background:'none', border:'none', color:'#a78bfa', fontSize:22, cursor:'pointer', padding:0, lineHeight:1 }}>‹</button>
+        <div style={{ flex:1, fontSize:15, fontWeight:700, color:'#ffffff' }}>{title}</div>
+        {right}
+      </div>
+    )
+  }
+
+  // ── HOME SCREEN ──────────────────────────────────────────────────────────
+  if (screen === 'home') return (
+    <div key={animKey} style={{ minHeight:'100vh', background:'#0a0a0f', color:'#fff', fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif', ...slideStyle }}>
       <Head><title>EPL — Setlist Builder</title></Head>
-
-      {/* Header */}
-      <div style={{ background:'#0a0a0f', borderBottom:'0.5px solid #1e1e2e', padding:'10px 16px', display:'flex', alignItems:'center', gap:10, position:'sticky', top:0, zIndex:50 }}>
+      <style>{`
+        @keyframes slideInRight { from { transform: translateX(60px); opacity:0 } to { transform: translateX(0); opacity:1 } }
+        @keyframes slideInLeft  { from { transform: translateX(-60px); opacity:0 } to { transform: translateX(0); opacity:1 } }
+        @keyframes fadeUp { from { transform: translateY(20px); opacity:0 } to { transform: translateY(0); opacity:1 } }
+        @keyframes fadeIn { from { opacity:0 } to { opacity:1 } }
+      `}</style>
+      <div style={{ background:'#0a0a0f', borderBottom:'0.5px solid #1e1e2e', padding:'12px 20px', display:'flex', alignItems:'center', gap:10, position:'sticky', top:0, zIndex:50 }}>
         <button onClick={onBack} style={{ background:'none', border:'none', color:'#a78bfa', fontSize:22, cursor:'pointer', padding:0 }}>‹</button>
-        <div style={{ flex:1 }}>
-          <input value={setName} onChange={e => setSetName(e.target.value)} placeholder="Set name..."
-            style={{ background:'transparent', border:'none', color:'#ffffff', fontSize:15, fontWeight:600, fontFamily:'inherit', outline:'none', width:'100%' }} />
-        </div>
-        <div style={{ fontSize:12, color:'#6b7280', marginRight:8 }}>{items.filter(i=>i.type==='song').length} songs · {totalDisplay}</div>
-        <button onClick={saveToAirtable} disabled={saving}
-          style={{ padding:'7px 14px', background: saved ? '#1a3a1a' : '#c084fc', border:'none', borderRadius:10, color: saved ? '#6bcb77' : '#0a0a0f', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>
-          {saving ? '...' : saved ? '✓ Saved' : 'Save'}
-        </button>
-        <button onClick={emailSetlist}
-          style={{ padding:'7px 12px', background:'#1a1a2e', border:'none', borderRadius:10, color:'#a78bfa', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>
-          ✉ Email
-        </button>
-        <button onClick={() => setShowPrint(true)}
-          style={{ padding:'7px 12px', background:'#1a1a2e', border:'none', borderRadius:10, color:'#a78bfa', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>
-          🖨 Print
-        </button>
+        <img src="/logo.png" alt="EPL" style={{ width:28, height:28, objectFit:'contain', mixBlendMode:'screen' }} />
+        <div style={{ flex:1, fontSize:15, fontWeight:700 }}>Setlist Builder</div>
       </div>
 
-      {/* Band / Show selectors */}
-      <div style={{ padding:'10px 16px', background:'#0a0a0f', borderBottom:'0.5px solid #1e1e2e', display:'flex', gap:8 }}>
-        <select value={selectedBand} onChange={e => setSelectedBand(e.target.value)}
-          style={{ flex:1, padding:'8px', background:'#0a0a0f', border:'0.5px solid #2a2a3a', borderRadius:8, color:selectedBand ? '#ffffff' : '#6b7280', fontSize:12, fontFamily:'inherit', outline:'none' }}>
-          <option value=''>Select band...</option>
-          {bands.map(b => <option key={b.id} value={b.id}>{b.fields['Band Name']}</option>)}
-        </select>
-        <select value={selectedShow} onChange={e => setSelectedShow(e.target.value)}
-          style={{ flex:1, padding:'8px', background:'#0a0a0f', border:'0.5px solid #2a2a3a', borderRadius:8, color:selectedShow ? '#ffffff' : '#6b7280', fontSize:12, fontFamily:'inherit', outline:'none' }}>
-          <option value=''>Link to show...</option>
-          {shows.filter(s => !selectedBand || (s.fields['Band']||[]).includes(selectedBand)).map(s => (
-            <option key={s.id} value={s.id}>{s.fields['Show Name'] || s.fields['Date']}</option>
-          ))}
-        </select>
-      </div>
+      <div style={{ padding:'32px 20px 40px' }}>
+        <div style={{ fontSize:13, color:'rgba(255,255,255,0.35)', marginBottom:28, textAlign:'center', letterSpacing:'0.04em' }}>MANAGEMENT</div>
 
-      {/* Logo upload row */}
-      {selectedBand && (
-        <div style={{ padding:'8px 16px', background:'#0a0a0f', borderBottom:'0.5px solid #1e1e2e', display:'flex', alignItems:'center', gap:10 }}>
-          {bandLogo
-            ? <img src={bandLogo} alt="logo" style={{ width:32, height:32, objectFit:'contain', borderRadius:6, background:'#1a1a2e' }} />
-            : <div style={{ width:32, height:32, borderRadius:6, background:'#1a1a2e', display:'flex', alignItems:'center', justifyContent:'center', fontSize:10, color:'#6b7280' }}>🎸</div>
-          }
-          <div style={{ fontSize:12, color:'#6b7280' }}>{bandLogo ? 'Band logo uploaded' : 'No logo — upload for print template'}</div>
-          <label style={{ marginLeft:'auto', padding:'5px 12px', background:'#1a1a2e', border:'0.5px solid #a78bfa40', borderRadius:20, color:'#a78bfa', fontSize:11, fontWeight:600, cursor:'pointer' }}>
-            {bandLogo ? 'Replace Logo' : '+ Upload Logo'}
-            <input type="file" accept="image/*" onChange={handleLogoUpload} style={{ display:'none' }} />
-          </label>
-        </div>
-      )}
+        {/* Big action cards */}
+        <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
 
-      {/* Mobile tabs */}
-      <div style={{ display:'flex', background:'#0a0a0f', borderBottom:'0.5px solid #1e1e2e', overflowX:'auto' }}>
-        {[
-          { key:'songs', label:'🎵 Library' },
-          { key:'setlist', label:`📋 Build (${items.length})` },
-          { key:'load', label:'📂 Load' },
-          { key:'preview', label:'👁 Preview' },
-        ].map(tab => (
-          <button key={tab.key} onClick={() => setActiveTab(tab.key)}
-            style={{ flex:1, padding:'10px 8px', background:'transparent', border:'none', borderBottom: activeTab===tab.key ? '2px solid #c084fc' : '2px solid transparent', color: activeTab===tab.key ? '#c084fc' : '#6b7280', fontSize:12, fontWeight:600, cursor:'pointer', fontFamily:'inherit', whiteSpace:'nowrap' }}>
-            {tab.label}
+          {/* New setlist */}
+          <button onClick={() => { setItems([]); setSetName(''); setSelectedBand(''); setSelectedShow(''); goTo('builder') }}
+            style={{ width:'100%', padding:'22px 20px', background:'linear-gradient(135deg,#1a0a2e,#2a1a4e)', border:'0.5px solid #a78bfa40', borderRadius:16, cursor:'pointer', textAlign:'left', fontFamily:'inherit', animation:'fadeUp 0.3s ease both' }}>
+            <div style={{ fontSize:28, marginBottom:6 }}>✨</div>
+            <div style={{ fontSize:17, fontWeight:700, color:'#ffffff', marginBottom:4 }}>New Setlist</div>
+            <div style={{ fontSize:13, color:'rgba(255,255,255,0.45)' }}>Start building from scratch</div>
           </button>
-        ))}
-      </div>
 
-      <div style={{ display:'flex', height:'calc(100vh - 160px)', overflow:'hidden' }}>
+          {/* Load setlist */}
+          <button onClick={() => goTo('setlists')}
+            style={{ width:'100%', padding:'22px 20px', background:'rgba(255,255,255,0.03)', border:'0.5px solid rgba(255,255,255,0.08)', borderRadius:16, cursor:'pointer', textAlign:'left', fontFamily:'inherit', animation:'fadeUp 0.35s ease both' }}>
+            <div style={{ fontSize:28, marginBottom:6 }}>📋</div>
+            <div style={{ fontSize:17, fontWeight:700, color:'#ffffff', marginBottom:4 }}>My Setlists</div>
+            <div style={{ fontSize:13, color:'rgba(255,255,255,0.45)' }}>{setlists.length} saved setlist{setlists.length !== 1 ? 's' : ''}</div>
+          </button>
 
-        {/* Song Library */}
-        <div style={{ flex:1, display: activeTab === 'songs' ? 'flex' : 'none', flexDirection:'column', borderRight:'0.5px solid #1a1a2a', overflow:'hidden' }}>
-          <div style={{ padding:'10px 12px', borderBottom:'0.5px solid #1e1e2e' }}>
-            <input value={filter} onChange={e => setFilter(e.target.value)} placeholder="Search songs, artist, tuning..."
-              style={{ width:'100%', padding:'9px 12px', background:'#0a0a0f', border:'0.5px solid #2a2a3a', borderRadius:10, color:'#ffffff', fontSize:13, fontFamily:'inherit', outline:'none', boxSizing:'border-box' }} />
-          </div>
-          <div style={{ overflowY:'auto', flex:1 }}>
-            {filteredSongs.map(song => {
-              const sf = song.fields
-              const alreadyIn = items.some(i => i.type === 'song' && i.id === song.id)
-              const tuning = sf['Guitar Tuning'] ? sf['Guitar Tuning'].split('.')[0] : ''
-              return (
-                <div key={song.id} onClick={() => !alreadyIn && addSong(song)}
-                  style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 12px', borderBottom:'0.5px solid #1e1e2e', cursor: alreadyIn ? 'default' : 'pointer', opacity: alreadyIn ? 0.4 : 1, background: alreadyIn ? 'transparent' : undefined }}>
-                  {tuning && <div style={{ width:26, height:26, borderRadius:6, background:'#1a1a2e', display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:800, color:'#a78bfa', flexShrink:0 }}>{tuning}</div>}
-                  <div style={{ flex:1, minWidth:0 }}>
-                    <div style={{ fontSize:13, fontWeight:600, color:'#ffffff', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{sf['Song Title']}</div>
-                    <div style={{ fontSize:11, color:'#6b7280' }}>{sf['Artist']}{sf['Duration'] ? ` · ${sf['Duration']}` : ''}</div>
-                  </div>
-                  {!alreadyIn && <div style={{ color:'#c084fc', fontSize:18, flexShrink:0 }}>+</div>}
-                </div>
-              )
-            })}
-          </div>
+          {/* Song library */}
+          <button onClick={() => goTo('songs')}
+            style={{ width:'100%', padding:'22px 20px', background:'rgba(255,255,255,0.03)', border:'0.5px solid rgba(255,255,255,0.08)', borderRadius:16, cursor:'pointer', textAlign:'left', fontFamily:'inherit', animation:'fadeUp 0.4s ease both' }}>
+            <div style={{ fontSize:28, marginBottom:6 }}>🎵</div>
+            <div style={{ fontSize:17, fontWeight:700, color:'#ffffff', marginBottom:4 }}>Song Library</div>
+            <div style={{ fontSize:13, color:'rgba(255,255,255,0.45)' }}>{songs.length} songs in your catalog</div>
+          </button>
+
         </div>
-
-        {/* Setlist */}
-        <div style={{ flex:1, display: activeTab === 'setlist' ? 'flex' : 'none', flexDirection:'column', overflow:'hidden' }}>
-          {/* Block type buttons */}
-          <div style={{ padding:'8px 10px', borderBottom:'0.5px solid #1e1e2e', display:'flex', gap:6, overflowX:'auto' }}>
-            {blockTypes.map(bt => (
-              <button key={bt.type} onClick={() => {
-                if (bt.type === 'tuning') {
-                  const t = window.prompt('Tuning (e.g. E, D, C, Eb):')
-                  if (t) addBlock('tuning', t.toUpperCase())
-                } else if (bt.type === 'custom') {
-                  const t = window.prompt('Custom text:')
-                  if (t) addBlock('custom', t)
-                } else {
-                  addBlock(bt.type, bt.label.split(' ').slice(1).join(' '))
-                }
-              }} style={{ padding:'6px 10px', background:'#0a0a0f', border:`0.5px solid ${bt.color}40`, borderRadius:20, color:bt.color, fontSize:11, fontWeight:600, cursor:'pointer', fontFamily:'inherit', whiteSpace:'nowrap' }}>
-                {bt.label}
-              </button>
-            ))}
-          </div>
-
-          {/* Setlist items */}
-          <div style={{ overflowY:'auto', flex:1, padding:'8px' }}>
-            {items.length === 0 && (
-              <div style={{ textAlign:'center', color:'#3a3a4a', fontSize:13, marginTop:40, lineHeight:2 }}><div>← Add songs from the library</div><div>or add special blocks above</div></div>
-            )}
-            {items.map((item, idx) => {
-              const isDragging = dragIdx === idx
-              const isOver = dragOverIdx === idx
-              if (item.type === 'song') {
-                const sf = item.fields
-                const tuning = sf['Guitar Tuning'] ? sf['Guitar Tuning'].split('.')[0] : ''
-                return (
-                  <div key={item.id || idx} draggable
-                    onDragStart={e => onDragStart(e, idx)}
-                    onDragOver={e => onDragOver(e, idx)}
-                    onDrop={e => onDrop(e, idx)}
-                    onDragEnd={() => { setDragIdx(null); setDragOverIdx(null) }}
-                    style={{ display:'flex', alignItems:'center', gap:8, padding:'9px 10px', marginBottom:4, background: isDragging ? '#1a1a2e' : '#111118', border: isOver ? '1px solid #c084fc' : '0.5px solid #2a2a3a', borderRadius:10, opacity: isDragging ? 0.5 : 1, cursor:'grab' }}>
-                    <div style={{ color:'#3a3a4a', fontSize:16, cursor:'grab' }}>⠿</div>
-                    <div style={{ width:22, textAlign:'center', fontSize:12, fontWeight:700, color:'#3a3a4a', flexShrink:0 }}>{idx+1}</div>
-                    {tuning && <div style={{ width:24, height:24, borderRadius:5, background:'#1a1a2e', display:'flex', alignItems:'center', justifyContent:'center', fontSize:10, fontWeight:800, color:'#a78bfa', flexShrink:0 }}>{tuning}</div>}
-                    <div style={{ flex:1, minWidth:0 }}>
-                      <div style={{ fontSize:13, fontWeight:600, color:'#ffffff', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{sf['Song Title']}</div>
-                      <div style={{ fontSize:11, color:'#6b7280' }}>{sf['Artist']}{sf['Duration'] ? ` · ${sf['Duration']}` : ''}</div>
-                    </div>
-                    <div style={{ display:'flex', gap:2 }}>
-                      <button onClick={() => moveItem(idx, -1)} style={{ background:'none', border:'none', color:'#3a3a4a', cursor:'pointer', fontSize:14, padding:'2px 4px' }}>↑</button>
-                      <button onClick={() => moveItem(idx, 1)} style={{ background:'none', border:'none', color:'#3a3a4a', cursor:'pointer', fontSize:14, padding:'2px 4px' }}>↓</button>
-                      <button onClick={() => removeItem(idx)} style={{ background:'none', border:'none', color:'#3a3a4a', cursor:'pointer', fontSize:14, padding:'2px 4px' }}>×</button>
-                    </div>
-                  </div>
-                )
-              }
-              // Special block
-              const blockColors = { break:'#6b7280', tuning:'#a78bfa', merch:'#f5a623', instagram:'#e1306c', custom:'#7ecbcb' }
-              const blockIcons = { break:'⏸', tuning:'🎸', merch:'👕', instagram:'📸', custom:'✏️' }
-              const color = blockColors[item.type] || '#6b7280'
-              return (
-                <div key={item.id || idx} draggable
-                  onDragStart={e => onDragStart(e, idx)}
-                  onDragOver={e => onDragOver(e, idx)}
-                  onDrop={e => onDrop(e, idx)}
-                  onDragEnd={() => { setDragIdx(null); setDragOverIdx(null) }}
-                  style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 10px', marginBottom:4, background:`${color}15`, border:`0.5px solid ${color}40`, borderRadius:10, opacity: isDragging ? 0.5 : 1, cursor:'grab' }}>
-                  <div style={{ color:'#3a3a4a', fontSize:16 }}>⠿</div>
-                  <div style={{ fontSize:13 }}>{blockIcons[item.type]}</div>
-                  <div style={{ flex:1, fontSize:13, fontWeight:600, color, textTransform: item.type !== 'custom' && item.type !== 'instagram' ? 'uppercase' : 'none' }}>
-                    {item.text || item.type}
-                  </div>
-                  <button onClick={() => removeItem(idx)} style={{ background:'none', border:'none', color:'#3a3a4a', cursor:'pointer', fontSize:14, padding:'2px 4px' }}>×</button>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-        {/* Load existing setlists */}
-        <div style={{ flex:1, display: activeTab === 'load' ? 'flex' : 'none', flexDirection:'column', overflow:'hidden' }}>
-          <div style={{ padding:'12px 16px', borderBottom:'0.5px solid #1e1e2e' }}>
-            <div style={{ fontSize:13, fontWeight:600, color:'#ffffff', marginBottom:4 }}>Saved Setlists</div>
-            <div style={{ fontSize:12, color:'#6b7280' }}>Tap to load into builder</div>
-          </div>
-          <div style={{ overflowY:'auto', flex:1 }}>
-            {(data['SETLISTS'] || []).map(sl => {
-              const sf = sl.fields
-              const songCount = (sf['Songs'] || []).length
-              const bandNames = (sf['Band'] || []).map(id => (data['BANDS'] || []).find(b => b.id === id)?.fields['Band Name']).filter(Boolean)
-              return (
-                <div key={sl.id} onClick={() => {
-                  // Load songs from this setlist into the builder
-                  const songIds = sf['Songs'] || []
-                  const loadedItems = songIds.map(id => {
-                    const song = (data['SONGS'] || []).find(s => s.id === id)
-                    return song ? { type:'song', id:song.id, fields:song.fields } : null
-                  }).filter(Boolean)
-
-                  // Try to parse builder data from Notes
-                  let builderItems = loadedItems
-                  if (sf['Notes'] && sf['Notes'].startsWith('%%BUILDER%%')) {
-                    try {
-                      const bd = JSON.parse(sf['Notes'].replace('%%BUILDER%%',''))
-                      builderItems = bd.map(b => {
-                        if (b.type === 'song') {
-                          const song = (data['SONGS'] || []).find(s => s.id === b.id)
-                          return song ? { type:'song', id:song.id, fields:song.fields } : null
-                        }
-                        return { ...b, id: Date.now() + Math.random() }
-                      }).filter(Boolean)
-                    } catch(e) {}
-                  }
-
-                  setItems(builderItems)
-                  setSetName(sf['Set Name'] || '')
-                  setActiveTab('setlist')
-                }} style={{ padding:'14px 16px', borderBottom:'0.5px solid #1e1e2e', cursor:'pointer' }}>
-                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
-                    <div>
-                      <div style={{ fontSize:14, fontWeight:600, color:'#ffffff', marginBottom:4 }}>{sf['Set Name'] || 'Untitled'}</div>
-                      <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
-                        {bandNames.map((b,i) => <span key={i} style={{ fontSize:10, padding:'1px 6px', borderRadius:20, background:BAND_COLORS[b]?.bg||'#1a1a2e', color:BAND_COLORS[b]?.color||'#a78bfa', fontWeight:600 }}>{b}</span>)}
-                        <span style={{ fontSize:11, color:'#6b7280' }}>{songCount} songs{sf['Set Length'] ? ` · ${sf['Set Length']} min` : ''}</span>
-                      </div>
-                    </div>
-                    <div style={{ color:'#2a2a3a', fontSize:18 }}>›</div>
-                  </div>
-                </div>
-              )
-            })}
-            {!(data['SETLISTS'] || []).length && (
-              <div style={{ textAlign:'center', color:'#3a3a4a', fontSize:13, marginTop:40 }}>No setlists saved yet</div>
-            )}
-          </div>
-        </div>
-
-        {/* Preview panel */}
-        <div style={{ flex:1, display: activeTab === 'preview' ? 'flex' : 'none', flexDirection:'column', overflow:'hidden' }}>
-          <div style={{ padding:'10px 16px', borderBottom:'0.5px solid #1e1e2e', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-            <div style={{ fontSize:13, fontWeight:600, color:'#ffffff' }}>Preview</div>
-            <div style={{ fontSize:12, color:'#6b7280' }}>{items.filter(i=>i.type==='song').length} songs · {totalDisplay}</div>
-          </div>
-          <div style={{ overflowY:'auto', flex:1, padding:'12px 16px' }}>
-            {items.length === 0 && (
-              <div style={{ textAlign:'center', color:'#3a3a4a', fontSize:13, marginTop:40 }}>Build your setlist first</div>
-            )}
-            {items.map((item, i) => {
-              if (item.type === 'song') {
-                const sf = item.fields
-                const tuning = sf['Guitar Tuning'] ? sf['Guitar Tuning'].split('.')[0] : ''
-                return (
-                  <div key={item.id||i} style={{ display:'flex', alignItems:'center', gap:10, padding:'9px 0', borderBottom:'0.5px solid #1e1e2e' }}>
-                    <div style={{ width:22, textAlign:'center', fontSize:12, fontWeight:700, color:'#3a3a4a', flexShrink:0 }}>{items.slice(0,i).filter(x=>x.type==='song').length+1}</div>
-                    <div style={{ flex:1 }}>
-                      <div style={{ fontSize:14, fontWeight:600, color:'#ffffff' }}>{sf['Song Title']}</div>
-                      <div style={{ fontSize:11, color:'#6b7280' }}>{sf['Artist']}{sf['Duration'] ? ` · ${sf['Duration']}` : ''}</div>
-                    </div>
-                    {tuning && <div style={{ fontSize:18, fontWeight:800, color:'#a78bfa' }}>{tuning}</div>}
-                  </div>
-                )
-              }
-              const blockStyles = { break:{color:'#6b7280',label:'— BREAK —'}, tuning:{color:'#a78bfa',label:`[ ${item.text} ]`}, merch:{color:'#f5a623',label:'👕 MERCH'}, instagram:{color:'#e1306c',label:`📸 ${item.text||'INSTAGRAM'}`}, custom:{color:'#a78bfa',label:item.text} }
-              const bs = blockStyles[item.type] || { color:'#6b7280', label: item.type }
-              return (
-                <div key={item.id||i} style={{ padding:'6px 0 6px 32px', borderBottom:'0.5px solid #1e1e2e' }}>
-                  <span style={{ fontSize:12, fontWeight:700, color:bs.color, textTransform:'uppercase', letterSpacing:'0.05em' }}>{bs.label}</span>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-
       </div>
     </div>
   )
+
+  // ── SONG LIBRARY SCREEN ──────────────────────────────────────────────────
+  if (screen === 'songs') {
+    const filtered = filterSongs(songFilter, tuningFilter)
+    return (
+      <div key={animKey} style={{ minHeight:'100vh', background:'#0a0a0f', color:'#fff', fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif', ...slideStyle }}>
+        <TopBar title="Song Library" onBackPress={() => goTo('home','back')} />
+        {/* Search */}
+        <div style={{ padding:'12px 16px', borderBottom:'0.5px solid #1e1e2e', position:'sticky', top:57, background:'#0a0a0f', zIndex:40 }}>
+          <input value={songFilter} onChange={e => setSongFilter(e.target.value)} placeholder="Search songs, artists..."
+            style={{ width:'100%', padding:'10px 14px', background:'rgba(255,255,255,0.05)', border:'0.5px solid rgba(255,255,255,0.1)', borderRadius:10, color:'#fff', fontSize:14, fontFamily:'inherit', outline:'none', boxSizing:'border-box' }} />
+          {/* Tuning chips */}
+          <div style={{ display:'flex', gap:6, overflowX:'auto', marginTop:10, paddingBottom:2 }}>
+            <button onClick={() => setTuningFilter('')} style={{ padding:'4px 12px', borderRadius:20, background: !tuningFilter ? '#a78bfa' : 'rgba(255,255,255,0.06)', border:'none', color: !tuningFilter ? '#000' : 'rgba(255,255,255,0.6)', fontSize:12, fontWeight:600, cursor:'pointer', fontFamily:'inherit', whiteSpace:'nowrap', flexShrink:0 }}>All</button>
+            {allTunings.sort().map(t => (
+              <button key={t} onClick={() => setTuningFilter(tuningFilter===t?'':t)} style={{ padding:'4px 12px', borderRadius:20, background: tuningFilter===t ? '#a78bfa' : 'rgba(255,255,255,0.06)', border:'none', color: tuningFilter===t ? '#000' : 'rgba(255,255,255,0.6)', fontSize:12, fontWeight:600, cursor:'pointer', fontFamily:'inherit', whiteSpace:'nowrap', flexShrink:0 }}>{t}</button>
+            ))}
+          </div>
+        </div>
+        <div style={{ padding:'4px 0 80px' }}>
+          <div style={{ padding:'8px 16px', fontSize:11, color:'rgba(255,255,255,0.25)', letterSpacing:'0.06em' }}>{filtered.length} SONGS</div>
+          {filtered.map((s,i) => {
+            const sf = s.fields
+            const tuning = (sf['Guitar Tuning']||'').split('.')[0]
+            return (
+              <div key={s.id} style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 16px', borderBottom:'0.5px solid rgba(255,255,255,0.04)', animation:'fadeIn 0.2s ease both', animationDelay: Math.min(i*0.015,0.3)+'s' }}>
+                {tuning ? <div style={{ width:30, height:30, borderRadius:8, background:'rgba(167,139,250,0.15)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:800, color:'#a78bfa', flexShrink:0 }}>{tuning}</div>
+                         : <div style={{ width:30, height:30, flexShrink:0 }} />}
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ fontSize:14, fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{sf['Song Title']}</div>
+                  <div style={{ fontSize:12, color:'rgba(255,255,255,0.4)', marginTop:2 }}>{sf['Artist']}{sf['Duration'] ? ' · ' + sf['Duration'] : ''}{sf['BPM'] ? ' · ' + sf['BPM'] + ' bpm' : ''}</div>
+                </div>
+                {sf['Key'] && <div style={{ fontSize:11, color:'rgba(255,255,255,0.3)', flexShrink:0 }}>{sf['Key']}</div>}
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    )
+  }
+
+  // ── SETLISTS SCREEN ──────────────────────────────────────────────────────
+  if (screen === 'setlists') return (
+    <div key={animKey} style={{ minHeight:'100vh', background:'#0a0a0f', color:'#fff', fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif', ...slideStyle }}>
+      <TopBar title="My Setlists" onBackPress={() => goTo('home','back')}
+        right={<button onClick={() => { setItems([]); setSetName(''); setSelectedBand(''); setSelectedShow(''); goTo('builder') }}
+          style={{ padding:'7px 14px', background:'#a78bfa', border:'none', borderRadius:20, color:'#000', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>+ New</button>} />
+      <div style={{ padding:'8px 0 80px' }}>
+        {setlists.length === 0 && (
+          <div style={{ textAlign:'center', color:'rgba(255,255,255,0.25)', padding:'60px 20px', fontSize:14 }}>No setlists saved yet</div>
+        )}
+        {setlists.map((sl,i) => {
+          const sf = sl.fields
+          const bandNames = (sf['Band']||[]).map(id => bands.find(b=>b.id===id)?.fields['Band Name']).filter(Boolean)
+          const songCount = (sf['Songs']||[]).length
+          const dur = sf['Set Length'] ? Math.floor(sf['Set Length']/60)+'h '+(sf['Set Length']%60)+'m' : ''
+          return (
+            <div key={sl.id} onClick={() => loadSetlist(sl)}
+              style={{ display:'flex', alignItems:'center', gap:14, padding:'16px 16px', borderBottom:'0.5px solid rgba(255,255,255,0.04)', cursor:'pointer', animation:'fadeUp 0.25s ease both', animationDelay: Math.min(i*0.04,0.4)+'s' }}>
+              <div style={{ width:44, height:44, borderRadius:12, background:'rgba(167,139,250,0.12)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:20, flexShrink:0 }}>📋</div>
+              <div style={{ flex:1, minWidth:0 }}>
+                <div style={{ fontSize:15, fontWeight:700, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{sf['Set Name']||'Untitled'}</div>
+                <div style={{ display:'flex', gap:6, marginTop:4, flexWrap:'wrap', alignItems:'center' }}>
+                  {bandNames.map((b,bi) => <span key={bi} style={{ fontSize:10, padding:'2px 8px', borderRadius:20, background:BAND_COLORS[b]?.bg||'rgba(167,139,250,0.1)', color:BAND_COLORS[b]?.color||'#a78bfa', fontWeight:600 }}>{b}</span>)}
+                  <span style={{ fontSize:11, color:'rgba(255,255,255,0.3)' }}>{songCount} songs{dur ? ' · '+dur : ''}</span>
+                </div>
+              </div>
+              <div style={{ color:'rgba(255,255,255,0.2)', fontSize:20 }}>›</div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+
+  // ── BUILDER SCREEN ───────────────────────────────────────────────────────
+  const songCount = items.filter(i=>i.type==='song').length
+  const pickerFiltered = filterSongs(pickerFilter, '')
+  const inSetIds = new Set(items.filter(i=>i.type==='song').map(i=>i.id))
+
+  const blockTypes = [
+    { type:'break', label:'Break', icon:'⏸', color:'#6b7280' },
+    { type:'tuning', label:'Tuning Change', icon:'🎸', color:'#a78bfa' },
+    { type:'merch', label:'Merch', icon:'👕', color:'#f5a623' },
+    { type:'instagram', label:'Instagram', icon:'📸', color:'#e1306c' },
+    { type:'custom', label:'Custom', icon:'✏️', color:'#7ecbcb' },
+  ]
+
+  return (
+    <div key={animKey} style={{ minHeight:'100vh', background:'#0a0a0f', color:'#fff', fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif', ...slideStyle }}>
+      <Head><title>EPL — {setName||'New Setlist'}</title></Head>
+
+      {/* Header */}
+      <div style={{ background:'#0a0a0f', borderBottom:'0.5px solid #1e1e2e', padding:'10px 14px', display:'flex', alignItems:'center', gap:8, position:'sticky', top:0, zIndex:50 }}>
+        <button onClick={() => goTo('home','back')} style={{ background:'none', border:'none', color:'#a78bfa', fontSize:22, cursor:'pointer', padding:0 }}>‹</button>
+        <input value={setName} onChange={e => setSetName(e.target.value)} placeholder="Set name..."
+          style={{ flex:1, background:'transparent', border:'none', color:'#fff', fontSize:15, fontWeight:700, fontFamily:'inherit', outline:'none' }} />
+        <div style={{ fontSize:11, color:'rgba(255,255,255,0.3)', whiteSpace:'nowrap' }}>{songCount} · {totalDisplay}</div>
+        <button onClick={saveToAirtable} disabled={saving}
+          style={{ padding:'7px 14px', background: saved?'rgba(107,203,119,0.2)':'#a78bfa', border:'none', borderRadius:20, color: saved?'#6bcb77':'#000', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:'inherit', transition:'all 0.2s' }}>
+          {saving?'…':saved?'✓':'Save'}
+        </button>
+        <button onClick={emailSetlist} style={{ padding:'7px 12px', background:'rgba(255,255,255,0.05)', border:'none', borderRadius:20, color:'rgba(255,255,255,0.6)', fontSize:12, cursor:'pointer', fontFamily:'inherit' }}>✉</button>
+        <button onClick={() => setShowPrint(true)} style={{ padding:'7px 12px', background:'rgba(255,255,255,0.05)', border:'none', borderRadius:20, color:'rgba(255,255,255,0.6)', fontSize:12, cursor:'pointer', fontFamily:'inherit' }}>🖨</button>
+      </div>
+
+      {/* Band / Show / Logo row */}
+      <div style={{ padding:'8px 14px', borderBottom:'0.5px solid #1e1e2e', display:'flex', gap:8, alignItems:'center', background:'#0a0a0f' }}>
+        <select value={selectedBand} onChange={e => setSelectedBand(e.target.value)}
+          style={{ flex:1, padding:'7px 10px', background:'rgba(255,255,255,0.05)', border:'0.5px solid rgba(255,255,255,0.1)', borderRadius:10, color: selectedBand?'#fff':'rgba(255,255,255,0.4)', fontSize:12, fontFamily:'inherit', outline:'none' }}>
+          <option value=''>Band...</option>
+          {bands.map(b => <option key={b.id} value={b.id}>{b.fields['Band Name']}</option>)}
+        </select>
+        <select value={selectedShow} onChange={e => setSelectedShow(e.target.value)}
+          style={{ flex:1, padding:'7px 10px', background:'rgba(255,255,255,0.05)', border:'0.5px solid rgba(255,255,255,0.1)', borderRadius:10, color: selectedShow?'#fff':'rgba(255,255,255,0.4)', fontSize:12, fontFamily:'inherit', outline:'none' }}>
+          <option value=''>Show...</option>
+          {shows.filter(s => !selectedBand || (s.fields['Band']||[]).includes(selectedBand)).map(s => (
+            <option key={s.id} value={s.id}>{s.fields['Show Name']||s.fields['Date']}</option>
+          ))}
+        </select>
+        {selectedBand && (
+          <label style={{ cursor:'pointer', flexShrink:0 }} title="Upload logo for print">
+            {bandLogo
+              ? <img src={bandLogo} alt="logo" style={{ width:30, height:30, objectFit:'contain', borderRadius:6, background:'rgba(255,255,255,0.05)' }} />
+              : <div style={{ width:30, height:30, borderRadius:6, background:'rgba(255,255,255,0.05)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:16 }}>🎸</div>}
+            <input type="file" accept="image/*" onChange={handleLogoUpload} style={{ display:'none' }} />
+          </label>
+        )}
+      </div>
+
+      {/* Setlist items */}
+      <div style={{ padding:'6px 0 160px', overflowY:'auto' }}>
+        {items.length === 0 && (
+          <div style={{ textAlign:'center', padding:'60px 20px' }}>
+            <div style={{ fontSize:40, marginBottom:12 }}>🎸</div>
+            <div style={{ fontSize:15, fontWeight:600, color:'rgba(255,255,255,0.5)', marginBottom:6 }}>Your setlist is empty</div>
+            <div style={{ fontSize:13, color:'rgba(255,255,255,0.25)' }}>Tap + Add Songs below to get started</div>
+          </div>
+        )}
+        {items.map((item, idx) => {
+          const isDragging = dragIdx === idx
+          const isOver = dragOverIdx === idx
+          if (item.type === 'song') {
+            const sf = item.fields
+            const tuning = (sf['Guitar Tuning']||'').split('.')[0]
+            return (
+              <div key={item.id||idx} draggable
+                onDragStart={e => onDragStart(e,idx)} onDragOver={e => onDragOver(e,idx)}
+                onDrop={e => onDrop(e,idx)} onDragEnd={() => { setDragIdx(null); setDragOverIdx(null) }}
+                style={{ display:'flex', alignItems:'center', gap:10, padding:'11px 14px', borderBottom: isOver?'2px solid #a78bfa':'0.5px solid rgba(255,255,255,0.04)', background: isDragging?'rgba(167,139,250,0.08)':'transparent', cursor:'grab', transition:'background 0.15s', animation:'fadeIn 0.2s ease' }}>
+                <div style={{ color:'rgba(255,255,255,0.15)', fontSize:14, flexShrink:0, userSelect:'none' }}>⠿</div>
+                <div style={{ fontSize:13, color:'rgba(255,255,255,0.25)', width:22, textAlign:'center', flexShrink:0, fontWeight:600 }}>{items.slice(0,idx).filter(x=>x.type==='song').length+1}</div>
+                {tuning && <div style={{ width:26, height:26, borderRadius:7, background:'rgba(167,139,250,0.15)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:10, fontWeight:800, color:'#a78bfa', flexShrink:0 }}>{tuning}</div>}
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ fontSize:14, fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{sf['Song Title']}</div>
+                  <div style={{ fontSize:11, color:'rgba(255,255,255,0.35)', marginTop:1 }}>{sf['Artist']}{sf['Duration']?' · '+sf['Duration']:''}</div>
+                </div>
+                <div style={{ display:'flex', gap:2 }}>
+                  <button onClick={() => moveItem(idx,-1)} style={{ background:'none', border:'none', color:'rgba(255,255,255,0.2)', cursor:'pointer', fontSize:14, padding:'3px 5px' }}>↑</button>
+                  <button onClick={() => moveItem(idx,1)} style={{ background:'none', border:'none', color:'rgba(255,255,255,0.2)', cursor:'pointer', fontSize:14, padding:'3px 5px' }}>↓</button>
+                  <button onClick={() => removeItem(idx)} style={{ background:'none', border:'none', color:'rgba(255,255,255,0.2)', cursor:'pointer', fontSize:16, padding:'3px 5px' }}>×</button>
+                </div>
+              </div>
+            )
+          }
+          const blockColors = { break:'rgba(107,114,128,0.15)', tuning:'rgba(167,139,250,0.12)', merch:'rgba(245,166,35,0.12)', instagram:'rgba(225,48,108,0.12)', custom:'rgba(126,203,203,0.12)' }
+          const textColors = { break:'#9ca3af', tuning:'#a78bfa', merch:'#f5a623', instagram:'#e1306c', custom:'#7ecbcb' }
+          const icons = { break:'⏸', tuning:'🎸', merch:'👕', instagram:'📸', custom:'✏️' }
+          return (
+            <div key={item.id||idx} draggable
+              onDragStart={e => onDragStart(e,idx)} onDragOver={e => onDragOver(e,idx)}
+              onDrop={e => onDrop(e,idx)} onDragEnd={() => { setDragIdx(null); setDragOverIdx(null) }}
+              style={{ display:'flex', alignItems:'center', gap:10, padding:'9px 14px', margin:'4px 10px', borderRadius:10, background: blockColors[item.type]||'rgba(255,255,255,0.05)', cursor:'grab', animation:'fadeIn 0.2s ease' }}>
+              <div style={{ color:'rgba(255,255,255,0.15)', fontSize:14, flexShrink:0 }}>⠿</div>
+              <span style={{ fontSize:14 }}>{icons[item.type]}</span>
+              <span style={{ flex:1, fontSize:13, fontWeight:600, color: textColors[item.type]||'#fff', textTransform: item.type==='custom'||item.type==='tuning'?'none':'uppercase', letterSpacing:'0.04em' }}>{item.text||item.type}</span>
+              <button onClick={() => removeItem(idx)} style={{ background:'none', border:'none', color:'rgba(255,255,255,0.2)', cursor:'pointer', fontSize:16, padding:'3px 5px' }}>×</button>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Bottom action bar */}
+      <div style={{ position:'fixed', bottom:0, left:0, right:0, background:'#0a0a0f', borderTop:'0.5px solid #1e1e2e', padding:'12px 14px 28px', display:'flex', gap:10, zIndex:50 }}>
+        <button onClick={() => { setPickerFilter(''); setShowSongPicker(true) }}
+          style={{ flex:2, padding:'13px', background:'#a78bfa', border:'none', borderRadius:12, color:'#000', fontSize:14, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>
+          + Add Songs
+        </button>
+        <button onClick={() => setShowBlockPicker(true)}
+          style={{ flex:1, padding:'13px', background:'rgba(255,255,255,0.06)', border:'0.5px solid rgba(255,255,255,0.1)', borderRadius:12, color:'rgba(255,255,255,0.7)', fontSize:14, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>
+          + Block
+        </button>
+      </div>
+
+      {/* Song Picker Overlay */}
+      {showSongPicker && (
+        <div style={{ position:'fixed', inset:0, zIndex:100, display:'flex', flexDirection:'column', background:'#0a0a0f', animation:'slideInRight 0.25s ease' }}>
+          <div style={{ padding:'12px 14px', borderBottom:'0.5px solid #1e1e2e', display:'flex', alignItems:'center', gap:10, background:'#0a0a0f' }}>
+            <button onClick={() => setShowSongPicker(false)} style={{ background:'none', border:'none', color:'#a78bfa', fontSize:22, cursor:'pointer', padding:0 }}>✕</button>
+            <div style={{ flex:1, fontSize:15, fontWeight:700 }}>Add Songs</div>
+            <div style={{ fontSize:12, color:'rgba(255,255,255,0.35)' }}>{pickerFiltered.filter(s=>!inSetIds.has(s.id)).length} available</div>
+          </div>
+          <div style={{ padding:'10px 14px', borderBottom:'0.5px solid #1e1e2e', background:'#0a0a0f' }}>
+            <input autoFocus value={pickerFilter} onChange={e => setPickerFilter(e.target.value)} placeholder="Search..."
+              style={{ width:'100%', padding:'10px 14px', background:'rgba(255,255,255,0.06)', border:'0.5px solid rgba(255,255,255,0.1)', borderRadius:10, color:'#fff', fontSize:14, fontFamily:'inherit', outline:'none', boxSizing:'border-box' }} />
+          </div>
+          <div style={{ flex:1, overflowY:'auto', paddingBottom:40 }}>
+            {pickerFiltered.map(s => {
+              const sf = s.fields
+              const already = inSetIds.has(s.id)
+              const tuning = (sf['Guitar Tuning']||'').split('.')[0]
+              return (
+                <div key={s.id} onClick={() => { if (!already) addSong(s) }}
+                  style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 14px', borderBottom:'0.5px solid rgba(255,255,255,0.04)', cursor: already?'default':'pointer', opacity: already?0.35:1, transition:'opacity 0.15s' }}>
+                  {tuning ? <div style={{ width:28, height:28, borderRadius:7, background:'rgba(167,139,250,0.15)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:10, fontWeight:800, color:'#a78bfa', flexShrink:0 }}>{tuning}</div>
+                           : <div style={{ width:28, flexShrink:0 }} />}
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ fontSize:14, fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{sf['Song Title']}</div>
+                    <div style={{ fontSize:11, color:'rgba(255,255,255,0.4)', marginTop:1 }}>{sf['Artist']}{sf['Duration']?' · '+sf['Duration']:''}</div>
+                  </div>
+                  <div style={{ fontSize:20, color: already?'#6bcb77':'#a78bfa', fontWeight:300, flexShrink:0 }}>{already?'✓':'+'}</div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Block Picker Overlay */}
+      {showBlockPicker && (
+        <div onClick={() => setShowBlockPicker(false)} style={{ position:'fixed', inset:0, zIndex:100, background:'rgba(0,0,0,0.7)', display:'flex', alignItems:'flex-end', animation:'fadeIn 0.2s ease' }}>
+          <div onClick={e => e.stopPropagation()} style={{ width:'100%', background:'#111118', borderRadius:'20px 20px 0 0', padding:'20px 16px 40px', animation:'slideInLeft 0.25s ease' }}>
+            <div style={{ width:36, height:4, background:'rgba(255,255,255,0.15)', borderRadius:2, margin:'0 auto 20px' }} />
+            <div style={{ fontSize:14, fontWeight:700, marginBottom:16, color:'rgba(255,255,255,0.5)', letterSpacing:'0.06em', textTransform:'uppercase' }}>Add Block</div>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:16 }}>
+              {blockTypes.slice(0,4).map(bt => (
+                <button key={bt.type} onClick={() => {
+                  if (bt.type==='tuning'||bt.type==='custom') return
+                  addBlock(bt.type, bt.label)
+                  setShowBlockPicker(false)
+                }} style={{ padding:'14px 12px', background:'rgba(255,255,255,0.04)', border:'0.5px solid rgba(255,255,255,0.08)', borderRadius:12, cursor:'pointer', fontFamily:'inherit', textAlign:'left' }}>
+                  <div style={{ fontSize:22, marginBottom:6 }}>{bt.icon}</div>
+                  <div style={{ fontSize:13, fontWeight:600, color: bt.color }}>{bt.label}</div>
+                </button>
+              ))}
+            </div>
+            {/* Tuning input */}
+            <div style={{ background:'rgba(255,255,255,0.04)', border:'0.5px solid rgba(255,255,255,0.08)', borderRadius:12, padding:'12px', marginBottom:10 }}>
+              <div style={{ fontSize:13, fontWeight:600, color:'#a78bfa', marginBottom:8 }}>🎸 Tuning Change</div>
+              <div style={{ display:'flex', gap:8 }}>
+                <input value={tuningBlockText} onChange={e => setTuningBlockText(e.target.value)} placeholder="e.g. E, D, C, Eb..."
+                  style={{ flex:1, padding:'8px 12px', background:'rgba(255,255,255,0.06)', border:'0.5px solid rgba(255,255,255,0.1)', borderRadius:8, color:'#fff', fontSize:13, fontFamily:'inherit', outline:'none' }} />
+                <button onClick={() => { if (tuningBlockText.trim()) { addBlock('tuning', tuningBlockText.trim().toUpperCase()); setTuningBlockText(''); setShowBlockPicker(false) } }}
+                  style={{ padding:'8px 16px', background:'#a78bfa', border:'none', borderRadius:8, color:'#000', fontSize:13, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>Add</button>
+              </div>
+            </div>
+            {/* Custom text input */}
+            <div style={{ background:'rgba(255,255,255,0.04)', border:'0.5px solid rgba(255,255,255,0.08)', borderRadius:12, padding:'12px' }}>
+              <div style={{ fontSize:13, fontWeight:600, color:'#7ecbcb', marginBottom:8 }}>✏️ Custom</div>
+              <div style={{ display:'flex', gap:8 }}>
+                <input value={customBlockText} onChange={e => setCustomBlockText(e.target.value)} placeholder="Custom callout text..."
+                  style={{ flex:1, padding:'8px 12px', background:'rgba(255,255,255,0.06)', border:'0.5px solid rgba(255,255,255,0.1)', borderRadius:8, color:'#fff', fontSize:13, fontFamily:'inherit', outline:'none' }} />
+                <button onClick={() => { if (customBlockText.trim()) { addBlock('custom', customBlockText.trim()); setCustomBlockText(''); setShowBlockPicker(false) } }}
+                  style={{ padding:'8px 16px', background:'#7ecbcb', border:'none', borderRadius:8, color:'#000', fontSize:13, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>Add</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+    </div>
+  )
 }
+
+
 
 function SetlistPrintView({ items, setName, bandName, bandId, venueName, showDate, totalDisplay, songCount, onClose }) {
   const [logo, setLogo] = useState(null)
