@@ -2426,9 +2426,6 @@ function SetlistBuilderMain({ data, onBack }) {
             const tStyle = getTuningStyle(tuning)
             const durSecs = sf['Duration']
             const durDisplay = durSecs ? (typeof durSecs === 'number' ? Math.floor(durSecs/60)+':'+(durSecs%60).toString().padStart(2,'0') : durSecs) : ''
-            const tStyle = getTuningStyle(tuning)
-            const durSecs = sf['Duration']
-            const durDisplay = durSecs ? (typeof durSecs === 'number' ? Math.floor(durSecs/60)+':'+(durSecs%60).toString().padStart(2,'0') : durSecs) : ''
             const songNum = items.slice(0,idx).filter(x=>x.type==='song').length+1
             return (
               <div key={item.id||idx}
