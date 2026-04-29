@@ -1957,6 +1957,16 @@ function SetlistBuilder({ data, onBack }) {
 }
 
 
+function SetlistTopBar({ title, onBackPress, right }) {
+  return (
+    <div style={{ background:'#0a0a0f', borderBottom:'0.5px solid #1e1e2e', padding:'12px 16px', display:'flex', alignItems:'center', gap:10, position:'sticky', top:0, zIndex:50 }}>
+      <button onClick={onBackPress} style={{ background:'none', border:'none', color:'#a78bfa', fontSize:22, cursor:'pointer', padding:0, lineHeight:1 }}>‹</button>
+      <div style={{ flex:1, fontSize:15, fontWeight:700, color:'#ffffff' }}>{title}</div>
+      {right}
+    </div>
+  )
+}
+
 function SetlistBuilderMain({ data, onBack }) {
   const songs = (data['SONGS'] || []).sort((a,b) => (a.fields['Song Title']||'').localeCompare(b.fields['Song Title']||''))
   const bands = data['BANDS'] || []
@@ -2142,34 +2152,25 @@ function SetlistBuilderMain({ data, onBack }) {
     return matchQ && matchT
   })
 
-  const fontFamily = "'-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif'"
-
   // Slide animation style
   const slideStyle = {
     animation: slideDir === 'forward' ? 'slideInRight 0.28s cubic-bezier(.25,.46,.45,.94)' : 'slideInLeft 0.28s cubic-bezier(.25,.46,.45,.94)',
   }
 
-  // ── SHARED TOPBAR ────────────────────────────────────────────────────────
-  function TopBar({ title, onBackPress, right }) {
-    return (
-      <div style={{ background:'#0a0a0f', borderBottom:'0.5px solid #1e1e2e', padding:'12px 16px', display:'flex', alignItems:'center', gap:10, position:'sticky', top:0, zIndex:50 }}>
-        <button onClick={onBackPress} style={{ background:'none', border:'none', color:'#a78bfa', fontSize:22, cursor:'pointer', padding:0, lineHeight:1 }}>‹</button>
-        <div style={{ flex:1, fontSize:15, fontWeight:700, color:'#ffffff' }}>{title}</div>
-        {right}
-      </div>
-    )
-  }
+  // TopBar defined outside component
 
   // ── HOME SCREEN ──────────────────────────────────────────────────────────
+  const animStyles = `
+    @keyframes slideInRight { from { transform: translateX(60px); opacity:0 } to { transform: translateX(0); opacity:1 } }
+    @keyframes slideInLeft  { from { transform: translateX(-60px); opacity:0 } to { transform: translateX(0); opacity:1 } }
+    @keyframes fadeUp { from { transform: translateY(20px); opacity:0 } to { transform: translateY(0); opacity:1 } }
+    @keyframes fadeIn { from { opacity:0 } to { opacity:1 } }
+  `
+
   if (screen === 'home') return (
     <div key={animKey} style={{ minHeight:'100vh', background:'#0a0a0f', color:'#fff', fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif', ...slideStyle }}>
       <Head><title>EPL — Setlist Builder</title></Head>
-      <style>{`
-        @keyframes slideInRight { from { transform: translateX(60px); opacity:0 } to { transform: translateX(0); opacity:1 } }
-        @keyframes slideInLeft  { from { transform: translateX(-60px); opacity:0 } to { transform: translateX(0); opacity:1 } }
-        @keyframes fadeUp { from { transform: translateY(20px); opacity:0 } to { transform: translateY(0); opacity:1 } }
-        @keyframes fadeIn { from { opacity:0 } to { opacity:1 } }
-      `}</style>
+      {/* animations defined globally below */}
       <div style={{ background:'#0a0a0f', borderBottom:'0.5px solid #1e1e2e', padding:'12px 20px', display:'flex', alignItems:'center', gap:10, position:'sticky', top:0, zIndex:50 }}>
         <button onClick={onBack} style={{ background:'none', border:'none', color:'#a78bfa', fontSize:22, cursor:'pointer', padding:0 }}>‹</button>
         <img src="/logo.png" alt="EPL" style={{ width:28, height:28, objectFit:'contain', mixBlendMode:'screen' }} />
@@ -2216,7 +2217,8 @@ function SetlistBuilderMain({ data, onBack }) {
     const filtered = filterSongs(songFilter, tuningFilter)
     return (
       <div key={animKey} style={{ minHeight:'100vh', background:'#0a0a0f', color:'#fff', fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif', ...slideStyle }}>
-        <TopBar title="Song Library" onBackPress={() => goTo('home','back')} />
+      <style>{animStyles}</style>
+        <SetlistTopBar title="Song Library" onBackPress={() => goTo('home','back')} />
         {/* Search */}
         <div style={{ padding:'12px 16px', borderBottom:'0.5px solid #1e1e2e', position:'sticky', top:57, background:'#0a0a0f', zIndex:40 }}>
           <input value={songFilter} onChange={e => setSongFilter(e.target.value)} placeholder="Search songs, artists..."
@@ -2254,7 +2256,8 @@ function SetlistBuilderMain({ data, onBack }) {
   // ── SETLISTS SCREEN ──────────────────────────────────────────────────────
   if (screen === 'setlists') return (
     <div key={animKey} style={{ minHeight:'100vh', background:'#0a0a0f', color:'#fff', fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif', ...slideStyle }}>
-      <TopBar title="My Setlists" onBackPress={() => goTo('home','back')}
+      <style>{animStyles}</style>
+      <SetlistTopBar title="My Setlists" onBackPress={() => goTo('home','back')}
         right={<button onClick={() => { setItems([]); setSetName(''); setSelectedBand(''); setSelectedShow(''); goTo('builder') }}
           style={{ padding:'7px 14px', background:'#a78bfa', border:'none', borderRadius:20, color:'#000', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>+ New</button>} />
       <div style={{ padding:'8px 0 80px' }}>
@@ -2300,6 +2303,7 @@ function SetlistBuilderMain({ data, onBack }) {
 
   return (
     <div key={animKey} style={{ minHeight:'100vh', background:'#0a0a0f', color:'#fff', fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif', ...slideStyle }}>
+      <style>{animStyles}</style>
       <Head><title>EPL — {setName||'New Setlist'}</title></Head>
 
       {/* Header */}
