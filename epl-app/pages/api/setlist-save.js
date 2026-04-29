@@ -1,26 +1,39 @@
-const AIRTABLE_TOKEN = process.env.AIRTABLE_TOKEN
-const AIRTABLE_BASE = process.env.AIRTABLE_BASE
+const TOKEN = process.env.AIRTABLE_TOKEN
+const BASE = process.env.AIRTABLE_BASE
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end()
-  const { setName, bandId, showId, songIds, builderData, setLength } = req.body
-  try {
-    const fields = { 'Set Name': setName }
-    if (bandId) fields['Band'] = [bandId]
-    if (showId) fields['Show'] = [showId]
-    if (songIds && songIds.length) fields['Songs'] = songIds
-    if (setLength) fields['Set Length'] = setLength
-    if (builderData) fields['Notes'] = '%%BUILDER%%' + JSON.stringify(builderData)
+  const { recordId, setName, bandId, showId, songIds, builderData, setLength } = req.body
 
-    const r = await fetch(`https://api.airtable.com/v0/${AIRTABLE_BASE}/SETLISTS`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${AIRTABLE_TOKEN}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ fields })
-    })
+  const fields = {}
+  if (setName) fields['Set Name'] = setName
+  if (bandId) fields['Band'] = [bandId]
+  if (showId) fields['Show'] = [showId]
+  if (songIds) fields['Songs'] = songIds
+  if (setLength !== undefined) fields['Set Length'] = setLength
+  if (builderData) fields['Notes'] = '%%BUILDER%%' + JSON.stringify(builderData)
+
+  try {
+    let r
+    if (recordId) {
+      // UPDATE existing
+      r = await fetch(`https://api.airtable.com/v0/${BASE}/SETLISTS/${recordId}`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fields })
+      })
+    } else {
+      // CREATE new
+      r = await fetch(`https://api.airtable.com/v0/${BASE}/SETLISTS`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fields })
+      })
+    }
     const data = await r.json()
-    if (data.error) return res.status(400).json(data)
-    res.json({ success: true, id: data.id })
+    if (!r.ok) return res.status(400).json(data)
+    return res.json({ success: true, id: data.id })
   } catch(e) {
-    res.status(500).json({ error: e.message })
+    return res.status(500).json({ error: e.message })
   }
 }
