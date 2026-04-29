@@ -2035,9 +2035,14 @@ function SetlistBuilderMain({ data, onBack }) {
 
   // Totals
   const totalMins = items.filter(i => i.type === 'song').reduce((acc, i) => {
-    const dur = i.fields['Duration'] || '0:00'
-    const parts = dur.split(':')
-    return acc + (parseInt(parts[0]||0)*60 + parseInt(parts[1]||0))
+    const dur = i.fields['Duration']
+    if (!dur) return acc
+    if (typeof dur === 'number') return acc + Math.floor(dur / 60)
+    if (typeof dur === 'string' && dur.includes(':')) {
+      const parts = dur.split(':')
+      return acc + (parseInt(parts[0]||0)*60 + parseInt(parts[1]||0))
+    }
+    return acc
   }, 0)
   const totalDisplay = Math.floor(totalMins/60) + 'h ' + (totalMins%60) + 'm'
 
