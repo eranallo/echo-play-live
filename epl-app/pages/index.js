@@ -2680,62 +2680,78 @@ function SetlistPrintView({ items, setName, bandName, bandId, bandLogo: bandLogo
         <div style={{ fontSize:12, color:'#6b7280', marginLeft:'auto' }}>{songCount} songs · {totalDisplay}</div>
       </div>
 
-      {/* Print page */}
-      <div className="print-page" style={{ maxWidth:720, margin:'0 auto', padding:'24px 28px 20px', position:'relative', minHeight:'90vh', boxSizing:'border-box' }}>
+      {/* Print page — sized for US Letter 8.5x11 */}
+      <div className="print-page" style={{ width:'8.5in', minHeight:'11in', margin:'0 auto', padding:'0.5in 0.55in', position:'relative', boxSizing:'border-box', background:'#fff' }}>
 
-        {/* Watermark logo */}
+        {/* Watermark logo — centered, greyscale, very faint */}
         {logo && (
-          <div style={{ position:'absolute', top:'50%', left:'50%', transform:'translate(-50%, -50%)', opacity:0.06, pointerEvents:'none', zIndex:0, width:340, height:340, display:'flex', alignItems:'center', justifyContent:'center' }}>
+          <div style={{ position:'absolute', top:'50%', left:'50%', transform:'translate(-50%, -50%)', opacity:0.05, pointerEvents:'none', zIndex:0, width:'4in', height:'4in', display:'flex', alignItems:'center', justifyContent:'center', filter:'grayscale(100%)' }}>
             <img src={logo} alt="" style={{ width:'100%', height:'100%', objectFit:'contain' }} />
           </div>
         )}
 
-        {/* Content above watermark */}
+        {/* Content */}
         <div style={{ position:'relative', zIndex:1 }}>
 
-          {/* Header */}
-          <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', marginBottom:6 }}>
+          {/* Header row: band logo left | band name center | EPL logo right */}
+          <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', marginBottom:8 }}>
+            {/* Band logo top-left */}
             {logo
-              ? <img src={logo} alt={bandName} style={{ width:52, height:52, objectFit:'contain' }} />
-              : <div style={{ width:52 }} />
+              ? <img src={logo} alt={bandName} style={{ width:56, height:56, objectFit:'contain', filter:'grayscale(100%)' }} />
+              : <div style={{ width:56 }} />
             }
+
+            {/* Band name + venue/date center */}
             <div style={{ textAlign:'center', flex:1, padding:'0 12px' }}>
-              <div style={{ fontSize:32, fontWeight:900, textTransform:'uppercase', letterSpacing:2, lineHeight:1 }}>{bandName || setName || 'SETLIST'}</div>
+              <div style={{ fontSize:36, fontWeight:900, textTransform:'uppercase', letterSpacing:2, lineHeight:1 }}>{bandName || setName || 'SETLIST'}</div>
               {(venueName || showDate) && (
-                <div style={{ fontSize:10, fontWeight:700, marginTop:4, letterSpacing:1 }}>
+                <div style={{ fontSize:10, fontWeight:700, marginTop:5, letterSpacing:1 }}>
                   {fmtDate(showDate)}{venueName && showDate ? ' // ' : ''}{venueName}
                 </div>
               )}
             </div>
-            <div style={{ width:52, textAlign:'right', fontSize:9, lineHeight:1.5, paddingTop:4 }}>
-              {showDate && <div>{fmtDate(showDate)}</div>}
-              {venueName && <div>@ {venueName}</div>}
+
+            {/* EPL logo top-right */}
+            <div style={{ width:56, display:'flex', flexDirection:'column', alignItems:'center', gap:3 }}>
+              <img src="/logo.png" alt="EPL" style={{ width:40, height:40, objectFit:'contain', filter:'grayscale(100%)', mixBlendMode:'multiply' }} />
+              <div style={{ fontSize:7, fontWeight:900, letterSpacing:1, textTransform:'uppercase', color:'#888', textAlign:'center' }}>Echo Play Live</div>
             </div>
           </div>
 
-          {/* Divider line */}
-          <div style={{ borderTop:'2px solid #000', marginBottom:8 }} />
+          {/* Divider */}
+          <div style={{ borderTop:'2px solid #000', marginBottom:10 }} />
 
           {/* Two-column song list */}
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0 20px' }}>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0 24px' }}>
             <div>{renderColumn(leftItems, 1)}</div>
             <div>{renderColumn(rightItems, leftItems.filter(i=>i.type==='song').length + 1)}</div>
           </div>
 
           {/* Footer */}
-          <div style={{ borderTop:'1.5px solid #000', marginTop:10, paddingTop:6, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-            <div style={{ fontSize:9, fontWeight:700, letterSpacing:1.5, textTransform:'uppercase' }}>{songCount} songs · {totalDisplay}</div>
-            {bandName && <div style={{ fontSize:9, fontWeight:900, letterSpacing:2, textTransform:'uppercase' }}>{bandName}</div>}
+          <div style={{ borderTop:'1.5px solid #000', marginTop:12, paddingTop:6, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+            <div style={{ fontSize:8, fontWeight:700, letterSpacing:1.5, textTransform:'uppercase', color:'#555' }}>{songCount} songs · {totalDisplay}</div>
+            <div style={{ fontSize:8, fontWeight:700, letterSpacing:1, color:'#999', textTransform:'uppercase' }}>Echo Play Live — Management</div>
+            {bandName && <div style={{ fontSize:8, fontWeight:900, letterSpacing:2, textTransform:'uppercase' }}>{bandName}</div>}
           </div>
-
         </div>
       </div>
 
       <style>{`
         @media print {
           .no-print { display: none !important; }
-          body { margin: 0; }
-          .print-page { max-width: 100%; padding: 16px 20px; }
+          * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          body { margin: 0; background: #fff; }
+          .print-page {
+            width: 8.5in !important;
+            min-height: 11in !important;
+            margin: 0 !important;
+            padding: 0.5in 0.55in !important;
+            box-shadow: none !important;
+          }
+          @page {
+            size: letter portrait;
+            margin: 0;
+          }
         }
       `}</style>
     </div>
