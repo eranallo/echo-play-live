@@ -2016,17 +2016,7 @@ function SetlistBuilderMain({ data, onBack }) {
     } else setBandLogo(null)
   }, [selectedBand])
 
-  function handleLogoUpload(e) {
-    const file = e.target.files[0]
-    if (!file) return
-    const reader = new FileReader()
-    reader.onload = ev => {
-      const b64 = ev.target.result
-      setBandLogo(b64)
-      if (selectedBand && typeof window !== 'undefined') localStorage.setItem('epl_logo_' + selectedBand, b64)
-    }
-    reader.readAsDataURL(file)
-  }
+  // Logo upload handled via Airtable band photo
 
   // Navigation helper
   function goTo(s, dir='forward') {
@@ -2172,6 +2162,10 @@ function SetlistBuilderMain({ data, onBack }) {
 
   // Resolve for print
   const printBand = bands.find(b => b.id === selectedBand)
+  // Get Airtable band logo URL for watermark
+  const airtableLogo = printBand?.fields['Photo']?.[0]?.url ||
+                       printBand?.fields['Logo']?.[0]?.url ||
+                       printBand?.fields['Band Logo']?.[0]?.url || null
   const printShow = shows.find(s => s.id === selectedShow)
   const printVenue = printShow ? (data['VENUES']||[]).find(v => (printShow.fields['Venue']||[]).includes(v.id)) : null
 
@@ -2180,6 +2174,7 @@ function SetlistBuilderMain({ data, onBack }) {
       items={items} setName={setName}
       bandName={printBand?.fields['Band Name']||''}
       bandId={selectedBand}
+      bandLogo={bandLogo || airtableLogo}
       venueName={printVenue?.fields['Venue Name']||''}
       showDate={printShow?.fields['Date']||''}
       totalDisplay={totalDisplay}
@@ -2384,32 +2379,32 @@ function SetlistBuilderMain({ data, onBack }) {
         <button onClick={() => setShowPrint(true)} style={{ padding:'7px 12px', background:'rgba(255,255,255,0.05)', border:'none', borderRadius:20, color:'rgba(255,255,255,0.6)', fontSize:12, cursor:'pointer', fontFamily:'inherit' }}>🖨</button>
       </div>
 
-      {/* Band / Show / Logo row */}
-      <div style={{ padding:'8px 14px', borderBottom:'0.5px solid #1e1e2e', display:'flex', gap:8, alignItems:'center', background:'#0a0a0f' }}>
+      {/* Band / Show row */}
+      <div style={{ padding:'6px 14px', borderBottom:'0.5px solid #1e1e2e', display:'flex', gap:8, alignItems:'center', background:'#0a0a0f' }}>
         <select value={selectedBand} onChange={e => setSelectedBand(e.target.value)}
-          style={{ flex:1, padding:'7px 10px', background:'rgba(255,255,255,0.05)', border:'0.5px solid rgba(255,255,255,0.1)', borderRadius:10, color: selectedBand?'#fff':'rgba(255,255,255,0.4)', fontSize:12, fontFamily:'inherit', outline:'none' }}>
+          style={{ width:'38%', minWidth:0, padding:'7px 10px', background:'rgba(255,255,255,0.05)', border:'0.5px solid rgba(255,255,255,0.1)', borderRadius:10, color: selectedBand?'#fff':'rgba(255,255,255,0.4)', fontSize:12, fontFamily:'inherit', outline:'none' }}>
           <option value=''>Band...</option>
           {bands.map(b => <option key={b.id} value={b.id}>{b.fields['Band Name']}</option>)}
         </select>
         <select value={selectedShow} onChange={e => setSelectedShow(e.target.value)}
-          style={{ flex:1, padding:'7px 10px', background:'rgba(255,255,255,0.05)', border:'0.5px solid rgba(255,255,255,0.1)', borderRadius:10, color: selectedShow?'#fff':'rgba(255,255,255,0.4)', fontSize:12, fontFamily:'inherit', outline:'none' }}>
+          style={{ flex:1, minWidth:0, padding:'7px 10px', background:'rgba(255,255,255,0.05)', border:'0.5px solid rgba(255,255,255,0.1)', borderRadius:10, color: selectedShow?'#fff':'rgba(255,255,255,0.4)', fontSize:12, fontFamily:'inherit', outline:'none', overflow:'hidden', textOverflow:'ellipsis' }}>
           <option value=''>Show...</option>
           {shows.filter(s => !selectedBand || (s.fields['Band']||[]).includes(selectedBand)).map(s => (
             <option key={s.id} value={s.id}>{s.fields['Show Name']||s.fields['Date']}</option>
           ))}
         </select>
-        {selectedBand && (
-          <label style={{ cursor:'pointer', flexShrink:0 }} title="Upload logo for print">
-            {bandLogo
-              ? <img src={bandLogo} alt="logo" style={{ width:30, height:30, objectFit:'contain', borderRadius:6, background:'rgba(255,255,255,0.05)' }} />
-              : <div style={{ width:30, height:30, borderRadius:6, background:'rgba(255,255,255,0.05)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:16 }}>🎸</div>}
-            <input type="file" accept="image/*" onChange={handleLogoUpload} style={{ display:'none' }} />
-          </label>
-        )}
       </div>
 
       {/* Setlist items */}
-      <div style={{ padding:'0 0 160px', overflowY:'auto', touchAction:'pan-y' }}>
+      <div style={{ padding:'0 0 160px', overflowY:'auto', touchAction:'pan-y', position:'relative' }}>
+        {/* Airtable band logo watermark */}
+        {airtableLogo && (
+          <div style={{ position:'sticky', top:0, height:0, overflow:'visible', zIndex:0, pointerEvents:'none' }}>
+            <div style={{ position:'absolute', top:'20vh', left:'50%', transform:'translateX(-50%)', width:260, height:260, display:'flex', alignItems:'center', justifyContent:'center', opacity:0.04, filter:'grayscale(100%)' }}>
+              <img src={airtableLogo} alt="" style={{ width:'100%', height:'100%', objectFit:'contain' }} />
+            </div>
+          </div>
+        )}
         {items.length === 0 && (
           <div style={{ textAlign:'center', padding:'60px 20px' }}>
             <div style={{ fontSize:52, marginBottom:16 }}>🎸</div>
@@ -2595,15 +2590,16 @@ function SetlistBuilderMain({ data, onBack }) {
 
 
 
-function SetlistPrintView({ items, setName, bandName, bandId, venueName, showDate, totalDisplay, songCount, onClose }) {
+function SetlistPrintView({ items, setName, bandName, bandId, bandLogo: bandLogoProp, venueName, showDate, totalDisplay, songCount, onClose }) {
   const [logo, setLogo] = useState(null)
 
   useEffect(() => {
-    if (bandId) {
-      const stored = localStorage.getItem(`epl_logo_${bandId}`)
+    if (bandLogoProp) { setLogo(bandLogoProp); return }
+    if (bandId && typeof window !== 'undefined') {
+      const stored = localStorage.getItem('epl_logo_' + bandId)
       if (stored) setLogo(stored)
     }
-  }, [bandId])
+  }, [bandId, bandLogoProp])
 
   // Split items into two columns, keeping breaks as full-width markers
   const half = Math.ceil(items.length / 2)
