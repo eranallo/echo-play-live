@@ -2502,6 +2502,20 @@ function SetlistBuilderMain({ data, onBack }) {
           )
 
         })}
+      </div>
+
+      {/* Bottom action bar */}
+      <div style={{ position:'fixed', bottom:0, left:0, right:0, background:'#0a0a0f', borderTop:'0.5px solid #1e1e2e', padding:'12px 14px 28px', display:'flex', gap:10, zIndex:50 }}>
+        <button onClick={() => { setPickerFilter(''); setShowSongPicker(true) }}
+          style={{ flex:2, padding:'16px', background:'#a78bfa', border:'none', borderRadius:14, color:'#000', fontSize:16, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>
+          + Add Songs
+        </button>
+        <button onClick={() => setShowBlockPicker(true)}
+          style={{ flex:1, padding:'16px', background:'rgba(255,255,255,0.06)', border:'0.5px solid rgba(255,255,255,0.1)', borderRadius:14, color:'rgba(255,255,255,0.7)', fontSize:16, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>
+          + Block
+        </button>
+      </div>
+
       {/* Song Picker Overlay */}
       {showSongPicker && (
         <div style={{ position:'fixed', inset:0, zIndex:100, display:'flex', flexDirection:'column', background:'#0a0a0f', animation:'slideInRight 0.25s ease' }}>
