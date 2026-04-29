@@ -1971,7 +1971,7 @@ function SetlistBuilderMain({ data, onBack }) {
   const songs = (data['SONGS'] || []).sort((a,b) => (a.fields['Song Title']||'').localeCompare(b.fields['Song Title']||''))
   const bands = data['BANDS'] || []
   const shows = (data['SHOWS'] || []).sort((a,b) => a.fields['Date'] > b.fields['Date'] ? 1 : -1)
-  const setlists = (data['SETLISTS'] || []).sort((a,b) => a.fields['Set Name'] > b.fields['Set Name'] ? 1 : -1)
+  const setlists = (data['SETLISTS'] || []).filter(s=>s&&s.fields).sort((a,b) => (a.fields['Set Name']||'') > (b.fields['Set Name']||'') ? 1 : -1)
 
   // Navigation
   const [screen, setScreen] = useState('home') // home | songs | setlists | builder
@@ -2081,9 +2081,9 @@ function SetlistBuilderMain({ data, onBack }) {
   function loadSetlist(sl) {
     const sf = sl.fields
     const songIds = sf['Songs'] || []
-    let builderItems = songIds.map(id => {
+    let builderItems = (songIds||[]).map(id => {
       const s = songs.find(x => x.id === id)
-      return s ? { type:'song', id:s.id, fields:s.fields } : null
+      return s && s.fields ? { type:'song', id:s.id, fields:s.fields } : null
     }).filter(Boolean)
     if (sf['Notes'] && sf['Notes'].startsWith('%%BUILDER%%')) {
       try {
@@ -2142,10 +2142,11 @@ function SetlistBuilderMain({ data, onBack }) {
   }
 
   // Unique tunings for filter chips
-  const allTunings = [...new Set(songs.map(s => (s.fields['Guitar Tuning']||'').split('.')[0]).filter(Boolean))]
+  const allTunings = [...new Set(songs.filter(s=>s&&s.fields).map(s => (s.fields['Guitar Tuning']||'').split('.')[0]).filter(Boolean))].sort()
 
   // Filtered songs for library and picker
   const filterSongs = (q, t) => songs.filter(s => {
+    if (!s || !s.fields) return false
     const f = s.fields
     const matchQ = !q || (f['Song Title']||'').toLowerCase().includes(q.toLowerCase()) || (f['Artist']||'').toLowerCase().includes(q.toLowerCase())
     const matchT = !t || (f['Guitar Tuning']||'').split('.')[0] === t
@@ -2226,7 +2227,7 @@ function SetlistBuilderMain({ data, onBack }) {
           {/* Tuning chips */}
           <div style={{ display:'flex', gap:6, overflowX:'auto', marginTop:10, paddingBottom:2 }}>
             <button onClick={() => setTuningFilter('')} style={{ padding:'4px 12px', borderRadius:20, background: !tuningFilter ? '#a78bfa' : 'rgba(255,255,255,0.06)', border:'none', color: !tuningFilter ? '#000' : 'rgba(255,255,255,0.6)', fontSize:12, fontWeight:600, cursor:'pointer', fontFamily:'inherit', whiteSpace:'nowrap', flexShrink:0 }}>All</button>
-            {allTunings.sort().map(t => (
+            {allTunings.map(t => (
               <button key={t} onClick={() => setTuningFilter(tuningFilter===t?'':t)} style={{ padding:'4px 12px', borderRadius:20, background: tuningFilter===t ? '#a78bfa' : 'rgba(255,255,255,0.06)', border:'none', color: tuningFilter===t ? '#000' : 'rgba(255,255,255,0.6)', fontSize:12, fontWeight:600, cursor:'pointer', fontFamily:'inherit', whiteSpace:'nowrap', flexShrink:0 }}>{t}</button>
             ))}
           </div>
