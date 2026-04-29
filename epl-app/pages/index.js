@@ -1986,6 +1986,7 @@ function SetlistBuilderMain({ data, onBack }) {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [showPrint, setShowPrint] = useState(false)
+  const [recordId, setRecordId] = useState(null) // Airtable record ID for sync
 
   // Song picker overlay
   const [showSongPicker, setShowSongPicker] = useState(false)
@@ -2078,10 +2079,25 @@ function SetlistBuilderMain({ data, onBack }) {
     setSaving(true); setSaved(false)
     const songIds = items.filter(i => i.type==='song').map(i => i.id)
     const builderData = items.map(i => i.type==='song' ? {type:'song',id:i.id} : {type:i.type,text:i.text||''})
-    await fetch('/api/setlist-save', { method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ setName: setName||'New Setlist', bandId: selectedBand||null, showId: selectedShow||null, songIds, builderData, setLength: totalMins }) })
+    const body = { setName: setName||'New Setlist', bandId: selectedBand||null, showId: selectedShow||null, songIds, builderData, setLength: totalMins }
+    if (recordId) body.recordId = recordId
+    const r = await fetch('/api/setlist-save', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) })
+    const json = await r.json()
+    if (json.id && !recordId) setRecordId(json.id) // store ID after first create
     setSaving(false); setSaved(true); setTimeout(() => setSaved(false), 3000)
   }
+
+  // Auto-sync to Airtable when items change (debounced)
+  useEffect(() => {
+    if (!recordId || items.length === 0) return
+    const timer = setTimeout(() => {
+      const songIds = items.filter(i => i.type==='song').map(i => i.id)
+      const builderData = items.map(i => i.type==='song' ? {type:'song',id:i.id} : {type:i.type,text:i.text||''})
+      fetch('/api/setlist-save', { method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ recordId, songIds, builderData, setLength: totalMins, setName: setName||'New Setlist' }) })
+    }, 1500) // debounce 1.5s
+    return () => clearTimeout(timer)
+  }, [items, recordId])
 
   function loadSetlist(sl) {
     const sf = sl.fields
@@ -2104,6 +2120,7 @@ function SetlistBuilderMain({ data, onBack }) {
     const bandId = (sf['Band'] || [])[0] || ''
     setSelectedBand(bandId)
     setSelectedShow((sf['Show'] || [])[0] || '')
+    setRecordId(sl.id)
     goTo('builder')
   }
 
@@ -2190,7 +2207,7 @@ function SetlistBuilderMain({ data, onBack }) {
         <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
 
           {/* New setlist */}
-          <button onClick={() => { setItems([]); setSetName(''); setSelectedBand(''); setSelectedShow(''); goTo('builder') }}
+          <button onClick={() => { setItems([]); setSetName(''); setSelectedBand(''); setSelectedShow(''); setRecordId(null); goTo('builder') }}
             style={{ width:'100%', padding:'22px 20px', background:'linear-gradient(135deg,#1a0a2e,#2a1a4e)', border:'0.5px solid #a78bfa40', borderRadius:16, cursor:'pointer', textAlign:'left', fontFamily:'inherit', animation:'fadeUp 0.3s ease both' }}>
             <div style={{ fontSize:28, marginBottom:6 }}>✨</div>
             <div style={{ fontSize:17, fontWeight:700, color:'#ffffff', marginBottom:4 }}>New Setlist</div>
@@ -2264,7 +2281,7 @@ function SetlistBuilderMain({ data, onBack }) {
     <div key={animKey} style={{ minHeight:'100vh', background:'#0a0a0f', color:'#fff', fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif', ...slideStyle }}>
       <style>{animStyles}</style>
       <SetlistTopBar title="My Setlists" onBackPress={() => goTo('home','back')}
-        right={<button onClick={() => { setItems([]); setSetName(''); setSelectedBand(''); setSelectedShow(''); goTo('builder') }}
+        right={<button onClick={() => { setItems([]); setSetName(''); setSelectedBand(''); setSelectedShow(''); setRecordId(null); goTo('builder') }}
           style={{ padding:'7px 14px', background:'#a78bfa', border:'none', borderRadius:20, color:'#000', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>+ New</button>} />
       <div style={{ padding:'8px 0 80px' }}>
         {setlists.length === 0 && (
@@ -2354,9 +2371,9 @@ function SetlistBuilderMain({ data, onBack }) {
       <div style={{ padding:'6px 0 160px', overflowY:'auto' }}>
         {items.length === 0 && (
           <div style={{ textAlign:'center', padding:'60px 20px' }}>
-            <div style={{ fontSize:40, marginBottom:12 }}>🎸</div>
-            <div style={{ fontSize:15, fontWeight:600, color:'rgba(255,255,255,0.5)', marginBottom:6 }}>Your setlist is empty</div>
-            <div style={{ fontSize:13, color:'rgba(255,255,255,0.25)' }}>Tap + Add Songs below to get started</div>
+            <div style={{ fontSize:52, marginBottom:16 }}>🎸</div>
+            <div style={{ fontSize:18, fontWeight:700, color:'rgba(255,255,255,0.5)', marginBottom:8 }}>Your setlist is empty</div>
+            <div style={{ fontSize:14, color:'rgba(255,255,255,0.25)' }}>Tap + Add Songs below to get started</div>
           </div>
         )}
         {items.map((item, idx) => {
@@ -2369,18 +2386,18 @@ function SetlistBuilderMain({ data, onBack }) {
               <div key={item.id||idx} draggable
                 onDragStart={e => onDragStart(e,idx)} onDragOver={e => onDragOver(e,idx)}
                 onDrop={e => onDrop(e,idx)} onDragEnd={() => { setDragIdx(null); setDragOverIdx(null) }}
-                style={{ display:'flex', alignItems:'center', gap:10, padding:'11px 14px', borderBottom: isOver?'2px solid #a78bfa':'0.5px solid rgba(255,255,255,0.04)', background: isDragging?'rgba(167,139,250,0.08)':'transparent', cursor:'grab', transition:'background 0.15s', animation:'fadeIn 0.2s ease' }}>
+                style={{ display:'flex', alignItems:'center', gap:12, padding:'16px 16px', borderBottom: isOver?'2px solid #a78bfa':'0.5px solid rgba(255,255,255,0.04)', background: isDragging?'rgba(167,139,250,0.08)':'transparent', cursor:'grab', transition:'background 0.15s', animation:'fadeIn 0.2s ease' }}>
                 <div style={{ color:'rgba(255,255,255,0.15)', fontSize:14, flexShrink:0, userSelect:'none' }}>⠿</div>
-                <div style={{ fontSize:13, color:'rgba(255,255,255,0.25)', width:22, textAlign:'center', flexShrink:0, fontWeight:600 }}>{items.slice(0,idx).filter(x=>x.type==='song').length+1}</div>
-                {tuning && <div style={{ width:26, height:26, borderRadius:7, background:'rgba(167,139,250,0.15)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:10, fontWeight:800, color:'#a78bfa', flexShrink:0 }}>{tuning}</div>}
+                <div style={{ fontSize:14, color:'rgba(255,255,255,0.25)', width:26, textAlign:'center', flexShrink:0, fontWeight:700 }}>{items.slice(0,idx).filter(x=>x.type==='song').length+1}</div>
+                {tuning && <div style={{ width:32, height:32, borderRadius:8, background:'rgba(167,139,250,0.15)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:12, fontWeight:800, color:'#a78bfa', flexShrink:0 }}>{tuning}</div>}
                 <div style={{ flex:1, minWidth:0 }}>
-                  <div style={{ fontSize:14, fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{sf['Song Title']}</div>
-                  <div style={{ fontSize:11, color:'rgba(255,255,255,0.35)', marginTop:1 }}>{sf['Artist']}{sf['Duration']?' · '+sf['Duration']:''}</div>
+                  <div style={{ fontSize:16, fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{sf['Song Title']}</div>
+                  <div style={{ fontSize:12, color:'rgba(255,255,255,0.4)', marginTop:3 }}>{sf['Artist']}{sf['Duration']?' · '+sf['Duration']:''}</div>
                 </div>
                 <div style={{ display:'flex', gap:2 }}>
-                  <button onClick={() => moveItem(idx,-1)} style={{ background:'none', border:'none', color:'rgba(255,255,255,0.2)', cursor:'pointer', fontSize:14, padding:'3px 5px' }}>↑</button>
-                  <button onClick={() => moveItem(idx,1)} style={{ background:'none', border:'none', color:'rgba(255,255,255,0.2)', cursor:'pointer', fontSize:14, padding:'3px 5px' }}>↓</button>
-                  <button onClick={() => removeItem(idx)} style={{ background:'none', border:'none', color:'rgba(255,255,255,0.2)', cursor:'pointer', fontSize:16, padding:'3px 5px' }}>×</button>
+                  <button onClick={() => moveItem(idx,-1)} style={{ background:'none', border:'none', color:'rgba(255,255,255,0.25)', cursor:'pointer', fontSize:18, padding:'4px 8px' }}>↑</button>
+                  <button onClick={() => moveItem(idx,1)} style={{ background:'none', border:'none', color:'rgba(255,255,255,0.25)', cursor:'pointer', fontSize:18, padding:'4px 8px' }}>↓</button>
+                  <button onClick={() => removeItem(idx)} style={{ background:'none', border:'none', color:'rgba(255,255,255,0.25)', cursor:'pointer', fontSize:20, padding:'4px 8px' }}>×</button>
                 </div>
               </div>
             )
@@ -2392,11 +2409,11 @@ function SetlistBuilderMain({ data, onBack }) {
             <div key={item.id||idx} draggable
               onDragStart={e => onDragStart(e,idx)} onDragOver={e => onDragOver(e,idx)}
               onDrop={e => onDrop(e,idx)} onDragEnd={() => { setDragIdx(null); setDragOverIdx(null) }}
-              style={{ display:'flex', alignItems:'center', gap:10, padding:'9px 14px', margin:'4px 10px', borderRadius:10, background: blockColors[item.type]||'rgba(255,255,255,0.05)', cursor:'grab', animation:'fadeIn 0.2s ease' }}>
+              style={{ display:'flex', alignItems:'center', gap:12, padding:'13px 14px', margin:'4px 10px', borderRadius:10, background: blockColors[item.type]||'rgba(255,255,255,0.05)', cursor:'grab', animation:'fadeIn 0.2s ease' }}>
               <div style={{ color:'rgba(255,255,255,0.15)', fontSize:14, flexShrink:0 }}>⠿</div>
               <span style={{ fontSize:14 }}>{icons[item.type]}</span>
               <span style={{ flex:1, fontSize:13, fontWeight:600, color: textColors[item.type]||'#fff', textTransform: item.type==='custom'||item.type==='tuning'?'none':'uppercase', letterSpacing:'0.04em' }}>{item.text||item.type}</span>
-              <button onClick={() => removeItem(idx)} style={{ background:'none', border:'none', color:'rgba(255,255,255,0.2)', cursor:'pointer', fontSize:16, padding:'3px 5px' }}>×</button>
+              <button onClick={() => removeItem(idx)} style={{ background:'none', border:'none', color:'rgba(255,255,255,0.25)', cursor:'pointer', fontSize:20, padding:'4px 8px' }}>×</button>
             </div>
           )
         })}
@@ -2405,11 +2422,11 @@ function SetlistBuilderMain({ data, onBack }) {
       {/* Bottom action bar */}
       <div style={{ position:'fixed', bottom:0, left:0, right:0, background:'#0a0a0f', borderTop:'0.5px solid #1e1e2e', padding:'12px 14px 28px', display:'flex', gap:10, zIndex:50 }}>
         <button onClick={() => { setPickerFilter(''); setShowSongPicker(true) }}
-          style={{ flex:2, padding:'13px', background:'#a78bfa', border:'none', borderRadius:12, color:'#000', fontSize:14, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>
+          style={{ flex:2, padding:'16px', background:'#a78bfa', border:'none', borderRadius:14, color:'#000', fontSize:16, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>
           + Add Songs
         </button>
         <button onClick={() => setShowBlockPicker(true)}
-          style={{ flex:1, padding:'13px', background:'rgba(255,255,255,0.06)', border:'0.5px solid rgba(255,255,255,0.1)', borderRadius:12, color:'rgba(255,255,255,0.7)', fontSize:14, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>
+          style={{ flex:1, padding:'16px', background:'rgba(255,255,255,0.06)', border:'0.5px solid rgba(255,255,255,0.1)', borderRadius:14, color:'rgba(255,255,255,0.7)', fontSize:16, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>
           + Block
         </button>
       </div>
@@ -2433,12 +2450,12 @@ function SetlistBuilderMain({ data, onBack }) {
               const tuning = (sf['Guitar Tuning']||'').split('.')[0]
               return (
                 <div key={s.id} onClick={() => { if (!already) addSong(s) }}
-                  style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 14px', borderBottom:'0.5px solid rgba(255,255,255,0.04)', cursor: already?'default':'pointer', opacity: already?0.35:1, transition:'opacity 0.15s' }}>
+                  style={{ display:'flex', alignItems:'center', gap:14, padding:'16px 16px', borderBottom:'0.5px solid rgba(255,255,255,0.04)', cursor: already?'default':'pointer', opacity: already?0.35:1, transition:'opacity 0.15s' }}>
                   {tuning ? <div style={{ width:28, height:28, borderRadius:7, background:'rgba(167,139,250,0.15)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:10, fontWeight:800, color:'#a78bfa', flexShrink:0 }}>{tuning}</div>
                            : <div style={{ width:28, flexShrink:0 }} />}
                   <div style={{ flex:1, minWidth:0 }}>
-                    <div style={{ fontSize:14, fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{sf['Song Title']}</div>
-                    <div style={{ fontSize:11, color:'rgba(255,255,255,0.4)', marginTop:1 }}>{sf['Artist']}{sf['Duration']?' · '+sf['Duration']:''}</div>
+                    <div style={{ fontSize:16, fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{sf['Song Title']}</div>
+                    <div style={{ fontSize:12, color:'rgba(255,255,255,0.4)', marginTop:3 }}>{sf['Artist']}{sf['Duration']?' · '+sf['Duration']:''}</div>
                   </div>
                   <div style={{ fontSize:20, color: already?'#6bcb77':'#a78bfa', fontWeight:300, flexShrink:0 }}>{already?'✓':'+'}</div>
                 </div>
