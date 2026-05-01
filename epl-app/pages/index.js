@@ -1280,21 +1280,60 @@ function FullSchedule({ data, member, resolve, resolveField, onShowClick, onBack
 
 function Blackouts({ data, member, resolve, onBack }) {
   const [showForm, setShowForm] = useState(false)
+  const [editingId, setEditingId] = useState(null)
   const [currentDate, setCurrentDate] = useState('')
   const [currentEndDate, setCurrentEndDate] = useState('')
   const [currentReason, setCurrentReason] = useState('Personal')
   const [pendingDates, setPendingDates] = useState([])
   const [submitting, setSubmitting] = useState(false)
-  const [submitted, setSubmitted] = useState(false)
+  const [statusMsg, setStatusMsg] = useState('')
   const [localBlackouts, setLocalBlackouts] = useState([])
-
-  const myBlackouts = [...(data['BLACKOUT DATES'] || []).filter(b => {
-    const bm = b.fields['Member'] || []
-    return Array.isArray(bm) ? bm.includes(member.id) : bm === member.id
-  }), ...localBlackouts].sort((a, b) => a.fields['Date'] > b.fields['Date'] ? 1 : -1)
-
+  const [localEdits, setLocalEdits] = useState({})
+  const [localDeletes, setLocalDeletes] = useState({})
+ 
   const REASONS = ['Personal', 'Other Gig', 'Vacation', 'Illness', 'Family', 'Other']
-
+ 
+  const myBlackouts = [
+    ...(data['BLACKOUT DATES'] || []).filter(b => {
+      const bm = b.fields['Member'] || []
+      return Array.isArray(bm) ? bm.includes(member.id) : bm === member.id
+    }),
+    ...localBlackouts
+  ]
+    .filter(b => !localDeletes[b.id])
+    .map(b => localEdits[b.id] ? { ...b, fields: { ...b.fields, ...localEdits[b.id] } } : b)
+    .sort((a, b) => a.fields['Date'] > b.fields['Date'] ? 1 : -1)
+ 
+  function showStatus(msg) {
+    setStatusMsg(msg)
+    setTimeout(() => setStatusMsg(''), 3000)
+  }
+ 
+  function startEdit(b) {
+    setEditingId(b.id)
+    setShowForm(false)
+    setPendingDates([])
+    setCurrentDate(b.fields['Date'] || '')
+    setCurrentEndDate(b.fields['End Date'] || '')
+    setCurrentReason(b.fields['Reason'] || 'Personal')
+  }
+ 
+  function cancelEdit() {
+    setEditingId(null)
+    setCurrentDate('')
+    setCurrentEndDate('')
+    setCurrentReason('Personal')
+  }
+ 
+  function toggleAddForm() {
+    if (editingId) cancelEdit()
+    setShowForm(f => !f)
+    setPendingDates([])
+    setCurrentDate('')
+    setCurrentEndDate('')
+    setCurrentReason('Personal')
+  }
+ 
   function addToPending() {
     if (!currentDate) return
     if (pendingDates.find(p => p.date === currentDate)) return
@@ -1303,35 +1342,74 @@ function Blackouts({ data, member, resolve, onBack }) {
     setCurrentEndDate('')
     setCurrentReason('Personal')
   }
-
+ 
   function removePending(date) {
     setPendingDates(prev => prev.filter(p => p.date !== date))
   }
-
+ 
   async function submitAll() {
     if (pendingDates.length === 0) return
     setSubmitting(true)
     try {
       const results = []
       for (const p of pendingDates) {
+        const body = { 'Member': [member.id], 'Date': p.date, 'Reason': p.reason }
+        if (p.endDate && p.endDate !== p.date) body['End Date'] = p.endDate
         const res = await fetch('/api/blackout', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 'Member': [member.id], 'Date': p.date, 'Reason': p.reason })
+          body: JSON.stringify(body)
         })
         const json = await res.json()
         if (json.error) throw new Error(json.error)
-        results.push({ id: json.id, fields: { Date: p.date, Reason: p.reason, Member: [member.id] } })
+        results.push({ id: json.id, fields: { Date: p.date, 'End Date': p.endDate, Reason: p.reason, Member: [member.id] } })
       }
       setLocalBlackouts(prev => [...prev, ...results])
       setPendingDates([])
       setShowForm(false)
-      setSubmitted(true)
-      setTimeout(() => setSubmitted(false), 3000)
+      showStatus(`${results.length} date${results.length > 1 ? 's' : ''} added`)
     } catch(e) { alert('Error: ' + e.message) }
     setSubmitting(false)
   }
-
+ 
+  async function saveEdit() {
+    if (!currentDate || !editingId) return
+    setSubmitting(true)
+    try {
+      const fields = { 'Date': currentDate, 'Reason': currentReason }
+      fields['End Date'] = (currentEndDate && currentEndDate !== currentDate) ? currentEndDate : null
+      const res = await fetch('/api/blackout', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ recordId: editingId, fields })
+      })
+      const json = await res.json()
+      if (json.error) throw new Error(json.error)
+      setLocalEdits(prev => ({ ...prev, [editingId]: fields }))
+      cancelEdit()
+      showStatus('Date updated')
+    } catch(e) { alert('Error: ' + e.message) }
+    setSubmitting(false)
+  }
+ 
+  async function deleteBlackout(id) {
+    if (typeof window !== 'undefined' && !window.confirm('Delete this date?')) return
+    setSubmitting(true)
+    try {
+      const res = await fetch('/api/blackout', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ recordId: id })
+      })
+      const json = await res.json()
+      if (json.error) throw new Error(json.error)
+      setLocalDeletes(prev => ({ ...prev, [id]: true }))
+      if (editingId === id) cancelEdit()
+      showStatus('Date deleted')
+    } catch(e) { alert('Error: ' + e.message) }
+    setSubmitting(false)
+  }
+ 
   return (
     <div style={{ minHeight:'100vh', background:'#0a0a0f', color:'#ffffff', fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif' }}>
       <Head>
@@ -1347,22 +1425,22 @@ function Blackouts({ data, member, resolve, onBack }) {
           <img src="/logo.png" alt="EPL" onClick={onBack} style={{ width:28, height:28, objectFit:'contain', mixBlendMode:'screen', cursor:'pointer', opacity:0.7 }} />
           <div style={{ fontSize:15, fontWeight:600 }}>My blackout dates</div>
         </div>
-        <button onClick={() => { setShowForm(f => !f); setPendingDates([]); setCurrentDate(''); setCurrentEndDate(''); setCurrentReason('Personal') }} style={{ fontSize:13, padding:'6px 14px', borderRadius:20, background: showForm ? '#2a2a3a' : '#1a1a2e', border:'none', color:'#a78bfa', cursor:'pointer', fontFamily:'inherit', fontWeight:600 }}>
+        <button onClick={toggleAddForm} style={{ fontSize:13, padding:'6px 14px', borderRadius:20, background: showForm ? '#2a2a3a' : '#1a1a2e', border:'none', color:'#a78bfa', cursor:'pointer', fontFamily:'inherit', fontWeight:600 }}>
           {showForm ? 'Cancel' : '+ Add dates'}
         </button>
       </div>
-
+ 
       <div style={{ padding:'8px 20px 80px' }}>
-        {submitted && (
-          <div style={{ background:'#0f2a0f', border:'0.5px solid #2a4a2a', borderRadius:10, padding:'12px 16px', marginBottom:14, fontSize:13, color:'#a78bfa' }}>
-            Blackout {localBlackouts.length === 1 ? 'date' : 'dates'} submitted successfully!
+        {statusMsg && (
+          <div style={{ background:'#0f2a0f', border:'0.5px solid #2a4a2a', borderRadius:10, padding:'12px 16px', marginBottom:14, fontSize:13, color:'#6bcb77' }}>
+            {statusMsg}
           </div>
         )}
-
+ 
         {showForm && (
           <div style={{ background:'#0a0a0f', border:'0.5px solid #2a2a3a', borderRadius:10, padding:16, marginBottom:20 }}>
             <div style={{ fontSize:14, fontWeight:600, marginBottom:14 }}>Add blackout dates</div>
-
+ 
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:10 }}>
               <div>
                 <div style={{ fontSize:12, color:'#6b7280', marginBottom:6 }}>Start date</div>
@@ -1384,7 +1462,7 @@ function Blackouts({ data, member, resolve, onBack }) {
                 />
               </div>
             </div>
-
+ 
             <div style={{ marginBottom:12 }}>
               <div style={{ fontSize:12, color:'#6b7280', marginBottom:8 }}>Reason</div>
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6 }}>
@@ -1393,11 +1471,11 @@ function Blackouts({ data, member, resolve, onBack }) {
                 ))}
               </div>
             </div>
-
+ 
             <button onClick={addToPending} disabled={!currentDate} style={{ width:'100%', padding:'11px', background: currentDate ? '#0f2a0f' : '#0a0a0a', border: currentDate ? '0.5px solid #2a4a2a' : '0.5px solid #1a1a1a', borderRadius:10, color: currentDate ? '#6bcb77' : '#3a3a3a', fontSize:13, fontWeight:600, cursor: currentDate ? 'pointer' : 'default', fontFamily:'inherit', marginBottom: pendingDates.length > 0 ? 12 : 0 }}>
               + Add to list
             </button>
-
+ 
             {pendingDates.length > 0 && (
               <div>
                 <div style={{ fontSize:11, color:'#6b7280', marginBottom:8, marginTop:4 }}>Dates to submit ({pendingDates.length})</div>
@@ -1417,23 +1495,70 @@ function Blackouts({ data, member, resolve, onBack }) {
             )}
           </div>
         )}
-
+ 
         <div style={{ fontSize:11, fontWeight:600, color:'#6b7280', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:12 }}>
           {myBlackouts.length} date{myBlackouts.length !== 1 ? 's' : ''} on record
         </div>
-
+ 
         {myBlackouts.length ? myBlackouts.map((b, i) => {
+          const isEditing = editingId === b.id
+          if (isEditing) {
+            return (
+              <div key={b.id} style={{ background:'#0a0a0f', border:'1px solid #a78bfa', borderRadius:10, padding:16, marginBottom:10 }}>
+                <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14 }}>
+                  <div style={{ fontSize:13, fontWeight:700, color:'#a78bfa' }}>Editing date</div>
+                  <button onClick={cancelEdit} style={{ background:'none', border:'none', color:'#6b7280', fontSize:18, cursor:'pointer', padding:0, fontFamily:'inherit' }}>×</button>
+                </div>
+ 
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:10 }}>
+                  <div>
+                    <div style={{ fontSize:12, color:'#6b7280', marginBottom:6 }}>Start date</div>
+                    <input type="date" value={currentDate} onChange={e => setCurrentDate(e.target.value)}
+                      style={{ width:'100%', padding:'10px 8px', background:'#1a1a2a', border:'0.5px solid #3a3a4a', borderRadius:10, color:'#ffffff', fontSize:13, fontFamily:'inherit', boxSizing:'border-box', display:'block' }} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize:12, color:'#6b7280', marginBottom:6 }}>End date <span style={{ color:'#3a3a4a' }}>(optional)</span></div>
+                    <input type="date" value={currentEndDate} min={currentDate} onChange={e => setCurrentEndDate(e.target.value)}
+                      style={{ width:'100%', padding:'10px 8px', background:'#1a1a2a', border:'0.5px solid #3a3a4a', borderRadius:10, color:'#ffffff', fontSize:13, fontFamily:'inherit', boxSizing:'border-box', display:'block' }} />
+                  </div>
+                </div>
+ 
+                <div style={{ marginBottom:14 }}>
+                  <div style={{ fontSize:12, color:'#6b7280', marginBottom:8 }}>Reason</div>
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6 }}>
+                    {REASONS.map(r => (
+                      <button key={r} onClick={() => setCurrentReason(r)} style={{ padding:'8px 6px', background: currentReason===r ? '#1a1a2e' : '#0a0a1a', border: currentReason===r ? '0.5px solid #a78bfa' : '0.5px solid #2a2a3a', borderRadius:8, color: currentReason===r ? '#a78bfa' : '#6b7280', fontSize:12, cursor:'pointer', fontFamily:'inherit', fontWeight: currentReason===r ? 600 : 400 }}>{r}</button>
+                    ))}
+                  </div>
+                </div>
+ 
+                <div style={{ display:'flex', gap:8 }}>
+                  <button onClick={saveEdit} disabled={submitting || !currentDate}
+                    style={{ flex:1, padding:'12px', background:'#1a1a2e', border:'none', borderRadius:10, color: (submitting || !currentDate) ? '#3a3a4a' : '#a78bfa', fontSize:14, fontWeight:700, cursor: (submitting || !currentDate) ? 'default' : 'pointer', fontFamily:'inherit' }}>
+                    {submitting ? '...' : 'Save'}
+                  </button>
+                  <button onClick={() => deleteBlackout(b.id)} disabled={submitting}
+                    style={{ padding:'12px 16px', background:'#2a1010', border:'0.5px solid #4a2020', borderRadius:10, color:'#ff9f7f', fontSize:14, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>
+                    Delete
+                  </button>
+                </div>
+              </div>
+            )
+          }
           const hasEnd = b.fields['End Date'] && b.fields['End Date'] !== b.fields['Date']
           const dateDisplay = hasEnd ? `${fmt(b.fields['Date'])} → ${fmt(b.fields['End Date'])}` : fmt(b.fields['Date'])
           const daysOut = daysUntil(b.fields['Date'])
           return (
-          <div key={i} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'14px 0', borderBottom:'0.5px solid #1e1e2e' }}>
+          <div key={b.id || i} onClick={() => startEdit(b)} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'14px 0', borderBottom:'0.5px solid #1e1e2e', cursor:'pointer' }}>
             <div>
               <div style={{ fontSize:14, fontWeight:600 }}>{dateDisplay}</div>
               <div style={{ fontSize:12, color:'#6b7280', marginTop:2 }}>{b.fields['Reason'] || 'No reason listed'}</div>
             </div>
-            <div style={{ fontSize:12, color: daysOut > 0 ? '#ff9f7f' : '#3a3a3a' }}>
-              {daysOut > 0 ? `In ${daysOut} days` : 'Past'}
+            <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+              <div style={{ fontSize:12, color: daysOut > 0 ? '#ff9f7f' : '#3a3a3a' }}>
+                {daysOut > 0 ? `In ${daysOut} days` : 'Past'}
+              </div>
+              <div style={{ color:'#3a3a4a', fontSize:16 }}>›</div>
             </div>
           </div>
         )}) : (
@@ -1445,6 +1570,7 @@ function Blackouts({ data, member, resolve, onBack }) {
     </div>
   )
 }
+
 
 function CrewSelect({ data, onSelect, onBack }) {
   const crew = data['CREW'] || []
@@ -1612,20 +1738,59 @@ function CrewBlackouts({ data, crew, onBack }) {
   const f = crew.fields
   const name = f['Name'] || '—'
   const [showForm, setShowForm] = useState(false)
+  const [editingId, setEditingId] = useState(null)
   const [currentDate, setCurrentDate] = useState('')
   const [currentEndDate, setCurrentEndDate] = useState('')
   const [currentReason, setCurrentReason] = useState('Personal')
   const [pendingDates, setPendingDates] = useState([])
   const [submitting, setSubmitting] = useState(false)
-  const [submitted, setSubmitted] = useState(false)
+  const [statusMsg, setStatusMsg] = useState('')
   const [localBlackouts, setLocalBlackouts] = useState([])
+  const [localEdits, setLocalEdits] = useState({})
+  const [localDeletes, setLocalDeletes] = useState({})
   const REASONS = ['Personal', 'Other Gig', 'Vacation', 'Illness', 'Family', 'Other']
-
-  const myBlackouts = [...(data['BLACKOUT DATES'] || []).filter(b => {
-    const bc = b.fields['Crew'] || []
-    return Array.isArray(bc) ? bc.includes(crew.id) : bc === crew.id
-  }), ...localBlackouts].sort((a, b) => a.fields['Date'] > b.fields['Date'] ? 1 : -1)
-
+ 
+  const myBlackouts = [
+    ...(data['BLACKOUT DATES'] || []).filter(b => {
+      const bc = b.fields['Crew'] || []
+      return Array.isArray(bc) ? bc.includes(crew.id) : bc === crew.id
+    }),
+    ...localBlackouts
+  ]
+    .filter(b => !localDeletes[b.id])
+    .map(b => localEdits[b.id] ? { ...b, fields: { ...b.fields, ...localEdits[b.id] } } : b)
+    .sort((a, b) => a.fields['Date'] > b.fields['Date'] ? 1 : -1)
+ 
+  function showStatus(msg) {
+    setStatusMsg(msg)
+    setTimeout(() => setStatusMsg(''), 3000)
+  }
+ 
+  function startEdit(b) {
+    setEditingId(b.id)
+    setShowForm(false)
+    setPendingDates([])
+    setCurrentDate(b.fields['Date'] || '')
+    setCurrentEndDate(b.fields['End Date'] || '')
+    setCurrentReason(b.fields['Reason'] || 'Personal')
+  }
+ 
+  function cancelEdit() {
+    setEditingId(null)
+    setCurrentDate('')
+    setCurrentEndDate('')
+    setCurrentReason('Personal')
+  }
+ 
+  function toggleAddForm() {
+    if (editingId) cancelEdit()
+    setShowForm(f => !f)
+    setPendingDates([])
+    setCurrentDate('')
+    setCurrentEndDate('')
+    setCurrentReason('Personal')
+  }
+ 
   function addToPending() {
     if (!currentDate) return
     if (pendingDates.find(p => p.date === currentDate)) return
@@ -1634,7 +1799,7 @@ function CrewBlackouts({ data, crew, onBack }) {
     setCurrentEndDate('')
     setCurrentReason('Personal')
   }
-
+ 
   async function submitAll() {
     if (pendingDates.length === 0) return
     setSubmitting(true)
@@ -1655,12 +1820,49 @@ function CrewBlackouts({ data, crew, onBack }) {
       setLocalBlackouts(prev => [...prev, ...results])
       setPendingDates([])
       setShowForm(false)
-      setSubmitted(true)
-      setTimeout(() => setSubmitted(false), 3000)
+      showStatus(`${results.length} date${results.length > 1 ? 's' : ''} added`)
     } catch(e) { alert('Error: ' + e.message) }
     setSubmitting(false)
   }
-
+ 
+  async function saveEdit() {
+    if (!currentDate || !editingId) return
+    setSubmitting(true)
+    try {
+      const fields = { 'Date': currentDate, 'Reason': currentReason }
+      fields['End Date'] = (currentEndDate && currentEndDate !== currentDate) ? currentEndDate : null
+      const res = await fetch('/api/blackout', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ recordId: editingId, fields })
+      })
+      const json = await res.json()
+      if (json.error) throw new Error(json.error)
+      setLocalEdits(prev => ({ ...prev, [editingId]: fields }))
+      cancelEdit()
+      showStatus('Date updated')
+    } catch(e) { alert('Error: ' + e.message) }
+    setSubmitting(false)
+  }
+ 
+  async function deleteBlackout(id) {
+    if (typeof window !== 'undefined' && !window.confirm('Delete this date?')) return
+    setSubmitting(true)
+    try {
+      const res = await fetch('/api/blackout', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ recordId: id })
+      })
+      const json = await res.json()
+      if (json.error) throw new Error(json.error)
+      setLocalDeletes(prev => ({ ...prev, [id]: true }))
+      if (editingId === id) cancelEdit()
+      showStatus('Date deleted')
+    } catch(e) { alert('Error: ' + e.message) }
+    setSubmitting(false)
+  }
+ 
   return (
     <div style={{ minHeight:'100vh', background:'#0a0a0f', color:'#ffffff', fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif' }}>
       <Head><title>EPL — Unavailable Dates</title></Head>
@@ -1670,19 +1872,19 @@ function CrewBlackouts({ data, crew, onBack }) {
           <img src="/logo.png" alt="EPL" onClick={onBack} style={{ width:28, height:28, objectFit:'contain', mixBlendMode:'screen', cursor:'pointer', opacity:0.7 }} />
           <div style={{ fontSize:15, fontWeight:600 }}>My unavailable dates</div>
         </div>
-        <button onClick={() => { setShowForm(f => !f); setPendingDates([]); setCurrentDate(''); setCurrentEndDate(''); setCurrentReason('Personal') }}
+        <button onClick={toggleAddForm}
           style={{ fontSize:13, padding:'6px 14px', borderRadius:20, background: showForm ? '#2a2a3a' : '#1a1a2e', border:'none', color:'#a78bfa', cursor:'pointer', fontFamily:'inherit', fontWeight:600 }}>
           {showForm ? 'Cancel' : '+ Add dates'}
         </button>
       </div>
-
+ 
       <div style={{ padding:'8px 20px 80px' }}>
-        {submitted && (
+        {statusMsg && (
           <div style={{ background:'#0f2a0f', border:'0.5px solid #2a4a2a', borderRadius:10, padding:'12px 16px', marginBottom:14, fontSize:13, color:'#6bcb77' }}>
-            Dates submitted successfully!
+            {statusMsg}
           </div>
         )}
-
+ 
         {showForm && (
           <div style={{ background:'#111118', border:'0.5px solid #2a2a3a', borderRadius:10, padding:16, marginBottom:20 }}>
             <div style={{ fontSize:14, fontWeight:600, marginBottom:14 }}>Add unavailable dates</div>
@@ -1713,7 +1915,7 @@ function CrewBlackouts({ data, crew, onBack }) {
               style={{ width:'100%', padding:'10px', background: currentDate ? '#1a1a2e' : '#0d0d1a', border:'none', borderRadius:10, color: currentDate ? '#a78bfa' : '#3a3a4a', fontSize:13, fontWeight:600, cursor: currentDate ? 'pointer' : 'default', fontFamily:'inherit' }}>
               + Add to list
             </button>
-
+ 
             {pendingDates.length > 0 && (
               <div style={{ marginTop:14, paddingTop:14, borderTop:'0.5px solid #1a1a2a' }}>
                 {pendingDates.map((p, i) => (
@@ -1734,20 +1936,70 @@ function CrewBlackouts({ data, crew, onBack }) {
             )}
           </div>
         )}
-
+ 
         {myBlackouts.length > 0 ? (
           <div>
             {myBlackouts.map((b, i) => {
+              const isEditing = editingId === b.id
+              if (isEditing) {
+                return (
+                  <div key={b.id} style={{ background:'#111118', border:'1px solid #a78bfa', borderRadius:10, padding:16, marginBottom:10 }}>
+                    <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14 }}>
+                      <div style={{ fontSize:13, fontWeight:700, color:'#a78bfa' }}>Editing date</div>
+                      <button onClick={cancelEdit} style={{ background:'none', border:'none', color:'rgba(255,255,255,0.4)', fontSize:18, cursor:'pointer', padding:0, fontFamily:'inherit' }}>×</button>
+                    </div>
+ 
+                    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:10 }}>
+                      <div>
+                        <div style={{ fontSize:12, color:'rgba(255,255,255,0.35)', marginBottom:6 }}>Start date</div>
+                        <input type="date" value={currentDate} onChange={e => setCurrentDate(e.target.value)}
+                          style={{ width:'100%', padding:'10px 8px', background:'#1a1a2a', border:'0.5px solid #3a3a4a', borderRadius:10, color:'#ffffff', fontSize:13, fontFamily:'inherit', boxSizing:'border-box', display:'block' }} />
+                      </div>
+                      <div>
+                        <div style={{ fontSize:12, color:'rgba(255,255,255,0.35)', marginBottom:6 }}>End date <span style={{ color:'#3a3a4a' }}>(optional)</span></div>
+                        <input type="date" value={currentEndDate} min={currentDate} onChange={e => setCurrentEndDate(e.target.value)}
+                          style={{ width:'100%', padding:'10px 8px', background:'#1a1a2a', border:'0.5px solid #3a3a4a', borderRadius:10, color:'#ffffff', fontSize:13, fontFamily:'inherit', boxSizing:'border-box', display:'block' }} />
+                      </div>
+                    </div>
+ 
+                    <div style={{ marginBottom:14 }}>
+                      <div style={{ fontSize:12, color:'rgba(255,255,255,0.35)', marginBottom:8 }}>Reason</div>
+                      <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+                        {REASONS.map(r => (
+                          <button key={r} onClick={() => setCurrentReason(r)}
+                            style={{ padding:'5px 12px', borderRadius:20, background: currentReason===r ? '#1a1a2e' : 'transparent', border: currentReason===r ? '1px solid #a78bfa' : '0.5px solid #2a2a3a', color: currentReason===r ? '#a78bfa' : 'rgba(255,255,255,0.35)', fontSize:12, cursor:'pointer', fontFamily:'inherit' }}>
+                            {r}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+ 
+                    <div style={{ display:'flex', gap:8 }}>
+                      <button onClick={saveEdit} disabled={submitting || !currentDate}
+                        style={{ flex:1, padding:'12px', background:'#a78bfa', border:'none', borderRadius:10, color: '#0a0a0f', fontSize:14, fontWeight:700, cursor: (submitting || !currentDate) ? 'default' : 'pointer', fontFamily:'inherit', opacity: (submitting || !currentDate) ? 0.5 : 1 }}>
+                        {submitting ? '...' : 'Save'}
+                      </button>
+                      <button onClick={() => deleteBlackout(b.id)} disabled={submitting}
+                        style={{ padding:'12px 16px', background:'#2a1010', border:'0.5px solid #4a2020', borderRadius:10, color:'#ff9f7f', fontSize:14, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                )
+              }
               const hasEnd = b.fields['End Date'] && b.fields['End Date'] !== b.fields['Date']
               const dateDisplay = hasEnd ? `${fmt(b.fields['Date'])} → ${fmt(b.fields['End Date'])}` : fmt(b.fields['Date'])
               return (
-                <div key={i} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'14px 0', borderBottom:'0.5px solid #1a1a2a' }}>
+                <div key={b.id || i} onClick={() => startEdit(b)} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'14px 0', borderBottom:'0.5px solid #1a1a2a', cursor:'pointer' }}>
                   <div>
                     <div style={{ fontSize:14, fontWeight:600 }}>{dateDisplay}</div>
                     <div style={{ fontSize:12, color:'rgba(255,255,255,0.35)', marginTop:2 }}>{b.fields['Reason'] || 'No reason listed'}</div>
                   </div>
-                  <div style={{ fontSize:12, color: daysUntil(b.fields['Date']) > 0 ? '#ff9f7f' : 'rgba(255,255,255,0.22)' }}>
-                    {daysUntil(b.fields['Date']) > 0 ? `In ${daysUntil(b.fields['Date'])} days` : 'Past'}
+                  <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+                    <div style={{ fontSize:12, color: daysUntil(b.fields['Date']) > 0 ? '#ff9f7f' : 'rgba(255,255,255,0.22)' }}>
+                      {daysUntil(b.fields['Date']) > 0 ? `In ${daysUntil(b.fields['Date'])} days` : 'Past'}
+                    </div>
+                    <div style={{ color:'rgba(255,255,255,0.2)', fontSize:16 }}>›</div>
                   </div>
                 </div>
               )
