@@ -1,61 +1,86 @@
 import { put } from '@vercel/blob'
 
-const TOKEN = process.env.AIRTABLE_TOKEN
-const BASE = process.env.AIRTABLE_BASE
-
 export const config = {
-  api: { bodyParser: { sizeLimit: '6mb' } }
+  api: {
+    bodyParser: {
+      sizeLimit: '6mb',
+    },
+  },
 }
 
 export default async function handler(req, res) {
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
-  if (!TOKEN || !BASE) return res.status(500).json({ error: 'Missing Airtable credentials' })
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' })
+  }
+
+  const { recordType, recordId, base64, photoField = 'Photo' } = req.body || {}
+
+  if (!recordType || !recordId || !base64) {
+    return res.status(400).json({ error: 'Missing required fields' })
+  }
+
+  if (recordType !== 'MEMBERS' && recordType !== 'CREW') {
+    return res.status(400).json({ error: 'Invalid recordType' })
+  }
 
   try {
-    const { recordType, recordId, base64, photoField } = req.body || {}
-
-    if (!recordType || !recordId || !base64) {
-      return res.status(400).json({ error: 'Missing required fields' })
+    // Strip the data URL prefix if present, e.g. "data:image/jpeg;base64,..."
+    const match = base64.match(/^data:([\w.\-+]+\/[\w.\-+]+);base64,(.+)$/)
+    let mime = 'image/jpeg'
+    let b64 = base64
+    if (match) {
+      mime = match[1]
+      b64 = match[2]
     }
-    if (!['MEMBERS', 'CREW'].includes(recordType)) {
-      return res.status(400).json({ error: 'Invalid recordType' })
-    }
 
-    // Decode base64 data URL
-    const matches = base64.match(/^data:(image\/[\w+]+);base64,(.+)$/)
-    if (!matches) return res.status(400).json({ error: 'Invalid image data' })
-    const mimeType = matches[1]
-    const ext = (mimeType.split('/')[1] || 'jpg').split('+')[0]
-    const buf = Buffer.from(matches[2], 'base64')
+    const buffer = Buffer.from(b64, 'base64')
+    const ext = mime.split('/')[1] || 'jpg'
+    const path = `profiles/${recordType}/${recordId}-${Date.now()}.${ext}`
 
-    // Upload to Vercel Blob
-    const path = `profiles/${recordType.toLowerCase()}/${recordId}-${Date.now()}.${ext}`
-    const blob = await put(path, buf, {
+    const blob = await put(path, buffer, {
       access: 'public',
-      contentType: mimeType,
+      contentType: mime,
       addRandomSuffix: false,
     })
 
-    // PATCH Airtable record with new photo URL
-    const field = photoField || 'Photo'
-    const r = await fetch(`https://api.airtable.com/v0/${BASE}/${recordType}/${recordId}`, {
-      method: 'PATCH',
-      headers: {
-        Authorization: `Bearer ${TOKEN}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        fields: { [field]: [{ url: blob.url }] }
-      }),
-    })
+    // Map record type to Airtable table
+    const table = recordType === 'MEMBERS' ? 'MEMBERS' : 'CREW'
 
-    const data = await r.json()
-    if (!r.ok) {
-      return res.status(500).json({ error: data.error?.message || 'Failed to update Airtable' })
+    // PATCH the Airtable record's Photo field
+    const apiKey = process.env.AIRTABLE_API_KEY
+    const baseId = process.env.AIRTABLE_BASE_ID
+
+    if (!apiKey || !baseId) {
+      return res.status(500).json({ error: 'Airtable env vars not configured' })
     }
 
-    return res.status(200).json({ url: blob.url, success: true })
-  } catch (err) {
-    return res.status(500).json({ error: err.message || 'Upload failed' })
+    const airtableRes = await fetch(
+      `https://api.airtable.com/v0/${baseId}/${encodeURIComponent(table)}/${recordId}`,
+      {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          fields: {
+            [photoField]: [{ url: blob.url }],
+          },
+        }),
+      }
+    )
+
+    if (!airtableRes.ok) {
+      const errText = await airtableRes.text()
+      return res.status(airtableRes.status).json({
+        error: `Airtable update failed: ${errText}`,
+        blobUrl: blob.url,
+      })
+    }
+
+    return res.status(200).json({ url: blob.url })
+  } catch (e) {
+    console.error('Upload error:', e)
+    return res.status(500).json({ error: e.message || 'Upload failed' })
   }
 }
