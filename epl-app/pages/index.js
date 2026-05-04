@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import Head from 'next/head'
 import Image from 'next/image'
 
@@ -73,6 +73,135 @@ function MemberAvatar({ member, size = 42 }) {
       {initials(name)}
     </div>
   )
+}
+
+// Tap-to-upload avatar. Uploads to Vercel Blob, then PATCHes the Airtable record's Photo field.
+function PhotoUploadAvatar({ record, recordType, nameField, size = 54, photoField = 'Photo' }) {
+  const fileInputRef = useRef(null)
+  const [photoOverride, setPhotoOverride] = useState(null)
+  const [uploading, setUploading] = useState(false)
+  const [error, setError] = useState(null)
+
+  const f = record.fields
+  const name = f[nameField] || '?'
+  const existingPhoto = f[photoField] && Array.isArray(f[photoField]) && f[photoField][0] ? f[photoField][0].url : null
+  const photo = photoOverride || existingPhoto
+  const initialsStr = name.split(' ').map(x => x[0]).join('').toUpperCase().slice(0, 2)
+
+  const camPx = Math.max(18, Math.round(size * 0.38))
+  const fontPx = size < 36 ? 11 : size < 50 ? 14 : 17
+
+  async function handleFile(file) {
+    if (!file) return
+    setError(null)
+    setUploading(true)
+    try {
+      const compressed = await compressImage(file, 800, 0.85)
+      const base64 = await new Promise((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(reader.result)
+        reader.onerror = () => reject(new Error('Failed to read file'))
+        reader.readAsDataURL(compressed)
+      })
+      const res = await fetch('/api/upload-photo', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          recordType,
+          recordId: record.id,
+          base64,
+          photoField,
+        }),
+      })
+      const json = await res.json()
+      if (!res.ok || json.error) throw new Error(json.error || 'Upload failed')
+      setPhotoOverride(json.url)
+    } catch (e) {
+      setError(e.message)
+      setTimeout(() => setError(null), 4000)
+    }
+    setUploading(false)
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  return (
+    <div style={{ position: 'relative', flexShrink: 0, width: size, height: size }}>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        onChange={e => handleFile(e.target.files?.[0])}
+        style={{ display: 'none' }}
+      />
+      <div
+        onClick={() => !uploading && fileInputRef.current?.click()}
+        style={{ cursor: uploading ? 'wait' : 'pointer', position: 'relative', width: size, height: size }}
+      >
+        {photo
+          ? <img src={photo} alt={name} style={{ width: size, height: size, borderRadius: '50%', objectFit: 'cover', display: 'block' }} />
+          : <div style={{ width: size, height: size, borderRadius: '50%', background: '#1a1a2e', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: fontPx, fontWeight: 700, color: '#a78bfa' }}>{initialsStr}</div>
+        }
+        <div style={{
+          position: 'absolute', bottom: -2, right: -2,
+          width: camPx, height: camPx, borderRadius: '50%',
+          background: '#a78bfa', border: '2px solid #0a0a0f',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: Math.round(camPx * 0.55), lineHeight: 1
+        }}>
+          📷
+        </div>
+        {uploading && (
+          <div style={{
+            position: 'absolute', inset: 0, borderRadius: '50%',
+            background: 'rgba(0,0,0,0.6)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center'
+          }}>
+            <div style={{
+              width: 18, height: 18,
+              border: '2px solid #a78bfa', borderTopColor: 'transparent',
+              borderRadius: '50%', animation: 'spin 0.8s linear infinite'
+            }} />
+          </div>
+        )}
+      </div>
+      {error && (
+        <div style={{
+          position: 'absolute', top: size + 6, left: '50%', transform: 'translateX(-50%)',
+          fontSize: 11, color: '#ff9f7f', whiteSpace: 'nowrap',
+          background: '#0a0a0f', padding: '2px 8px', borderRadius: 4,
+          border: '0.5px solid #3a1a1a', zIndex: 10
+        }}>
+          {error}
+        </div>
+      )}
+    </div>
+  )
+}
+
+async function compressImage(file, maxDim, quality) {
+  return new Promise((resolve, reject) => {
+    const img = new window.Image()
+    img.onload = () => {
+      let { width, height } = img
+      if (width > maxDim || height > maxDim) {
+        if (width >= height) {
+          height = Math.round(height * maxDim / width)
+          width = maxDim
+        } else {
+          width = Math.round(width * maxDim / height)
+          height = maxDim
+        }
+      }
+      const canvas = document.createElement('canvas')
+      canvas.width = width
+      canvas.height = height
+      const ctx = canvas.getContext('2d')
+      ctx.drawImage(img, 0, 0, width, height)
+      canvas.toBlob(b => resolve(b || file), 'image/jpeg', quality)
+    }
+    img.onerror = () => reject(new Error('Could not load image'))
+    img.src = URL.createObjectURL(file)
+  })
 }
 
 export default function Home() {
@@ -316,7 +445,7 @@ function MemberHome({ data, member, resolve, resolveField, onShowClick, onBack, 
 
       <div style={{ padding:'20px 20px 40px' }}>
         <div style={{ display:'flex', alignItems:'center', gap:14, marginBottom:24 }}>
-          <MemberAvatar member={member} size={54} />
+          <PhotoUploadAvatar record={member} recordType="MEMBERS" nameField="Member Name" size={54} />
           <div>
             <div style={{ fontSize:20, fontWeight:700 }}>{name}</div>
             <div style={{ display:'flex', gap:4, marginTop:4, flexWrap:'wrap' }}>{bands.map((b, i) => <BandTag key={i} name={b} />)}</div>
@@ -699,6 +828,32 @@ function ShowDetail({ data, member, show, resolve, resolveField, onBack, onSetli
             </div>
           )}
         </div>
+
+        {(f['Ticket Price'] || f['Ticket URL']) && (
+          <div style={{ marginBottom:20 }}>
+            <div style={{ fontSize:11, fontWeight:600, color:'#6b7280', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:10 }}>Tickets</div>
+            <div style={{ background:'#0a0a0f', border:'0.5px solid #2a2a3a', borderRadius:10, padding:16 }}>
+              {f['Ticket Price'] && (
+                <div style={{ fontSize:24, fontWeight:700, color:'#ffffff', marginBottom: f['Ticket URL'] ? 14 : 0 }}>
+                  {f['Ticket Price']}
+                </div>
+              )}
+              {f['Ticket URL'] && (
+                <a
+                  href={f['Ticket URL']}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={e => e.stopPropagation()}
+                  style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:8, padding:'12px', background:'#1a1a2e', borderRadius:10, textDecoration:'none' }}
+                >
+                  <span style={{ fontSize:14 }}>🎫</span>
+                  <span style={{ fontSize:14, fontWeight:600, color:'#a78bfa' }}>Get tickets</span>
+                  <span style={{ fontSize:12, color:'#6b7280' }}>↗</span>
+                </a>
+              )}
+            </div>
+          </div>
+        )}
 
         {(address || vf['Venue Name']) && (
           <div style={{ marginBottom:20 }}>
@@ -1662,10 +1817,7 @@ function CrewHome({ data, crew, resolve, resolveField, onShowClick, onBack, onBl
 
       <div style={{ padding:'20px 20px 40px' }}>
         <div style={{ display:'flex', alignItems:'center', gap:14, marginBottom:24 }}>
-          {f['Photo'] && Array.isArray(f['Photo']) && f['Photo'][0]
-            ? <img src={f['Photo'][0].url} alt={name} style={{ width:54, height:54, borderRadius:'50%', objectFit:'cover', flexShrink:0 }} />
-            : <div style={{ width:54, height:54, borderRadius:'50%', background:'#1a1a2e', display:'flex', alignItems:'center', justifyContent:'center', fontSize:17, fontWeight:700, color:'#a78bfa' }}>{initials}</div>
-          }
+          <PhotoUploadAvatar record={crew} recordType="CREW" nameField="Name" size={54} />
           <div>
             <div style={{ fontSize:20, fontWeight:700 }}>{name}</div>
             <div style={{ display:'flex', gap:4, marginTop:4 }}>
