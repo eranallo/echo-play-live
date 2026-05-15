@@ -204,10 +204,34 @@ async function compressImage(file, maxDim, quality) {
   })
 }
 
+// Phase 03: dismissible banner shown when /api/airtable returns a partial
+// success (one or more tables failed). Was previously silently swallowed.
+function PartialErrorBanner({ errors, onDismiss }) {
+  const names = Object.keys(errors || {})
+  if (!names.length) return null
+  return (
+    <div style={{
+      position:'fixed', top:0, left:0, right:0, zIndex:200,
+      background:'#3a1a0a', color:'#fbbf24', padding:'10px 14px',
+      borderBottom:'1px solid #5a3a1a', fontSize:12, lineHeight:1.4,
+      display:'flex', alignItems:'center', justifyContent:'space-between', gap:12,
+    }}>
+      <span style={{ flex:1, minWidth:0 }}>
+        ⚠ Couldn't load: <strong>{names.join(', ')}</strong>. Some screens may show empty.
+      </span>
+      <button onClick={onDismiss} style={{
+        background:'none', border:'1px solid #fbbf24', borderRadius:4,
+        color:'#fbbf24', padding:'2px 10px', fontSize:11, cursor:'pointer', flexShrink:0,
+      }}>Dismiss</button>
+    </div>
+  )
+}
+
 export default function Home() {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [partialErrors, setPartialErrors] = useState(null)
   const [member, setMember] = useState(null)
   const [page, setPage] = useState('select')
   const [selectedShow, setSelectedShow] = useState(null)
@@ -220,6 +244,14 @@ export default function Home() {
       const res = await fetch('/api/airtable')
       const json = await res.json()
       if (json.error) throw new Error(json.error)
+      // Phase 03 M2: peel off per-table errors so we can show a banner; the
+      // rest of the code sees `data` with no errors key contaminating it.
+      if (json.errors) {
+        setPartialErrors(json.errors)
+        delete json.errors
+      } else {
+        setPartialErrors(null)
+      }
       setData(json)
     } catch (e) {
       setError(e.message)
@@ -331,27 +363,47 @@ export default function Home() {
     </div>
   )
 
+  // Phase 03 L3: retry button so the user isn't stranded on a network blip
   if (error) return (
     <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', background:'#0a0a0f' }}>
-      <div style={{ background:'#1a0a0a', border:'1px solid #3a1a1a', borderRadius:10, padding:'2rem', color:'#ff9f7f', fontSize:14, maxWidth:400 }}>
-        Connection error: {error}
+      <div style={{ background:'#1a0a0a', border:'1px solid #3a1a1a', borderRadius:10, padding:'2rem', color:'#ff9f7f', fontSize:14, maxWidth:420, textAlign:'center' }}>
+        <div style={{ marginBottom:18, lineHeight:1.5 }}>Connection error: {error}</div>
+        <button
+          onClick={() => { setError(null); setLoading(true); loadData() }}
+          style={{
+            background:'#a78bfa', color:'#0a0a0f', border:'none', borderRadius:8,
+            padding:'10px 24px', fontSize:13, fontWeight:600, cursor:'pointer',
+            fontFamily:'inherit',
+          }}
+        >Try again</button>
       </div>
     </div>
   )
 
-  if (page === 'select') return <MemberSelect data={data} onSelect={selectMember} onBooking={() => setPage('booking')} onCalendar={() => setPage('master-calendar')} onCrew={() => setPage('crew-select')} onBuilder={() => setPage('setlist-builder')} />
-  if (page === 'crew-select') return <CrewSelect data={data} onSelect={(c) => { setCrewMember(c); setPage('crew-home') }} onBack={() => setPage('select')} />
-  if (page === 'crew-home') return <CrewHome data={data} crew={crewMember} resolve={resolve} resolveField={resolveField} onShowClick={openShow} onBack={() => setPage('crew-select')} onBlackouts={() => setPage('crew-blackouts')} />
-  if (page === 'crew-blackouts') return <CrewBlackouts data={data} crew={crewMember} onBack={() => setPage('crew-home')} />
-  if (page === 'home') return <MemberHome data={data} member={member} resolve={resolve} resolveField={resolveField} onShowClick={openShow} onBack={goToSelect} onNav={setPage} />
-  if (page === 'show-detail') return <ShowDetail data={data} member={member} show={selectedShow} resolve={resolve} resolveField={resolveField} onBack={() => setPage(previousPage)} onSetlist={(d) => { setSetlistData(d); setPage('setlist') }} onMemberSelect={(m) => { setMember(m); setPage('home') }} />
-  if (page === 'setlist') return <SetlistPage data={data} setlistData={setlistData} onBack={() => setPage('show-detail')} />
-  if (page === 'schedule') return <FullSchedule data={data} member={member} resolve={resolve} resolveField={resolveField} onShowClick={openShow} onBack={() => setPage('home')} />
-  if (page === 'blackouts') return <Blackouts data={data} member={member} resolve={resolve} onBack={() => setPage('home')} />
-  if (page === 'master-calendar') return <MasterCalendar data={data} resolve={resolve} resolveField={resolveField} onShowClick={openShow} onBack={() => member ? setPage('home') : setPage('select')} />
-  if (page === 'booking') return <BookingPage data={data} onBack={() => setPage('select')} />
-  if (page === 'setlist-builder') return <SetlistBuilder data={data} onBack={() => setPage('select')} />
-  return null
+  // Phase 03 M2: pick the right view, then render it inside a fragment that
+  // also includes the partial-errors banner when one or more tables failed.
+  const view = (() => {
+    if (page === 'select') return <MemberSelect data={data} onSelect={selectMember} onBooking={() => setPage('booking')} onCalendar={() => setPage('master-calendar')} onCrew={() => setPage('crew-select')} onBuilder={() => setPage('setlist-builder')} />
+    if (page === 'crew-select') return <CrewSelect data={data} onSelect={(c) => { setCrewMember(c); setPage('crew-home') }} onBack={() => setPage('select')} />
+    if (page === 'crew-home') return <CrewHome data={data} crew={crewMember} resolve={resolve} resolveField={resolveField} onShowClick={openShow} onBack={() => setPage('crew-select')} onBlackouts={() => setPage('crew-blackouts')} />
+    if (page === 'crew-blackouts') return <CrewBlackouts data={data} crew={crewMember} onBack={() => setPage('crew-home')} />
+    if (page === 'home') return <MemberHome data={data} member={member} resolve={resolve} resolveField={resolveField} onShowClick={openShow} onBack={goToSelect} onNav={setPage} />
+    if (page === 'show-detail') return <ShowDetail data={data} member={member} show={selectedShow} resolve={resolve} resolveField={resolveField} onBack={() => setPage(previousPage)} onSetlist={(d) => { setSetlistData(d); setPage('setlist') }} onMemberSelect={(m) => { setMember(m); setPage('home') }} />
+    if (page === 'setlist') return <SetlistPage data={data} setlistData={setlistData} onBack={() => setPage('show-detail')} />
+    if (page === 'schedule') return <FullSchedule data={data} member={member} resolve={resolve} resolveField={resolveField} onShowClick={openShow} onBack={() => setPage('home')} />
+    if (page === 'blackouts') return <Blackouts data={data} member={member} resolve={resolve} onBack={() => setPage('home')} />
+    if (page === 'master-calendar') return <MasterCalendar data={data} resolve={resolve} resolveField={resolveField} onShowClick={openShow} onBack={() => member ? setPage('home') : setPage('select')} />
+    if (page === 'booking') return <BookingPage data={data} onBack={() => setPage('select')} />
+    if (page === 'setlist-builder') return <SetlistBuilder data={data} onBack={() => setPage('select')} />
+    return null
+  })()
+
+  return (
+    <>
+      <PartialErrorBanner errors={partialErrors} onDismiss={() => setPartialErrors(null)} />
+      {view}
+    </>
+  )
 }
 
 function MemberSelect({ data, onSelect, onBooking, onCalendar, onCrew, onBuilder }) {
