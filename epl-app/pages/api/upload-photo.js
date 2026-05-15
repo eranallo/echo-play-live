@@ -46,12 +46,15 @@ export default async function handler(req, res) {
     // Map record type to Airtable table
     const table = recordType === 'MEMBERS' ? 'MEMBERS' : 'CREW'
 
-    // PATCH the Airtable record's Photo field
-    const apiKey = process.env.AIRTABLE_API_KEY
-    const baseId = process.env.AIRTABLE_BASE_ID
+    // PATCH the Airtable record's Photo field.
+    // Canonical env-var names used app-wide: AIRTABLE_TOKEN + AIRTABLE_BASE.
+    // (Earlier versions of this file used AIRTABLE_API_KEY + AIRTABLE_BASE_ID;
+    // those names don't exist in the Vercel deployment.)
+    const apiKey = process.env.AIRTABLE_TOKEN
+    const baseId = process.env.AIRTABLE_BASE
 
     if (!apiKey || !baseId) {
-      return res.status(500).json({ error: 'Airtable env vars not configured' })
+      return res.status(500).json({ error: 'AIRTABLE_TOKEN / AIRTABLE_BASE not configured' })
     }
 
     const airtableRes = await fetch(
