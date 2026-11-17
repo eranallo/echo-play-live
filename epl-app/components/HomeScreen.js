@@ -70,7 +70,7 @@ function NextShow({ show }) {
     f['Sound Check Time'] && `Soundcheck ${fmtTime(f['Sound Check Time'])}`,
     f['Start Time'] && `Set ${fmtTime(f['Start Time'])}`,
   ].filter(Boolean)
-  const role = roleOnShow(show, me, record)
+  const role = roleOnShow(show, me, record, idx)
   return (
     <section className="next-card">
       <p className="eyebrow next-eyebrow"><span>Next on your schedule</span><span>{countdown(f['Date'])}</span></p>
@@ -134,14 +134,14 @@ function ThisWeek({ shows, blackouts }) {
 }
 
 export default function HomeScreen() {
-  const { data, me, record } = useApp()
+  const { data, me, record, idx } = useApp()
   const today = todayStr()
   const mine = useMemo(() => upcoming(myShows(data, me), today), [data, me, today])
   const blackouts = useMemo(() => myBlackouts(data, me), [data, me])
   const items = useMemo(() => needsYou(data, me, record), [data, me, record])
   const name = me.type === 'member' ? record.fields['Member Name'] : record.fields['Name']
   // Crew see which job they're booked for on each show.
-  const roleFor = (s) => roleOnShow(s, me, record)
+  const roleFor = (s) => roleOnShow(s, me, record, idx)
   return (
     <>
       <TopBar />

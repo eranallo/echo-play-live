@@ -6,7 +6,7 @@ import { useMemo, useState } from 'react'
 import { ChevronLeft, ChevronRight, CalendarX, Plus } from 'lucide-react'
 import { useApp } from './context'
 import { Panel, PageHead, ShowList, ShowRow, Sheet, Chevron, PersonAvatar, TopBar } from './ui'
-import { sortedShows, myShows, upcoming, myBlackouts, blackoutsByDate, showsByDate, blackoutPeople } from '../lib/derive'
+import { sortedShows, myShows, upcoming, myBlackouts, blackoutsByDate, showsByDate, blackoutPeople, blackoutCovers } from '../lib/derive'
 import { MONTH_NAMES, todayStr, toDateStr, parseDate, fmtLong, fmtDate, plural } from '../lib/format'
 
 const REASONS = ['Personal', 'Other Gig', 'Vacation', 'Illness', 'Family', 'Other']
@@ -35,25 +35,26 @@ export function BlackoutSheet({ existing, defaultDate, onClose }) {
       if (existing) await send('PATCH', { recordId: existing.id, fields })
       else await send('POST', fields)
       await reload()
-      toast(existing ? 'Date updated' : 'Marked unavailable')
+      toast(existing ? 'Blackout updated' : 'Blackout added')
       onClose()
     } catch (e) { setError(e.message); setBusy(false) }
   }
 
   async function remove() {
-    if (!window.confirm('Remove this date?')) return
+    if (!window.confirm('Remove this blackout date?')) return
     setBusy(true); setError(null)
     try {
       await send('DELETE', { recordId: existing.id })
       await reload()
-      toast('Date removed')
+      toast('Blackout removed')
       onClose()
     } catch (e) { setError(e.message); setBusy(false) }
   }
 
   return (
-    <Sheet onClose={onClose} label={existing ? 'Edit unavailable date' : 'Mark unavailable'}>
-      <h2>{existing ? 'Edit unavailable date' : "Mark dates you can't play"}</h2>
+    <Sheet onClose={onClose} label={existing ? 'Edit blackout date' : 'Add blackout dates'}>
+      <h2>{existing ? 'Edit blackout date' : 'Add blackout dates'}</h2>
+      <p className="row-sub">Dates you can't play. Pick one day, or a run of days with Through.</p>
       <div className="sheet-section">
         <div className="field-grid">
           <label className="label">Date
@@ -74,7 +75,7 @@ export function BlackoutSheet({ existing, defaultDate, onClose }) {
       {error && <p className="form-error" style={{ marginTop: '0.9rem' }}>{error}</p>}
       <div className="sheet-section">
         <button className="button button-filled button-block" onClick={save} disabled={busy}>{busy ? 'Saving…' : 'Save'}</button>
-        {existing && <button className="button button-danger button-block" onClick={remove} disabled={busy}>Remove date</button>}
+        {existing && <button className="button button-danger button-block" onClick={remove} disabled={busy}>Remove blackout</button>}
         <button className="button button-tinted button-block" onClick={onClose} disabled={busy}>Cancel</button>
       </div>
     </Sheet>
@@ -163,11 +164,14 @@ export default function CalendarScreen() {
     <>
       <TopBar />
       <main className="content rise">
-        <PageHead title="Calendar" sub={view === 'mine' ? 'Your shows and the dates you can’t play.' : 'Every confirmed EPL show, and who’s out.'} />
-        <div className="seg" role="group" aria-label="Whose calendar">
-          <button aria-pressed={view === 'mine'} onClick={() => { setView('mine'); setSelected(null) }}>Mine</button>
-          <button aria-pressed={view === 'all'} onClick={() => { setView('all'); setSelected(null) }}>All EPL</button>
+        <PageHead title="Calendar" sub={view === 'mine' ? 'Your shows and your blackout dates.' : 'Every confirmed Echo Play Live show, and who’s out.'} />
+        <div className="seg" role="group" aria-label="Which calendar">
+          <button aria-pressed={view === 'mine'} onClick={() => { setView('mine'); setSelected(null) }}>Personal</button>
+          <button aria-pressed={view === 'all'} onClick={() => { setView('all'); setSelected(null) }}>Echo Play Live</button>
         </div>
+        <button className="button button-filled button-block" onClick={() => setSheet({ defaultDate: selected && selected >= today ? selected : today })}>
+          <CalendarX aria-hidden="true" />Add blackout dates
+        </button>
 
         <section className="panel">
           <div className="month-head">
@@ -197,7 +201,7 @@ export default function CalendarScreen() {
                     <li key={b.id}>
                       <button className="row" onClick={() => setSheet({ existing: b })}>
                         <span className="row-icon" data-tone="bad"><CalendarX aria-hidden="true" /></span>
-                        <span><span className="row-title">You're unavailable</span><span className="row-sub">{b.fields['Reason'] || 'No reason given'} · tap to edit</span></span>
+                        <span><span className="row-title">You're blacked out</span><span className="row-sub">{b.fields['Reason'] || 'No reason given'} · tap to edit</span></span>
                         <Chevron />
                       </button>
                     </li>
@@ -214,8 +218,9 @@ export default function CalendarScreen() {
               </ul>
             )}
             {!selShows.length && !selOut.length && <p className="empty">Nothing on this day.</p>}
-            {view === 'mine' && selected >= today && !selOut.length && (
-              <div className="panel-body"><button className="button button-tinted button-block" onClick={() => setSheet({ defaultDate: selected })}><CalendarX aria-hidden="true" />Mark unavailable</button></div>
+            {/* From either view, as long as you aren't already out that day. */}
+            {selected >= today && !mineOut.some(b => blackoutCovers(b, selected)) && (
+              <div className="panel-body"><button className="button button-tinted button-block" onClick={() => setSheet({ defaultDate: selected })}><CalendarX aria-hidden="true" />Black out this date</button></div>
             )}
           </Panel>
         )}
@@ -226,7 +231,7 @@ export default function CalendarScreen() {
 
         {view === 'mine' && (
           <Panel
-            title="My unavailable dates"
+            title="My blackout dates"
             count={myUpcomingOut.length}
             action={<button className="text-link" onClick={() => setSheet({ defaultDate: today })}><Plus size={16} aria-hidden="true" />Add</button>}
           >

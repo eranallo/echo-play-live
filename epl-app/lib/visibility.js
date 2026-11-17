@@ -12,12 +12,24 @@ export const VISIBLE_FIELDS = {
     'Trailer Load-In Time', 'Load-In Time', 'Sound Check Time', 'Doors Time',
     'Start Time', 'End Time', 'Indoor / Outdoor',
     'Ticket Price', 'Ticket URL',
-    'Show Notes', 'Sound Notes', 'Merch Notes', 'SETLISTS',
+    'Show Notes', 'Sound Notes', 'Merch Notes', 'Production Notes', 'SETLISTS',
   ],
   BANDS: ['Band Name', 'Logo/Photo', 'Active'],
-  MEMBERS: ['Member Name', 'Primary Bands', 'Instruments', 'Profile Photo', 'Phone', 'Active'],
+  // "Role - <band>" says what each member plays in that band, which is what
+  // the lineup on a show shows. Add a field here when a band gets one.
+  MEMBERS: [
+    'Member Name', 'Primary Bands', 'Instruments', 'Profile Photo', 'Phone', 'Active',
+    'Role - So Long Goodnight', 'Role - The Dick Beldings', 'Role - Jambi', 'Role - Elite',
+  ],
   CREW: ['Name', 'Role', 'Photo', 'Phone', 'Active'],
-  VENUES: ['Venue Name', 'Address', 'City', 'State', 'Parking Notes', 'Photo'],
+  // Only what matters for playing the date (Evan, 18 Nov 2026): production,
+  // parking, green room, photos. Contacts, deal terms and the general Notes
+  // field stay in Airtable.
+  VENUES: [
+    'Venue Name', 'Address', 'City', 'State', 'Venue Type', 'Capacity', 'Age Restriction',
+    'Parking Notes', 'Green Room', 'Stage Specs', 'PA System', 'House Console', 'FOH Location',
+    'Power Drops', 'Mic Locker', 'Sound Notes', 'Photo', 'Room Layout',
+  ],
   'BLACKOUT DATES': ['Member', 'Crew', 'Date', 'End Date', 'Reason'],
   SETLISTS: ['Set Name', 'Songs', 'Band', 'Show', 'Duration', 'Notes'],
   SONGS: ['Song Title', 'Artist', 'Duration', 'Guitar Tuning', 'Bass Tuning', 'Key', 'BPM'],

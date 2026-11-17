@@ -1,8 +1,9 @@
 // Shared building blocks, in StageKin's shapes with EPL's brand.
 import { useEffect, useState } from 'react'
-import { ChevronLeft, ChevronRight, MapPin, Phone, MessageSquare } from 'lucide-react'
+import { ChevronLeft, ChevronRight, MapPin, Phone, MessageSquare, X, CalendarDays } from 'lucide-react'
 import { useApp } from './context'
-import { initials, fmtTime, daysUntil, attachmentUrl, memberPhoto, telHref, smsHref, parseDate } from '../lib/format'
+import { initials, fmtTime, fmtDate, daysUntil, attachmentUrl, memberPhoto, telHref, smsHref, parseDate } from '../lib/format'
+import { memberBands, nextShowFor } from '../lib/derive'
 
 // Each band's colour, as [light theme, dark theme] shades that both read on
 // their card. Bands not listed fall back to the amber accent.
@@ -13,9 +14,30 @@ const BAND_PALETTE = {
   'Elite': ['#1b7a43', '#5fe08f'],
 }
 
-export function BandTag({ name }) {
+const bandStyle = (name) => {
   const c = BAND_PALETTE[name]
-  return <span className="band-tag" style={c ? { '--band-l': c[0], '--band-d': c[1] } : undefined}>{name}</span>
+  return c ? { '--band-l': c[0], '--band-d': c[1] } : undefined
+}
+
+// A band named with its colour as a dot, rather than a filled chip.
+export function BandTag({ name }) {
+  return <span className="band-tag" style={bandStyle(name)}><BandDot name={name} />{name}</span>
+}
+
+export function BandDot({ name }) {
+  return <span className="band-dot" style={bandStyle(name)} aria-hidden="true" />
+}
+
+// A member's bands as lines: dot, band, and what they play in it.
+export function BandRoles({ bands }) {
+  if (!bands.length) return null
+  return (
+    <ul className="band-roles">
+      {bands.map(b => (
+        <li key={b.name}><BandDot name={b.name} /><span className="band-roles-name">{b.name}</span>{b.role && <span className="band-roles-role">{b.role}</span>}</li>
+      ))}
+    </ul>
+  )
 }
 
 // The EPL seal, black on light and white on dark.
@@ -163,37 +185,74 @@ export function Sheet({ onClose, label, children }) {
   )
 }
 
-// A bandmate's or crew person's card: photo, what they do, bands, phone.
+// A centred dialog: for quick looks like a person's card or a photo.
+export function Modal({ onClose, label, className = '', children }) {
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', onKey)
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.removeEventListener('keydown', onKey); document.body.style.overflow = prev }
+  }, [onClose])
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className={`modal ${className}`} role="dialog" aria-modal="true" aria-label={label} onClick={e => e.stopPropagation()}>
+        <button className="icon-btn modal-close" onClick={onClose} aria-label="Close"><X /></button>
+        {children}
+      </div>
+    </div>
+  )
+}
+
+export function Lightbox({ src, alt, onClose }) {
+  return (
+    <div className="modal-backdrop lightbox" onClick={onClose} role="dialog" aria-modal="true" aria-label={alt}>
+      <img src={src} alt={alt} />
+    </div>
+  )
+}
+
+// A bandmate's or crew person's card: who they are, what they play in which
+// band, their next show, and a quick call or text.
 export function PersonCard({ profile, onClose }) {
-  const { idx } = useApp()
+  const { data, idx, openShow } = useApp()
   const { record, type } = profile
   const f = record.fields || {}
   const isMember = type === 'member'
   const name = (isMember ? f['Member Name'] : f['Name']) || '—'
-  const what = isMember ? (f['Instruments'] || []).join(', ') : (f['Role'] || 'Crew')
-  const bands = isMember ? idx.all('BANDS', f['Primary Bands']).map(b => b.fields['Band Name']) : []
+  const bands = isMember ? memberBands(record, idx) : []
+  const next = nextShowFor(data, record, type)
+  const nextBand = next ? idx.all('BANDS', next.fields['Band'])[0] : null
   const phone = f['Phone']
   return (
-    <Sheet onClose={onClose} label={name}>
-      <div className="sheet-section center" style={{ marginTop: 0 }}>
-        <PersonAvatar record={record} type={type} size={92} />
+    <Modal onClose={onClose} label={name} className="person-card">
+      <div className="person-head">
+        <PersonAvatar record={record} type={type} size={84} />
         <h2>{name}</h2>
-        {what && <p className="row-sub" style={{ marginTop: 0 }}>{what}</p>}
-        {bands.length > 0 && <div className="tags" style={{ justifyContent: 'center' }}>{bands.map(b => <BandTag key={b} name={b} />)}</div>}
+        {!isMember && <p className="row-sub">{f['Role'] || 'Crew'}</p>}
+        {isMember && !bands.length && (f['Instruments'] || []).length > 0 && <p className="row-sub">{f['Instruments'].join(', ')}</p>}
       </div>
-      <div className="sheet-section">
-        {phone ? (
-          <>
-            <div className="button-row">
-              <a className="button button-filled" href={telHref(phone)}><Phone aria-hidden="true" />Call</a>
-              <a className="button button-tinted" href={smsHref(phone)}><MessageSquare aria-hidden="true" />Text</a>
-            </div>
-            <p className="row-sub num" style={{ textAlign: 'center' }}>{phone}</p>
-          </>
-        ) : <p className="row-sub" style={{ textAlign: 'center' }}>No phone number on file.</p>}
-        <button className="button button-tinted button-block" onClick={onClose}>Close</button>
-      </div>
-    </Sheet>
+      <BandRoles bands={bands} />
+      {next && (
+        <button className="row person-next" onClick={() => { onClose(); openShow(next.id) }}>
+          <span className="row-icon"><CalendarDays aria-hidden="true" /></span>
+          <span>
+            <span className="row-sub" style={{ marginTop: 0 }}>Next show</span>
+            <span className="row-title">{fmtDate(next.fields['Date'])} · {nextBand?.fields['Band Name'] || next.fields['Show Name']}</span>
+          </span>
+          <ChevronRight className="chev" aria-hidden="true" />
+        </button>
+      )}
+      {phone ? (
+        <>
+          <div className="button-row" style={{ marginTop: '1rem' }}>
+            <a className="button button-filled" href={telHref(phone)}><Phone aria-hidden="true" />Call</a>
+            <a className="button button-tinted" href={smsHref(phone)}><MessageSquare aria-hidden="true" />Text</a>
+          </div>
+          <p className="row-sub num" style={{ textAlign: 'center', marginTop: '0.6rem' }}>{phone}</p>
+        </>
+      ) : <p className="row-sub" style={{ textAlign: 'center', marginTop: '1rem' }}>No phone number on file.</p>}
+    </Modal>
   )
 }
 

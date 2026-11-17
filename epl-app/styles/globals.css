@@ -343,23 +343,37 @@ button.row:active, a.row:active { background: var(--hover); }
 .pill-warn { background: var(--warn-soft); color: var(--warn); }
 .pill-bad { background: var(--bad-soft); color: var(--bad); }
 
-/* Each band keeps its own colour; two shades so it reads in both themes. */
+/* Each band keeps its own colour, carried by a dot beside its name (two
+   shades so it reads in both themes) rather than a filled chip. */
+.band-dot {
+  display: inline-block;
+  flex-shrink: 0;
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 999px;
+  background: var(--band-l, var(--accent-fill));
+}
+:root[data-theme="dark"] .band-dot { background: var(--band-d, var(--accent-fill)); }
 .band-tag {
   display: inline-flex;
   align-items: center;
-  padding: 0.18rem 0.55rem;
-  border-radius: 999px;
-  color: var(--band-l, var(--accent));
-  background: color-mix(in srgb, var(--band-l, var(--accent)) 12%, transparent);
-  font-size: 0.75rem;
-  font-weight: 700;
+  gap: 0.4rem;
+  color: var(--muted);
+  font-size: 0.8125rem;
+  font-weight: 650;
   white-space: nowrap;
 }
-:root[data-theme="dark"] .band-tag {
-  color: var(--band-d, var(--accent));
-  background: color-mix(in srgb, var(--band-d, var(--accent)) 16%, transparent);
-}
-.tags { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+.tags { display: flex; flex-wrap: wrap; gap: 0.3rem 0.85rem; }
+
+/* A member's bands as a small list: dot, band, what they play in it. */
+.band-roles { list-style: none; display: grid; gap: 0.35rem; }
+.band-roles li { display: flex; align-items: center; gap: 0.5rem; font-size: 0.875rem; }
+.band-roles-name { flex: 1; min-width: 0; font-weight: 650; overflow-wrap: anywhere; }
+.band-roles-role { color: var(--muted); white-space: nowrap; }
+.row .band-roles { margin-top: 0.35rem; gap: 0.2rem; }
+.row .band-roles li { gap: 0.35rem; font-size: 0.8125rem; }
+.row .band-roles-name { flex: 0 1 auto; font-weight: 600; color: var(--muted); }
+.row .band-roles-role::before { content: "· "; }
 
 .state { display: inline-flex; align-items: center; gap: 0.35rem; color: var(--muted); font-size: 0.75rem; font-weight: 600; white-space: nowrap; }
 .state::before { content: ""; width: 0.45rem; height: 0.45rem; border-radius: 999px; background: var(--good); }
@@ -517,6 +531,50 @@ button.row:active, a.row:active { background: var(--hover); }
 .show-badges { display: flex; flex-wrap: wrap; gap: 0.4rem; }
 .band-logo { width: 3.25rem; height: 3.25rem; border-radius: 999px; object-fit: cover; }
 
+.hero-photo {
+  display: block;
+  overflow: hidden;
+  height: 11.5rem;
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  background: var(--fill);
+}
+.hero-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+/* A strip of venue photos that scrolls sideways. */
+.gallery {
+  display: flex;
+  gap: 0.5rem;
+  overflow-x: auto;
+  padding: 0.2rem 1.05rem 0.95rem;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+}
+.gallery::-webkit-scrollbar { display: none; }
+.gallery-item {
+  position: relative;
+  flex: 0 0 auto;
+  width: 9.5rem;
+  height: 6.75rem;
+  overflow: hidden;
+  border-radius: 0.8rem;
+  background: var(--fill);
+  scroll-snap-align: start;
+}
+.gallery-item img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.gallery-tag {
+  position: absolute;
+  left: 0.4rem;
+  bottom: 0.4rem;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  background: rgb(17 25 29 / 0.72);
+  color: #f5f0e8;
+  font-size: 0.6875rem;
+  font-weight: 650;
+}
+.gallery-file { display: grid; place-items: center; padding: 0.5rem; color: var(--accent); font-size: 0.8125rem; font-weight: 650; text-align: center; }
+
 /* --- setlist -------------------------------------------------------------- */
 
 .tuning-head {
@@ -568,6 +626,38 @@ button.row:active, a.row:active { background: var(--hover); }
 .center { text-align: center; justify-items: center; }
 @keyframes fade-in { from { opacity: 0; } }
 @keyframes sheet-in { from { transform: translateY(28px); opacity: 0.6; } }
+
+/* A centred dialog, for quick looks such as a person's card. */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 110;
+  display: grid;
+  place-items: center;
+  padding: 1.25rem;
+  background: rgb(0 0 0 / 0.5);
+  animation: fade-in 170ms var(--ease);
+}
+.modal {
+  position: relative;
+  width: 100%;
+  max-width: 22.5rem;
+  max-height: 86svh;
+  overflow: auto;
+  border-radius: 1.4rem;
+  background: var(--card);
+  padding: 1.5rem 1.25rem 1.25rem;
+  box-shadow: var(--shadow-raised);
+  animation: pop-in 220ms var(--spring);
+}
+.modal-close { position: absolute; top: 0.35rem; right: 0.35rem; color: var(--muted); }
+@keyframes pop-in { from { transform: scale(0.94); opacity: 0; } }
+.person-head { display: grid; justify-items: center; gap: 0.35rem; text-align: center; margin-bottom: 1rem; }
+.person-head h2 { font-size: 1.45rem; margin-top: 0.35rem; }
+.person-card .band-roles { padding: 0.75rem 0.9rem; border-radius: 0.9rem; background: var(--fill-quiet); }
+.person-next { margin-top: 0.75rem; padding: 0.6rem 0.75rem; border-radius: 0.9rem; background: var(--fill-quiet); }
+.lightbox { padding: 0.75rem; background: rgb(0 0 0 / 0.85); }
+.lightbox img { max-width: 100%; max-height: 88svh; border-radius: 0.9rem; object-fit: contain; animation: pop-in 220ms var(--spring); }
 
 .label { display: block; color: var(--muted); font-size: 0.8125rem; font-weight: 600; }
 .input {

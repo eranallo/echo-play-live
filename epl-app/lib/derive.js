@@ -17,6 +17,28 @@ export function indexData(data) {
   return { get, all }
 }
 
+// Bands are listed only while their Active box is ticked in Airtable.
+export const isActiveBand = (band) => !!band?.fields?.['Active']
+
+export function activeBands(data) {
+  return (data['BANDS'] || []).filter(isActiveBand)
+    .slice().sort((a, b) => (a.fields['Band Name'] || '').localeCompare(b.fields['Band Name'] || ''))
+}
+
+// What a member plays in a band: the "Role - <band>" field, falling back to
+// their general instruments when that band has no role set for them.
+export function roleInBand(member, bandName) {
+  const role = bandName ? member?.fields?.[`Role - ${bandName}`] : null
+  return role || (member?.fields?.['Instruments'] || []).join(', ')
+}
+
+// A member's active bands, each with what they play in it.
+export function memberBands(member, idx) {
+  return idx.all('BANDS', member.fields['Primary Bands'])
+    .filter(isActiveBand)
+    .map(b => ({ band: b, name: b.fields['Band Name'], role: roleInBand(member, b.fields['Band Name']) }))
+}
+
 // "me" is { type: 'member' | 'crew', id } from the server.
 export function isOnShow(show, me) {
   const f = show.fields
@@ -24,8 +46,9 @@ export function isOnShow(show, me) {
   return ids(f['Sound Engineer']).includes(me.id) || ids(f['Merch Person']).includes(me.id)
 }
 
-// What this person does on a show, in a word or two.
-export function roleOnShow(show, me, record) {
+// What this person does on a show, in a word or two. For a member that is
+// their role in the show's band (bass in one band, guitar in another).
+export function roleOnShow(show, me, record, idx) {
   const f = show.fields
   if (me.type === 'crew') {
     const jobs = []
@@ -33,7 +56,14 @@ export function roleOnShow(show, me, record) {
     if (ids(f['Merch Person']).includes(me.id)) jobs.push('Merch')
     return jobs.join(' & ')
   }
-  return (record?.fields?.['Instruments'] || []).join(', ')
+  const band = idx ? idx.all('BANDS', f['Band'])[0] : null
+  return roleInBand(record, band?.fields?.['Band Name'])
+}
+
+// A member's next upcoming show, for their card.
+export function nextShowFor(data, person, type) {
+  const today = todayStr()
+  return sortedShows(data).find(s => s.fields['Date'] >= today && isOnShow(s, { type, id: person.id })) || null
 }
 
 const byDate = (a, b) => (a.fields['Date'] || '').localeCompare(b.fields['Date'] || '')

@@ -30,6 +30,19 @@ export default async function handler(req, res) {
     }
   }));
 
+  // Send only the venues the visible shows play at and the songs on the
+  // setlists. The tables hold hundreds of venues and over a thousand songs;
+  // a phone needs a few dozen of each.
+  const linked = (records, field) => new Set((records || []).flatMap(r => r.fields?.[field] || []));
+  if (!errors.VENUES && !errors.SHOWS) {
+    const used = linked(results.SHOWS, 'Venue');
+    results.VENUES = results.VENUES.filter(v => used.has(v.id));
+  }
+  if (!errors.SONGS && !errors.SETLISTS) {
+    const used = linked(results.SETLISTS, 'Songs');
+    results.SONGS = results.SONGS.filter(s => used.has(s.id));
+  }
+
   if (Object.keys(errors).length) results.errors = errors;
   results.me = person;
   return res.status(200).json(results);

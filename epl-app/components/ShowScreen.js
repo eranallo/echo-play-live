@@ -3,8 +3,8 @@
 import { useEffect, useState } from 'react'
 import { Navigation, Ticket, ListMusic, Sun, CloudSun, Cloud, CloudFog, CloudDrizzle, CloudRain, CloudSnow, CloudLightning, Thermometer, Home, Trees } from 'lucide-react'
 import { useApp } from './context'
-import { Panel, TopBar, BandTag, PersonAvatar, Chevron } from './ui'
-import { setlistsForShow, ids } from '../lib/derive'
+import { Panel, TopBar, BandTag, PersonAvatar, Chevron, Lightbox } from './ui'
+import { setlistsForShow, ids, roleInBand } from '../lib/derive'
 import { fmtTime, fmtFull, countdown, daysUntil, attachmentUrl, mapsHref, googleMapsHref, fmtSetLength, plural } from '../lib/format'
 
 const WEATHER = [
@@ -45,11 +45,69 @@ function useForecast(show, venue) {
   return wx
 }
 
+const isImage = (a) => !a.type || a.type.startsWith('image/')
+const thumb = (a) => a.thumbnails?.large?.url || a.url
+
+// What the band needs to know about the room to play it: photos (including
+// the room layout), production details and the green room.
+function VenuePanel({ venue, onPhoto }) {
+  const vf = venue.fields
+  const files = [
+    ...(vf['Photo'] || []).map(a => ({ ...a, label: null })),
+    ...(vf['Room Layout'] || []).map(a => ({ ...a, label: 'Room layout' })),
+  ]
+  const facts = [
+    ['Venue type', vf['Venue Type']],
+    ['Capacity', vf['Capacity'] ? Number(vf['Capacity']).toLocaleString() : null],
+    ['Ages', vf['Age Restriction']],
+    ['Green room', vf['Green Room'] ? 'Yes' : null],
+    ['House console', vf['House Console']],
+    ['FOH', vf['FOH Location']],
+    ['Power', vf['Power Drops']],
+  ].filter(([, v]) => v)
+  const notes = [
+    ['Stage', vf['Stage Specs']],
+    ['PA system', vf['PA System']],
+    ['Mic locker', vf['Mic Locker']],
+    ['Sound notes', vf['Sound Notes']],
+  ].filter(([, v]) => v)
+  if (!files.length && !facts.length && !notes.length) return null
+  return (
+    <Panel title={vf['Venue Name'] ? `About ${vf['Venue Name']}` : 'Venue'}>
+      {files.length > 0 && (
+        <div className="gallery" role="list">
+          {files.map((a, i) => isImage(a) ? (
+            <button key={a.id || i} className="gallery-item" role="listitem" onClick={() => onPhoto(a)} aria-label={a.label || `Venue photo ${i + 1}`}>
+              <img src={thumb(a)} alt="" loading="lazy" />
+              {a.label && <span className="gallery-tag">{a.label}</span>}
+            </button>
+          ) : (
+            <a key={a.id || i} className="gallery-item gallery-file" role="listitem" href={a.url} target="_blank" rel="noopener noreferrer">
+              <span>{a.label || a.filename || 'File'}</span>
+            </a>
+          ))}
+        </div>
+      )}
+      {facts.length > 0 && (
+        <dl className="rows" style={files.length ? { borderTop: '1px solid var(--separator)' } : undefined}>
+          {facts.map(([label, value]) => <div className="kv" key={label}><dt>{label}</dt><dd>{value}</dd></div>)}
+        </dl>
+      )}
+      {notes.length > 0 && (
+        <div className="rows" style={{ borderTop: '1px solid var(--separator)' }}>
+          {notes.map(([label, text]) => <p className="note" key={label}><span className="note-label">{label}</span>{text}</p>)}
+        </div>
+      )}
+    </Panel>
+  )
+}
+
 export default function ShowScreen({ showId, onBack }) {
   const { idx, openPerson, openSetlist } = useApp()
   const show = idx.get('SHOWS', showId)
   const venue = show ? idx.all('VENUES', show.fields['Venue'])[0] : null
   const wx = useForecast(show || { fields: {} }, venue)
+  const [photo, setPhoto] = useState(null)
   useEffect(() => { window.scrollTo(0, 0) }, [showId])
   if (!show) return (<><TopBar title="Show" onBack={onBack} /><main className="content"><p className="empty">This show isn't available any more.</p></main></>)
 
@@ -80,13 +138,19 @@ export default function ShowScreen({ showId, onBack }) {
     return provider ? [{ job, provider }] : []
   })
   const sets = setlistsForShow(show, idx)
-  const notes = [['Show notes', f['Show Notes']], ['Sound notes', f['Sound Notes']], ['Merch notes', f['Merch Notes']]].filter(([, v]) => v)
+  const notes = [['Show notes', f['Show Notes']], ['Production notes', f['Production Notes']], ['Sound notes', f['Sound Notes']], ['Merch notes', f['Merch Notes']]].filter(([, v]) => v)
   const env = f['Indoor / Outdoor']
+  const hero = (vf['Photo'] || []).find(isImage)
 
   return (
     <>
       <TopBar title={bandName} onBack={onBack} />
       <main className="content rise">
+        {hero && (
+          <button className="hero-photo" onClick={() => setPhoto(hero)} aria-label={`Photo of ${vf['Venue Name'] || 'the venue'}`}>
+            <img src={thumb(hero)} alt="" />
+          </button>
+        )}
         <header className="show-head">
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
             {logo && <img className="band-logo" src={logo} alt="" />}
@@ -130,7 +194,7 @@ export default function ShowScreen({ showId, onBack }) {
                 <li key={m.id}>
                   <button className="row" onClick={() => openPerson(m, 'member')}>
                     <PersonAvatar record={m} type="member" size={38} />
-                    <span><span className="row-title">{m.fields['Member Name']}</span><span className="row-sub">{(m.fields['Instruments'] || []).join(', ')}</span></span>
+                    <span><span className="row-title">{m.fields['Member Name']}</span><span className="row-sub">{roleInBand(m, band?.fields['Band Name'])}</span></span>
                     <Chevron />
                   </button>
                 </li>
@@ -173,6 +237,8 @@ export default function ShowScreen({ showId, onBack }) {
           ) : <p className="empty">No setlist yet. Check back closer to the show.</p>}
         </Panel>
 
+        {venue && <VenuePanel venue={venue} onPhoto={setPhoto} />}
+
         {(f['Ticket URL'] || f['Ticket Price']) && (
           <Panel title="Tickets">
             {f['Ticket URL'] ? (
@@ -195,6 +261,7 @@ export default function ShowScreen({ showId, onBack }) {
 
         {band && <div className="tags" style={{ justifyContent: 'center' }}><BandTag name={band.fields['Band Name']} /></div>}
       </main>
+      {photo && <Lightbox src={photo.url} alt={vf['Venue Name'] || 'Venue'} onClose={() => setPhoto(null)} />}
     </>
   )
 }

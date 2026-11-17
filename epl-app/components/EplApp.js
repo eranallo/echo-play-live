@@ -4,13 +4,13 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import Head from 'next/head'
 import { House, CalendarDays, UsersRound, ListMusic, Camera, Sun, Moon } from 'lucide-react'
 import { AppContext, useApp } from './context'
-import { Seal, Sheet, PersonCard, PersonAvatar, BandTag, Toast } from './ui'
+import { Seal, Sheet, PersonCard, PersonAvatar, BandRoles, Toast } from './ui'
 import HomeScreen from './HomeScreen'
 import CalendarScreen from './CalendarScreen'
 import PeopleScreen from './PeopleScreen'
 import SetlistsScreen, { SetlistScreen } from './SetlistsScreen'
 import ShowScreen from './ShowScreen'
-import { indexData } from '../lib/derive'
+import { indexData, memberBands } from '../lib/derive'
 
 const TABS = [
   ['home', 'Home', House],
@@ -51,7 +51,7 @@ function ProfileSheet({ onClose, theme, setTheme }) {
   const isMember = me.type === 'member'
   const name = isMember ? f['Member Name'] : f['Name']
   const what = isMember ? (f['Instruments'] || []).join(', ') : (f['Role'] || 'Crew')
-  const bands = isMember ? idx.all('BANDS', f['Primary Bands']).map(b => b.fields['Band Name']) : []
+  const bands = isMember ? memberBands(record, idx) : []
   const standalone = typeof window !== 'undefined' && (window.navigator.standalone || window.matchMedia?.('(display-mode: standalone)').matches)
 
   async function upload(file) {
@@ -84,10 +84,14 @@ function ProfileSheet({ onClose, theme, setTheme }) {
           <span className="avatar-badge">{busy ? <span className="spinner" style={{ width: '0.9rem', height: '0.9rem' }} /> : <Camera aria-hidden="true" />}</span>
         </button>
         <h2>{name}</h2>
-        {what && <p className="row-sub" style={{ marginTop: 0 }}>{what}</p>}
-        {bands.length > 0 && <div className="tags" style={{ justifyContent: 'center' }}>{bands.map(b => <BandTag key={b} name={b} />)}</div>}
+        {(!isMember || !bands.length) && what && <p className="row-sub" style={{ marginTop: 0 }}>{what}</p>}
         {error && <p className="form-error">{error}</p>}
       </div>
+      {bands.length > 0 && (
+        <div className="sheet-section">
+          <div className="person-card"><BandRoles bands={bands} /></div>
+        </div>
+      )}
       <div className="sheet-section">
         <span className="label">Appearance</span>
         <div className="seg" role="group" aria-label="Appearance">
