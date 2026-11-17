@@ -7,7 +7,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Search, ChevronDown, Check } from 'lucide-react'
 import { useApp } from './context'
 import { PageHead, TopBar, BandDot, Sheet } from './ui'
-import { SetlistsList, SongModal, SongRow, SongColsHead, useSongAnswers } from './SetlistsScreen'
+import { SetlistsList, SongModal, SongRow, TuningBadge, useSongAnswers } from './SetlistsScreen'
 import { activeBands, memberBands, bandRoster, knowledgeIndex, mergedKnowledge, songBandIndex, upcomingSetSongs, isRetired, tuningName, compareTunings, SONG_STATUS, KNOWLEDGE } from '../lib/derive'
 import { plural } from '../lib/format'
 
@@ -85,7 +85,7 @@ function groupSongs(songs, scope, { bands, bandsOf, idx }) {
     }
     return [...map.entries()]
       .sort(([a], [b]) => (!a ? 1 : !b ? -1 : compareTunings(a, b)))
-      .map(([t, list]) => ({ key: 't' + t, title: t ? tuningName(t) : 'Tuning not set', eyebrow: 'Tuning', songs: list }))
+      .map(([t, list]) => ({ key: 't' + t, title: t ? tuningName(t) : 'Tuning not set', tuning: t, songs: list }))
   }
   // The full catalog: A–Z.
   if (scope === 'catalog') {
@@ -144,7 +144,7 @@ function Library() {
   const source = scope === 'catalog' ? (catalog.data?.SONGS || []) : (data['SONGS'] || [])
   const pool = useMemo(() => source.filter(s => inScope(s, scope)).sort(byTitle), [source, scope, bandsOf, myBandIds, soonSongs]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const searched = pool.filter(s => matches(q, s.fields['Song Title'], s.fields['Artist'], s.fields['Abbreviation'], s.fields['Album']))
+  const searched = pool.filter(s => matches(q, s.fields['Song Title'], s.fields['Artist'], s.fields['Abbreviation'], s.fields['Album'], tuningName(s.fields['Guitar Tuning'])))
   const answerOf = (s) => mineFor(s.id) || NOT_MARKED
   const shown = status ? searched.filter(s => answerOf(s) === status) : searched
   const groups = groupSongs(shown, scope, { bands, bandsOf, idx })
@@ -199,7 +199,7 @@ function Library() {
         <label style={{ position: 'relative', display: 'block' }}>
           <span className="sr-only">Search songs</span>
           <Search aria-hidden="true" size={18} style={{ position: 'absolute', left: '0.85rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--faint)', marginTop: '0.175rem' }} />
-          <input className="input" style={{ paddingLeft: '2.4rem', background: 'var(--card)', boxShadow: 'var(--shadow-card)' }} type="search" placeholder="Song, artist or album" value={q} onChange={e => setQ(e.target.value)} />
+          <input className="input" style={{ paddingLeft: '2.4rem', background: 'var(--card)', boxShadow: 'var(--shadow-card)' }} type="search" placeholder="Song, artist or tuning" value={q} onChange={e => setQ(e.target.value)} />
         </label>
         <div className={`filter-buttons${isMember ? '' : ' single'}`}>
           <button className="filter-button" onClick={() => setSheet('band')} aria-haspopup="dialog">
@@ -225,11 +225,11 @@ function Library() {
         </section>
       ) : shown.length ? (
         <div className="song-list">
-          <SongColsHead title={plural(shown.length, 'song')} />
+          <p className="song-count">{plural(shown.length, 'song')}</p>
           {drawn.map(g => (
             <section className="panel" key={g.key}>
               <div className="song-group-head">
-                <span>{g.eyebrow && <span className="song-group-eyebrow">{g.eyebrow} </span>}{g.band && <BandDot name={g.band} />}<strong>{g.title}</strong></span>
+                <span>{g.tuning !== undefined ? <><span className="song-group-eyebrow">Tuning</span><TuningBadge value={g.tuning} /></> : <>{g.band && <BandDot name={g.band} />}<strong>{g.title}</strong></>}</span>
                 <span>{plural(g.total, 'song')}</span>
               </div>
               <ul className="rows">

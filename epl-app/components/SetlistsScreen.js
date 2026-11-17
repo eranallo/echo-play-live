@@ -6,41 +6,34 @@ import { useEffect, useMemo, useState } from 'react'
 import { ListMusic, ExternalLink } from 'lucide-react'
 import { useApp } from './context'
 import { Panel, BandTag, Chevron, Modal, PersonAvatar, TopBar } from './ui'
-import { myShows, upcoming, ids, tuningBlocks, tuningName, knowledgeIndex, bandRoster, KNOWLEDGE, roleInBand, SONG_STATUS } from '../lib/derive'
+import { myShows, upcoming, ids, tuningBlocks, tuningName, tuningColor, knowledgeIndex, bandRoster, KNOWLEDGE, roleInBand, SONG_STATUS } from '../lib/derive'
 import { fmtDate, fmtDur, fmtSetLength, setlistNotes, todayStr, plural } from '../lib/format'
 
 export const STATUS_PILL = { 'Know it': 'pill-good', 'Learning': 'pill-warn', 'To learn': '' }
 const MARK = { 'Know it': 'know', 'Learning': 'learning', 'To learn': 'to-learn' }
-const COL_LABEL = { tuning: 'Tuning', key: 'Key', bpm: 'BPM' }
 
-// One song as a row: your mark (a dot), title and artist, then tuning, key
-// and BPM in fixed columns, so they line up down the list and your mark
-// never covers them.
-export function SongRow({ song, n, mine, sub, cols = ['tuning', 'key', 'bpm'], onOpen }) {
+// A guitar tuning as a coloured badge: "Drop D", "Eb standard".
+export function TuningBadge({ value }) {
+  const name = tuningName(value)
+  if (!name) return <span className="tuning-badge tuning-none">No tuning</span>
+  return <span className={`tuning-badge tune-${tuningColor(value)}`}>{name}</span>
+}
+
+// One song as a row: your mark (a dot), title and artist, and the tuning.
+// Key, BPM and the rest are on the song's page. A setlist leaves the tuning
+// to its block header, so showTuning is off there.
+export function SongRow({ song, n, mine, sub, showTuning = true, onOpen }) {
   const f = song.fields
-  const values = { tuning: tuningName(f['Guitar Tuning'], { short: true }), key: f['Key'], bpm: f['BPM'] }
   return (
-    <button className={`song-row cols-${cols.length}${n != null ? ' numbered' : ''}`} onClick={onOpen}>
+    <button className={`song-row${n != null ? ' numbered' : ''}${showTuning ? '' : ' no-tuning'}`} onClick={onOpen}>
       {n != null && <span className="song-num">{n}</span>}
       <span className={`song-mark${mine ? ` mark-${MARK[mine]}` : ''}`}>{mine && <span className="sr-only">{mine}</span>}</span>
       <span className="song-main">
         <span className="row-title">{f['Song Title']}</span>
         {sub && <span className="row-sub">{sub}</span>}
       </span>
-      {cols.map(c => <span key={c} className={`song-col${values[c] ? '' : ' song-col-empty'}`}>{values[c] || '–'}</span>)}
+      {showTuning && <TuningBadge value={f['Guitar Tuning']} />}
     </button>
-  )
-}
-
-// The labels over SongRow's columns.
-export function SongColsHead({ title, cols = ['tuning', 'key', 'bpm'], numbered = false }) {
-  return (
-    <div className={`song-row song-cols-head cols-${cols.length}${numbered ? ' numbered' : ''}`} aria-hidden="true">
-      {numbered && <span />}
-      <span />
-      <span className="song-main">{title}</span>
-      {cols.map(c => <span key={c} className="song-col">{COL_LABEL[c]}</span>)}
-    </div>
   )
 }
 
@@ -196,8 +189,8 @@ export function SongModal({ song, roster, answers, bandName, everyone = false, m
 
       {(guitar.length > 0 || bass.length > 0) && (
         <div className="practice-section">
-          {guitar.length > 0 && <><span className="label">Guitar · <strong>{tuningName(f['Guitar Tuning'])}</strong>, low to high</span><div className="strings">{guitar.map((s, i) => <div className="string" key={i}><span>{s.name}</span><strong>{s.note}</strong></div>)}</div></>}
-          {bass.length > 0 && <><span className="label" style={{ marginTop: guitar.length ? '0.6rem' : 0 }}>Bass · <strong>{tuningName(f['Bass Tuning'])}</strong>, low to high</span><div className="strings">{bass.map((s, i) => <div className="string" key={i}><span>{s.name}</span><strong>{s.note}</strong></div>)}</div></>}
+          {guitar.length > 0 && <><span className="label strings-label">Guitar <TuningBadge value={f['Guitar Tuning']} /> low to high</span><div className="strings">{guitar.map((s, i) => <div className="string" key={i}><span>{s.name}</span><strong>{s.note}</strong></div>)}</div></>}
+          {bass.length > 0 && <><span className="label strings-label" style={{ marginTop: guitar.length ? '0.6rem' : 0 }}>Bass <TuningBadge value={f['Bass Tuning']} /> low to high</span><div className="strings">{bass.map((s, i) => <div className="string" key={i}><span>{s.name}</span><strong>{s.note}</strong></div>)}</div></>}
         </div>
       )}
 
@@ -296,10 +289,9 @@ export function SetlistScreen({ setlistId, onBack }) {
         <section className="panel">
           {blocks.length ? (
             <>
-              <SongColsHead title="Songs" cols={['key', 'bpm']} numbered />
               {blocks.map((block, bi) => (
                 <div key={bi}>
-                  <div className="tuning-head"><span>Tuning <strong>{block.tuning}</strong></span><span>{plural(block.songs.length, 'song')}</span></div>
+                  <div className="tuning-head"><span>Tuning <TuningBadge value={block.value} /></span><span>{plural(block.songs.length, 'song')}</span></div>
                   <ul className="rows">
                     {block.songs.map(({ song: s, n }) => (
                       <li key={s.id + n}>
@@ -308,7 +300,7 @@ export function SetlistScreen({ setlistId, onBack }) {
                           n={n}
                           mine={mineFor(s.id)}
                           sub={[s.fields['Artist'], fmtDur(s.fields['Duration'])].filter(Boolean).join(' · ')}
-                          cols={['key', 'bpm']}
+                          showTuning={false}
                           onOpen={() => setSongId(s.id)}
                         />
                       </li>

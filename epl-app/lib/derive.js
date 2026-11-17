@@ -165,6 +165,14 @@ export function tuningName(value, { short = false } = {}) {
   return notes.join(' ')
 }
 
+// A colour per tuning so they stand out in lists: standard tunings in cool
+// colours, drop tunings in warm ones. The colours are in styles/globals.css.
+const TUNING_COLOR = {
+  'Standard': 'blue', 'Eb standard': 'violet', 'D standard': 'teal', 'C standard': 'slate',
+  'Drop D': 'orange', 'Drop Db': 'red', 'Drop C': 'magenta', 'Drop B': 'brown',
+}
+export const tuningColor = (value) => TUNING_COLOR[tuningName(value)] || 'gray'
+
 // Order tunings from E standard down, standard before drop on the same note.
 export function compareTunings(a, b) {
   const depth = (v) => { const n = SEMITONE[String(v || '').split('.')[0]]; return n == null ? -99 : n <= 4 ? n : n - 12 }

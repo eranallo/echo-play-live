@@ -59,8 +59,10 @@ A Library / Setlists switch. The library is built from SONGS:
   shows' setlists) and Full catalog.
 - The list groups to suit the band choice: one band by tuning, several
   bands by band, the full catalog A–Z. Each row shows your mark (a dot),
-  then tuning, key and BPM in columns. Tunings are named from their notes
-  (`D.A.D.G.B.E` → Drop D) in `lib/derive.js`.
+  the title and artist, and a colour-coded tuning badge; key, BPM and the
+  rest are on the song's page. Tunings are named from their notes
+  (`D.A.D.G.B.E` → Drop D) and coloured in `lib/derive.js` (standard
+  tunings cool, drop tunings warm; colours in `styles/globals.css`).
 - Who knows a song is listed only at the bottom of its page; setlists and
   song lists don't show it.
 - A song's page adds band status, album / year / time signature / shorthand,

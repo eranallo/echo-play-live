@@ -660,31 +660,66 @@ button.row:active, a.row:active { background: var(--hover); }
 .choice-gap { display: inline-block; width: 1.1rem; }
 .choice[aria-pressed="true"] .choice-title { color: var(--accent); }
 
-/* Song rows: mark, title and artist, then fixed columns that line up. */
+/* Song rows: your mark, title and artist, and the tuning badge. */
 .song-list { display: grid; gap: 0.75rem; }
+.song-count { padding-inline: 1.05rem; color: var(--muted); font-size: 0.6875rem; font-weight: 750; letter-spacing: 0.08em; text-transform: uppercase; }
 .song-row {
   display: grid;
-  grid-template-columns: 0.5rem minmax(0, 1fr) 3.6rem 2.3rem 1.9rem;
+  grid-template-columns: 0.5rem minmax(0, 1fr) auto;
   align-items: center;
-  column-gap: 0.6rem;
+  column-gap: 0.65rem;
   width: 100%;
   min-height: 3.25rem;
   padding: 0.65rem 1.05rem;
   text-align: left;
 }
-.song-row.cols-2 { grid-template-columns: 0.5rem minmax(0, 1fr) 2.3rem 1.9rem; }
-.song-row.numbered.cols-3 { grid-template-columns: 1.2rem 0.5rem minmax(0, 1fr) 3.6rem 2.3rem 1.9rem; }
-.song-row.numbered.cols-2 { grid-template-columns: 1.2rem 0.5rem minmax(0, 1fr) 2.3rem 1.9rem; }
+.song-row.numbered { grid-template-columns: 1.2rem 0.5rem minmax(0, 1fr) auto; }
+.song-row.no-tuning { grid-template-columns: 0.5rem minmax(0, 1fr); }
+.song-row.numbered.no-tuning { grid-template-columns: 1.2rem 0.5rem minmax(0, 1fr); }
 button.song-row { transition: background 150ms var(--ease); }
 button.song-row:active { background: var(--hover); }
 .song-row .song-num { width: auto; }
 .song-main { min-width: 0; }
-.song-col { text-align: right; font-size: 0.8125rem; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.song-col-empty { color: var(--faint); font-weight: 500; }
-.song-cols-head { min-height: 0; padding-block: 0 0.1rem; color: var(--muted); font-size: 0.6875rem; font-weight: 750; letter-spacing: 0.08em; text-transform: uppercase; }
-.song-cols-head .song-col { font-size: 0.625rem; font-weight: 750; }
-.panel > .song-cols-head { padding-top: 0.8rem; }
-.song-cols-head .song-main { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Tunings, colour-coded: standard tunings cool, drop tunings warm. Solid
+   badges so they're the first thing you see; only the colour changes per
+   tuning and theme. */
+.tuning-badge {
+  --tune: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  padding: 0.22rem 0.6rem;
+  border-radius: 999px;
+  background: var(--tune);
+  color: #ffffff;
+  font-size: 0.75rem;
+  font-weight: 750;
+  letter-spacing: 0.01em;
+  text-transform: none;
+  white-space: nowrap;
+}
+.tuning-none { background: none; box-shadow: inset 0 0 0 1px var(--separator); color: var(--faint); font-weight: 600; }
+.tune-blue    { --tune: #1f5fbf; }
+.tune-violet  { --tune: #6a3fc0; }
+.tune-teal    { --tune: #0b766c; }
+.tune-slate   { --tune: #4a5868; }
+.tune-orange  { --tune: #b9520b; }
+.tune-red     { --tune: #c0262e; }
+.tune-magenta { --tune: #9e2391; }
+.tune-brown   { --tune: #85561f; }
+.tune-gray    { --tune: var(--muted); }
+:root[data-theme="dark"] .tune-blue    { --tune: #86b4ff; }
+:root[data-theme="dark"] .tune-violet  { --tune: #bda3ff; }
+:root[data-theme="dark"] .tune-teal    { --tune: #5fd6c6; }
+:root[data-theme="dark"] .tune-slate   { --tune: #b3bfcc; }
+:root[data-theme="dark"] .tune-orange  { --tune: #ffa25e; }
+:root[data-theme="dark"] .tune-red     { --tune: #ff8186; }
+:root[data-theme="dark"] .tune-magenta { --tune: #f28be8; }
+:root[data-theme="dark"] .tune-brown   { --tune: #e3b57f; }
+:root[data-theme="dark"] .tuning-badge { color: #11191d; }
+:root[data-theme="dark"] .tuning-none { color: var(--faint); }
+.tuning-head .tuning-badge { margin-left: 0.35rem; }
+.strings-label { display: flex; align-items: center; gap: 0.4rem; }
 
 /* Your mark: green know it, amber learning, an open ring to learn. */
 .song-mark { display: inline-block; flex-shrink: 0; width: 0.5rem; height: 0.5rem; border-radius: 999px; }
