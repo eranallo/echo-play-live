@@ -72,7 +72,10 @@ function ProfileSheet({ onClose, theme, setTheme }) {
       if (!res.ok || json.error) throw new Error(json.error || 'Upload failed')
       await reload()
       toast('Photo updated')
-    } catch (e) { setError(e.message) }
+    } catch (e) {
+      // Plain words only; the technical detail stays in the server log.
+      setError(`Couldn't save your photo. ${e.message && !/fetch|network/i.test(e.message) ? e.message + '.' : 'Check your signal and try again.'}`)
+    }
     setBusy(false)
     if (fileRef.current) fileRef.current.value = ''
   }

@@ -158,6 +158,34 @@ export async function fetchTable(table, opts = {}) {
   return records;
 }
 
+// Airtable's file-upload endpoint lives on a separate host.
+const CONTENT_ROOT = process.env.AIRTABLE_CONTENT_ROOT || 'https://content.airtable.com/v0';
+
+/**
+ * Upload a file straight into an attachment field (up to 5 MB). Airtable
+ * appends it to whatever the field already holds. Returns { ok, status,
+ * attachments } where attachments is the field's new value.
+ */
+export async function uploadAttachment(recordId, field, { contentType, base64, filename }) {
+  assertEnv();
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 30000);
+  try {
+    const res = await fetch(`${CONTENT_ROOT}/${BASE}/${recordId}/${encodeURIComponent(field)}/uploadAttachment`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ contentType, file: base64, filename }),
+      signal: ctrl.signal,
+    });
+    const data = await res.json().catch(() => ({}));
+    // The response keys fields by field ID, not name; there is only one.
+    const attachments = Object.values(data?.fields || {})[0] || [];
+    return { ok: res.ok, status: res.status, attachments, error: data?.error?.message || data?.error };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /**
  * 405 helper. Sets the Allow header per HTTP spec and returns the JSON error.
  */
@@ -166,6 +194,5 @@ export function methodGuard(res, allowed) {
   return res.status(405).json({ error: 'Method not allowed' });
 }
 
-// Exported for direct use in special cases (upload-photo.js builds its own
-// PATCH URL because it talks to both Vercel Blob AND Airtable in one route).
+// Exported for direct use in special cases.
 export { TOKEN, BASE, API_ROOT, authHeaders, buildUrl, assertEnv };

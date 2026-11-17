@@ -50,8 +50,9 @@ Two tables in Airtable feed the newer features:
   before any edit or delete.
 - **Their own answer for a song** (`pages/api/song-knowledge.js`): Know it,
   Learning, To learn, or cleared. Members only; always the caller's own row.
-- **Their own profile photo** (`pages/api/upload-photo.js`), stored in Vercel
-  Blob and attached to their MEMBERS "Profile Photo" or CREW "Photo" field.
+- **Their own profile photo** (`pages/api/upload-photo.js`), uploaded straight
+  into their MEMBERS "Profile Photo" or CREW "Photo" field (the new photo
+  replaces the old one).
 
 ## Environment variables (Vercel → Settings → Environment Variables)
 
@@ -59,7 +60,6 @@ Two tables in Airtable feed the newer features:
 |------|-------|
 | `AIRTABLE_TOKEN` | Airtable personal access token for the Echo Play Live base |
 | `AIRTABLE_BASE` | The base ID (starts with `app`) |
-| `BLOB_READ_WRITE_TOKEN` | Added automatically when a Vercel Blob store is connected |
 
 Set them for both **Production** and **Preview** so preview links work.
 
