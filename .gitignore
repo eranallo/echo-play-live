@@ -1,0 +1,17 @@
+# dependencies
+node_modules/
+
+# Next.js build output
+.next/
+out/
+
+# local env files (hold the Airtable token; never commit)
+.env
+.env*.local
+
+# Vercel
+.vercel
+
+# OS / editor
+.DS_Store
+*.log

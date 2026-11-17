@@ -7,7 +7,8 @@
 const TOKEN = process.env.AIRTABLE_TOKEN;
 const BASE  = process.env.AIRTABLE_BASE;
 
-const API_ROOT = 'https://api.airtable.com/v0';
+// Overridable so local tests can point at a stand-in Airtable.
+const API_ROOT = process.env.AIRTABLE_API_ROOT || 'https://api.airtable.com/v0';
 const DEFAULT_TIMEOUT_MS = 15000;
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -62,28 +63,39 @@ export async function airtableRaw(path, init = {}) {
   if (query && typeof query === 'object') {
     const qs = new URLSearchParams();
     for (const [k, v] of Object.entries(query)) {
-      if (v !== undefined && v !== null) qs.append(k, String(v));
+      if (v === undefined || v === null) continue;
+      // Arrays repeat the key (Airtable's fields[]=A&fields[]=B form).
+      if (Array.isArray(v)) v.forEach(item => qs.append(k, String(item)));
+      else qs.append(k, String(v));
     }
     const s = qs.toString();
     if (s) url += (url.includes('?') ? '&' : '?') + s;
   }
 
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  const payload = body === undefined ? undefined
+                : typeof body === 'string' ? body
+                : JSON.stringify(body);
 
+  // Airtable allows 5 requests/second per base and answers 429 above that.
+  // One app load fires ~10 in parallel, so wait and retry a couple of times
+  // instead of showing the person a failed table.
   let res, data;
-  try {
-    res = await fetch(url, {
-      ...rest,
-      headers: { ...authHeaders(), ...(rest.headers || {}) },
-      body: body === undefined ? undefined
-          : typeof body === 'string' ? body
-          : JSON.stringify(body),
-      signal: ctrl.signal,
-    });
-    data = await res.json().catch(() => ({}));
-  } finally {
-    clearTimeout(timer);
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+    try {
+      res = await fetch(url, {
+        ...rest,
+        headers: { ...authHeaders(), ...(rest.headers || {}) },
+        body: payload,
+        signal: ctrl.signal,
+      });
+      data = await res.json().catch(() => ({}));
+    } finally {
+      clearTimeout(timer);
+    }
+    if (res.status !== 429 || attempt === 3) break;
+    await new Promise(r => setTimeout(r, 1000 * attempt + Math.random() * 300));
   }
 
   return { ok: res.ok, status: res.status, data };
@@ -115,15 +127,25 @@ export async function airtableRequest(res, path, init = {}, shape) {
 }
 
 /**
- * Page through an entire table, returning the full record array.
+ * Page through a table, returning the full record array.
  * Throws on failure (with a statusCode property the caller can forward).
+ *
+ * @param {string} table
+ * @param {object} [opts]
+ * @param {string[]} [opts.fields]  Only return these fields. Every name must
+ *        exist in Airtable or the whole request fails (422), so keep these
+ *        lists in step with the base.
+ * @param {string} [opts.filterByFormula]
  */
-export async function fetchTable(table) {
+export async function fetchTable(table, opts = {}) {
+  const { fields, filterByFormula } = opts;
   const records = [];
   let offset = null;
   do {
     const query = { pageSize: 100 };
     if (offset) query.offset = offset;
+    if (filterByFormula) query.filterByFormula = filterByFormula;
+    if (fields && fields.length) query['fields[]'] = fields;
     const { ok, status, data } = await airtableRaw(table, { query });
     if (!ok) {
       const err = new Error(data?.error?.message || `Failed to fetch ${table}: HTTP ${status}`);

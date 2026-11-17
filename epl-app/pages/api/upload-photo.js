@@ -1,11 +1,12 @@
-// Upload a profile photo: stores in Vercel Blob, then PATCHes the Airtable
-// record's Photo field with the blob URL.
+// Upload your own profile photo: stores it in Vercel Blob, then sets the
+// photo field on your MEMBERS or CREW record.
 //
-// Phase 03: routes the Airtable PATCH through lib/airtable.js. Vercel Blob
-// upload still uses @vercel/blob directly.
+// Who you are comes from your personal-link token, so a request can only
+// ever change its own sender's photo.
 
 import { put } from '@vercel/blob';
-import { airtableRaw, TOKEN, BASE } from '../../lib/airtable';
+import { airtableRaw, methodGuard } from '../../lib/airtable';
+import { requirePerson } from '../../lib/identity';
 
 export const config = {
   api: {
@@ -15,62 +16,51 @@ export const config = {
   },
 };
 
+// MEMBERS calls it "Profile Photo"; CREW calls it "Photo".
+const TARGET = {
+  member: { table: 'MEMBERS', field: 'Profile Photo' },
+  crew: { table: 'CREW', field: 'Photo' },
+};
+
+const MIME_EXT = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/heic': 'heic' };
+
 export default async function handler(req, res) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+  if (req.method !== 'POST') return methodGuard(res, ['POST']);
+
+  const person = await requirePerson(req, res);
+  if (!person) return;
+
+  const { base64 } = req.body || {};
+  if (typeof base64 !== 'string' || !base64) {
+    return res.status(400).json({ error: 'No image received' });
   }
 
-  const { recordType, recordId, base64, photoField = 'Photo' } = req.body || {};
+  // Expect a data URL, e.g. "data:image/jpeg;base64,..."
+  const match = base64.match(/^data:([\w.+-]+\/[\w.+-]+);base64,(.+)$/);
+  const mime = match ? match[1] : 'image/jpeg';
+  const ext = MIME_EXT[mime];
+  if (!ext) return res.status(400).json({ error: 'Please choose a JPG, PNG, WebP or HEIC photo' });
 
-  if (!recordType || !recordId || !base64) {
-    return res.status(400).json({ error: 'Missing required fields' });
-  }
-  if (recordType !== 'MEMBERS' && recordType !== 'CREW') {
-    return res.status(400).json({ error: 'Invalid recordType' });
-  }
-  if (!TOKEN || !BASE) {
-    return res.status(500).json({ error: 'AIRTABLE_TOKEN / AIRTABLE_BASE not configured' });
-  }
+  const { table, field } = TARGET[person.type];
 
   try {
-    // Strip the data URL prefix if present, e.g. "data:image/jpeg;base64,..."
-    const match = base64.match(/^data:([\w.\-+]+\/[\w.\-+]+);base64,(.+)$/);
-    let mime = 'image/jpeg';
-    let b64 = base64;
-    if (match) {
-      mime = match[1];
-      b64 = match[2];
-    }
-
-    const buffer = Buffer.from(b64, 'base64');
-    const ext = mime.split('/')[1] || 'jpg';
-    const path = `profiles/${recordType}/${recordId}-${Date.now()}.${ext}`;
-
-    const blob = await put(path, buffer, {
+    const buffer = Buffer.from(match ? match[2] : base64, 'base64');
+    const blob = await put(`profiles/${table}/${person.id}-${Date.now()}.${ext}`, buffer, {
       access: 'public',
       contentType: mime,
-      addRandomSuffix: false,
+      addRandomSuffix: true,
     });
 
-    // PATCH the Airtable record's Photo field via the shared lib.
-    const table = recordType === 'MEMBERS' ? 'MEMBERS' : 'CREW';
-    const { ok, status, data } = await airtableRaw(`${table}/${recordId}`, {
+    const { ok, status, data } = await airtableRaw(`${table}/${person.id}`, {
       method: 'PATCH',
-      body: {
-        fields: {
-          [photoField]: [{ url: blob.url }],
-        },
-      },
+      body: { fields: { [field]: [{ url: blob.url }] } },
     });
 
     if (!ok) {
       return res.status(status).json({
-        error: `Airtable update failed: ${data?.error?.message || 'unknown'}`,
-        blobUrl: blob.url,   // surface the blob URL so the client can retry the PATCH later
-        detail: data,
+        error: `Saving the photo to Airtable failed: ${data?.error?.message || 'unknown error'}`,
       });
     }
-
     return res.status(200).json({ url: blob.url });
   } catch (e) {
     console.error('Upload error:', e);
