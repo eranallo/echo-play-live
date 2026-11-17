@@ -62,21 +62,41 @@ Put the variables above in `.env.local` (git ignores it). Then open
 `AIRTABLE_API_ROOT` can point the app at a stand-in Airtable API for testing;
 leave it unset to use the real one.
 
+## Look and feel
+
+The layout follows StageKin (cards on a recessed page, large titles, a bottom
+tab bar, bottom sheets); colour and type are Echo Play Live's "After Hours"
+brand from the website: night `#11191d`, warm white `#f5f0e8`, amber
+`#efc47c`, Cabinet Grotesk headings and DM Sans text (both self-hosted in
+`public/fonts`), and the EPL seal (`public/brand`). Light is the default;
+members can switch to dark in their profile sheet (stored on their phone).
+All colours are CSS variables at the top of `styles/globals.css`.
+
 ## Layout
 
 ```
 pages/
-  index.js          the bare address: "use your personal link"
-  m/[token].js      a person's app
-  api/me.js         everything a signed-in person can see, in one request
-  api/blackout.js   create / edit / delete your own blackout dates
+  index.js            the bare address: "use your personal link"
+  m/[token].js        a person's app
+  _document.js        applies the saved light/dark theme before first paint
+  api/me.js           everything a signed-in person can see, in one request
+  api/blackout.js     create / edit / delete your own blackout dates
   api/upload-photo.js
 components/
-  EplApp.js         every screen
+  EplApp.js           loading, tabs, back stack, profile sheet, theme
+  HomeScreen.js       needs you, next show, this week, upcoming
+  CalendarScreen.js   month view (Mine / All EPL), coming up, unavailable dates
+  ShowScreen.js       call times, directions, lineup, crew, set, notes, weather
+  PeopleScreen.js     everyone in EPL, tap to call or text
+  SetlistsScreen.js   setlists, and one setlist grouped by tuning
+  ui.js               shared pieces: cards, rows, tags, sheets, avatars
+  context.js          what every screen can reach (data, api, navigation)
 lib/
-  airtable.js       the one place that talks to Airtable
-  identity.js       personal-link token → member or crew record
-  visibility.js     which fields and shows a person may receive
+  airtable.js         the one place that talks to Airtable
+  identity.js         personal-link token → member or crew record
+  visibility.js       which fields and shows a person may receive
+  derive.js           whose show is this, who is out, what needs you
+  format.js           dates, times, durations
 styles/
-  globals.css
+  globals.css         design tokens and every component style
 ```
