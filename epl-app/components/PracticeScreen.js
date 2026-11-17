@@ -107,10 +107,9 @@ export function PracticeModal({ practiceId, onClose }) {
 export default function PracticeScreen() {
   const { data, me, record } = useApp()
   const today = todayStr()
-  const [view, setView] = useState(me.type === 'member' ? 'mine' : 'all')
   const [showPast, setShowPast] = useState(false)
-  const all = useMemo(() => sortedPractices(data), [data])
-  const list = view === 'mine' ? all.filter(p => isMyPractice(p, me, record)) : all
+  // Only the practices that are yours: your bands', or ones you're named for.
+  const list = useMemo(() => sortedPractices(data).filter(p => isMyPractice(p, me, record)), [data, me, record])
   const coming = list.filter(p => p.fields['Date'] >= today)
   const past = list.filter(p => p.fields['Date'] < today).reverse()
 
@@ -118,18 +117,12 @@ export default function PracticeScreen() {
     <>
       <TopBar />
       <main className="content rise">
-        <PageHead title="Practice" sub="What each band is rehearsing, and when." />
-        {me.type === 'member' && (
-          <div className="seg" role="group" aria-label="Which practices">
-            <button aria-pressed={view === 'mine'} onClick={() => setView('mine')}>My practices</button>
-            <button aria-pressed={view === 'all'} onClick={() => setView('all')}>All bands</button>
-          </div>
-        )}
+        <PageHead title="Practice" sub="Your bands' practices, and any you're needed at." />
         <Panel title="Coming up" count={coming.filter(p => !isCancelled(p)).length}>
           {coming.length ? (
             <ul className="agenda">{coming.map(p => <li key={p.id}><PracticeRow practice={p} /></li>)}</ul>
           ) : (
-            <p className="empty">{view === 'mine' ? 'No practices scheduled for your bands yet.' : 'No practices scheduled yet.'}</p>
+            <p className="empty">No practices scheduled for your bands yet.</p>
           )}
         </Panel>
         {past.length > 0 && (

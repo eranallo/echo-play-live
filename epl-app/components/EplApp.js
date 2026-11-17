@@ -295,7 +295,7 @@ export default function EplApp({ token }) {
       <div className="app">{screen}</div>
       <nav className="dock" aria-label="Tabs">
         <div className="dock-inner">
-          {TABS.map(([key, label, Icon]) => (
+          {TABS.filter(([key]) => key !== 'practice' || me.type === 'member').map(([key, label, Icon]) => (
             <button
               key={key}
               className="dock-item"
