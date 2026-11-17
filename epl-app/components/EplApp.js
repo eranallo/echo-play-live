@@ -2,7 +2,7 @@
 // (Home, Calendar, People, Setlists) with show and setlist pages pushed on top.
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import Head from 'next/head'
-import { House, CalendarDays, UsersRound, ListMusic, Camera, Sun, Moon } from 'lucide-react'
+import { House, CalendarDays, UsersRound, ListMusic, Camera, Sun, Moon, Drum } from 'lucide-react'
 import { AppContext, useApp } from './context'
 import { Seal, Sheet, PersonCard, PersonAvatar, BandRoles, Toast } from './ui'
 import HomeScreen from './HomeScreen'
@@ -10,11 +10,13 @@ import CalendarScreen from './CalendarScreen'
 import PeopleScreen from './PeopleScreen'
 import SetlistsScreen, { SetlistScreen } from './SetlistsScreen'
 import ShowScreen from './ShowScreen'
+import PracticeScreen, { PracticeModal } from './PracticeScreen'
 import { indexData, memberBands } from '../lib/derive'
 
 const TABS = [
   ['home', 'Home', House],
   ['calendar', 'Calendar', CalendarDays],
+  ['practice', 'Practice', Drum],
   ['people', 'People', UsersRound],
   ['setlists', 'Setlists', ListMusic],
 ]
@@ -132,6 +134,7 @@ export default function EplApp({ token }) {
   const [tab, setTabState] = useState('home')
   const [stack, setStack] = useState([]) // [{ type: 'show' | 'setlist', id }]
   const [person, setPerson] = useState(null)
+  const [practiceId, setPracticeId] = useState(null)
   const [profileOpen, setProfileOpen] = useState(false)
   const [toastMsg, setToastMsg] = useState(null)
   const [theme, setThemeState] = useState('light')
@@ -237,6 +240,7 @@ export default function EplApp({ token }) {
     openShow: (id) => push({ type: 'show', id }),
     openSetlist: (id) => push({ type: 'setlist', id }),
     openPerson: (rec, type) => setPerson({ record: rec, type }),
+    openPractice: (id) => setPracticeId(id),
     openProfile: () => setProfileOpen(true),
   }), [data, idx, me, record, api, toast, setTab, loadData, push])
 
@@ -272,6 +276,7 @@ export default function EplApp({ token }) {
   if (top?.type === 'show') screen = <ShowScreen key={'s' + top.id + stack.length} showId={top.id} onBack={pop} />
   else if (top?.type === 'setlist') screen = <SetlistScreen key={'l' + top.id + stack.length} setlistId={top.id} onBack={pop} />
   else if (tab === 'calendar') screen = <CalendarScreen />
+  else if (tab === 'practice') screen = <PracticeScreen />
   else if (tab === 'people') screen = <PeopleScreen />
   else if (tab === 'setlists') screen = <SetlistsScreen />
   else screen = <HomeScreen />
@@ -303,6 +308,7 @@ export default function EplApp({ token }) {
           ))}
         </div>
       </nav>
+      {practiceId && <PracticeModal practiceId={practiceId} onClose={() => setPracticeId(null)} />}
       {person && <PersonCard profile={person} onClose={() => setPerson(null)} />}
       {profileOpen && <ProfileSheet onClose={() => setProfileOpen(false)} theme={theme} setTheme={setTheme} />}
       <Toast message={toastMsg} />

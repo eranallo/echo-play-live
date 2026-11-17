@@ -4,7 +4,8 @@ import { useMemo, useState } from 'react'
 import { AlertTriangle, Camera } from 'lucide-react'
 import { useApp } from './context'
 import { Panel, PageHead, ShowList, Chevron, BandTag, TopBar } from './ui'
-import { myShows, upcoming, myBlackouts, blackoutCovers, needsYou, roleOnShow } from '../lib/derive'
+import { myShows, upcoming, myBlackouts, blackoutCovers, needsYou, roleOnShow, sortedPractices, isMyPractice, isCancelled } from '../lib/derive'
+import { PracticeRow } from './PracticeScreen'
 import { todayStr, addDays, parseDate, fmtLong, fmtTime, fmtDate, countdown, firstName, plural } from '../lib/format'
 
 function NeedsYou({ items }) {
@@ -87,33 +88,37 @@ function NextShow({ show }) {
   )
 }
 
-function ThisWeek({ shows, blackouts }) {
+function ThisWeek({ shows, blackouts, practices }) {
   const { idx } = useApp()
   const today = todayStr()
   const days = Array.from({ length: 7 }, (_, i) => addDays(today, i))
   const [selected, setSelected] = useState(null)
   const showsOn = (ds) => shows.filter(s => s.fields['Date'] === ds)
   const outOn = (ds) => blackouts.some(b => blackoutCovers(b, ds))
+  const practiceOn = (ds) => practices.filter(p => p.fields['Date'] === ds)
   const sel = selected && showsOn(selected)
+  const selPractice = selected ? practiceOn(selected) : []
   return (
     <Panel title="This week">
       <div className="week">
         {days.map(ds => {
           const d = parseDate(ds)
           const n = showsOn(ds).length
+          const np = practiceOn(ds).filter(p => !isCancelled(p)).length
           return (
             <button
               key={ds}
               className="week-day"
               data-today={ds === today ? '' : undefined}
               aria-pressed={selected === ds}
-              aria-label={`${fmtLong(ds)}${n ? `, ${plural(n, 'show')}` : ''}${outOn(ds) ? ', unavailable' : ''}`}
+              aria-label={`${fmtLong(ds)}${n ? `, ${plural(n, 'show')}` : ''}${np ? `, ${plural(np, 'practice')}` : ''}${outOn(ds) ? ', blacked out' : ''}`}
               onClick={() => setSelected(selected === ds ? null : ds)}
             >
               <span className="wd">{d.toLocaleDateString('en-US', { weekday: 'narrow' })}</span>
               <span className="dn">{d.getDate()}</span>
               <span className="dots">
                 {n > 0 && <span className="dot" />}
+                {np > 0 && <span className="dot dot-practice" />}
                 {outOn(ds) && <span className="dot dot-out" />}
               </span>
             </button>
@@ -122,10 +127,10 @@ function ThisWeek({ shows, blackouts }) {
       </div>
       {selected && (
         <div style={{ borderTop: '1px solid var(--separator)' }}>
-          {sel.length ? (
-            <ShowList shows={sel} open={5} />
-          ) : (
-            <p className="empty">{fmtLong(selected)}: {outOn(selected) ? "you're marked unavailable." : 'nothing on for you.'}</p>
+          {sel.length > 0 && <ShowList shows={sel} open={5} />}
+          {selPractice.length > 0 && <ul className="agenda" style={sel.length ? { borderTop: '1px solid var(--separator)' } : undefined}>{selPractice.map(p => <li key={p.id}><PracticeRow practice={p} /></li>)}</ul>}
+          {!sel.length && !selPractice.length && (
+            <p className="empty">{fmtLong(selected)}: {outOn(selected) ? "you're blacked out." : 'nothing on for you.'}</p>
           )}
         </div>
       )}
@@ -139,6 +144,8 @@ export default function HomeScreen() {
   const mine = useMemo(() => upcoming(myShows(data, me), today), [data, me, today])
   const blackouts = useMemo(() => myBlackouts(data, me), [data, me])
   const items = useMemo(() => needsYou(data, me, record), [data, me, record])
+  const practices = useMemo(() => sortedPractices(data).filter(p => p.fields['Date'] >= today && isMyPractice(p, me, record)), [data, me, record, today])
+  const nextPractice = practices.find(p => !isCancelled(p))
   const name = me.type === 'member' ? record.fields['Member Name'] : record.fields['Name']
   // Crew see which job they're booked for on each show.
   const roleFor = (s) => roleOnShow(s, me, record, idx)
@@ -149,7 +156,12 @@ export default function HomeScreen() {
         <PageHead eyebrow={fmtLong(today)} title={`Hi, ${firstName(name)}`} />
         <NeedsYou items={items} />
         <NextShow show={mine[0]} />
-        <ThisWeek shows={mine} blackouts={blackouts} />
+        {nextPractice && (
+          <Panel title="Next practice">
+            <ul className="agenda"><li><PracticeRow practice={nextPractice} /></li></ul>
+          </Panel>
+        )}
+        <ThisWeek shows={mine} blackouts={blackouts} practices={practices} />
         <Panel title="My upcoming shows" count={mine.length}>
           <ShowList shows={mine} open={3} subFor={me.type === 'crew' ? roleFor : undefined} emptyText="No upcoming shows assigned yet." />
         </Panel>

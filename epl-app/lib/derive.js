@@ -157,3 +157,67 @@ export function tuningBlocks(songs) {
   })
   return blocks
 }
+
+// --- practices ------------------------------------------------------------
+
+export const isCancelled = (p) => p.fields['Status'] === 'Cancelled'
+
+export function sortedPractices(data) {
+  return (data['PRACTICES'] || []).filter(p => p.fields['Date']).slice().sort((a, b) =>
+    (a.fields['Date'] || '').localeCompare(b.fields['Date'] || '') ||
+    (a.fields['Start Time'] || '').localeCompare(b.fields['Start Time'] || ''))
+}
+
+// Practices you're asked to: you're listed as needed, or it's one of your
+// active bands and nobody in particular is listed (empty means everyone).
+export function isMyPractice(p, me, record) {
+  if (me.type !== 'member') return false
+  const needed = ids(p.fields['Members Needed'])
+  if (needed.length) return needed.includes(me.id)
+  const myBands = ids(record?.fields?.['Primary Bands'])
+  return ids(p.fields['Band']).some(id => myBands.includes(id))
+}
+
+export function practicesByDate(list) {
+  const map = {}
+  for (const p of list) (map[p.fields['Date']] = map[p.fields['Date']] || []).push(p)
+  return map
+}
+
+// --- song knowledge -------------------------------------------------------
+
+export const KNOWLEDGE = ['Know it', 'Learning', 'To learn']
+
+// songId -> Map(memberId -> status)
+export function knowledgeIndex(data) {
+  const bySong = new Map()
+  for (const k of data['SONG KNOWLEDGE'] || []) {
+    const status = k.fields['Status']
+    if (!status) continue
+    for (const songId of ids(k.fields['Song'])) {
+      if (!bySong.has(songId)) bySong.set(songId, new Map())
+      for (const memberId of ids(k.fields['Member'])) bySong.get(songId).set(memberId, status)
+    }
+  }
+  return bySong
+}
+
+// The members a setlist is for: the band's roster.
+export function bandRoster(data, bandId) {
+  return (data['MEMBERS'] || []).filter(m => ids(m.fields['Primary Bands']).includes(bandId))
+    .slice().sort((a, b) => (a.fields['Member Name'] || '').localeCompare(b.fields['Member Name'] || ''))
+}
+
+// One line for a song, said the way StageKin says it: "Everyone knows it",
+// "Kevin, Josh still on it", "3 of 5 know it", "Nobody has said". People who
+// haven't answered are not counted as not knowing it.
+export function knowledgeSummary(answers, roster) {
+  if (!roster.length) return null
+  const first = (m) => (m.fields['Member Name'] || '?').split(' ')[0]
+  const knows = roster.filter(m => answers?.get(m.id) === 'Know it')
+  const working = roster.filter(m => ['Learning', 'To learn'].includes(answers?.get(m.id)))
+  if (knows.length === roster.length) return { text: 'Everyone knows it', tone: 'good' }
+  if (working.length) return { text: `${working.map(first).join(', ')} still on it`, tone: 'warn' }
+  if (knows.length) return { text: `${knows.length} of ${roster.length} know it`, tone: 'quiet' }
+  return { text: 'Nobody has said', tone: 'quiet' }
+}

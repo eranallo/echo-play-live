@@ -41,6 +41,9 @@ export default async function handler(req, res) {
   if (!errors.SONGS && !errors.SETLISTS) {
     const used = linked(results.SETLISTS, 'Songs');
     results.SONGS = results.SONGS.filter(s => used.has(s.id));
+    if (!errors['SONG KNOWLEDGE']) {
+      results['SONG KNOWLEDGE'] = results['SONG KNOWLEDGE'].filter(k => (k.fields?.Song || []).some(id => used.has(id)));
+    }
   }
 
   if (Object.keys(errors).length) results.errors = errors;

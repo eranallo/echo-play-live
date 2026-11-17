@@ -6,7 +6,8 @@ import { useMemo, useState } from 'react'
 import { ChevronLeft, ChevronRight, CalendarX, Plus } from 'lucide-react'
 import { useApp } from './context'
 import { Panel, PageHead, ShowList, ShowRow, Sheet, Chevron, PersonAvatar, TopBar } from './ui'
-import { sortedShows, myShows, upcoming, myBlackouts, blackoutsByDate, showsByDate, blackoutPeople, blackoutCovers } from '../lib/derive'
+import { sortedShows, myShows, upcoming, myBlackouts, blackoutsByDate, showsByDate, blackoutPeople, blackoutCovers, sortedPractices, isMyPractice, isCancelled, practicesByDate } from '../lib/derive'
+import { PracticeRow } from './PracticeScreen'
 import { MONTH_NAMES, todayStr, toDateStr, parseDate, fmtLong, fmtDate, plural } from '../lib/format'
 
 const REASONS = ['Personal', 'Other Gig', 'Vacation', 'Illness', 'Family', 'Other']
@@ -82,7 +83,7 @@ export function BlackoutSheet({ existing, defaultDate, onClose }) {
   )
 }
 
-function MonthGrid({ month, selected, onSelect, showsMap, outMap }) {
+function MonthGrid({ month, selected, onSelect, showsMap, outMap, practiceMap }) {
   const today = todayStr()
   const first = new Date(month.getFullYear(), month.getMonth(), 1)
   const daysIn = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate()
@@ -97,6 +98,7 @@ function MonthGrid({ month, selected, onSelect, showsMap, outMap }) {
         const dow = parseDate(ds).getDay()
         const n = (showsMap[ds] || []).length
         const out = (outMap[ds] || []).length
+        const np = (practiceMap[ds] || []).filter(p => !isCancelled(p)).length
         return (
           <button
             key={ds}
@@ -105,12 +107,13 @@ function MonthGrid({ month, selected, onSelect, showsMap, outMap }) {
             data-past={ds < today ? '' : undefined}
             data-weekend={dow === 5 || dow === 6 ? '' : undefined}
             aria-pressed={selected === ds}
-            aria-label={`${fmtLong(ds)}${n ? `, ${plural(n, 'show')}` : ''}${out ? `, ${out} out` : ''}`}
+            aria-label={`${fmtLong(ds)}${n ? `, ${plural(n, 'show')}` : ''}${np ? `, ${plural(np, 'practice')}` : ''}${out ? `, ${out} out` : ''}`}
             onClick={() => onSelect(selected === ds ? null : ds)}
           >
             <span className="dn">{parseDate(ds).getDate()}</span>
             <span className="dots">
               {n > 0 && <span className="dot" />}
+              {np > 0 && <span className="dot dot-practice" />}
               {out > 0 && <span className="dot dot-out" />}
             </span>
           </button>
@@ -121,7 +124,7 @@ function MonthGrid({ month, selected, onSelect, showsMap, outMap }) {
 }
 
 export default function CalendarScreen() {
-  const { data, me, idx, openPerson } = useApp()
+  const { data, me, record, idx, openPerson } = useApp()
   const today = todayStr()
   const [view, setView] = useState('mine')
   const [month, setMonth] = useState(() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1) })
@@ -134,6 +137,9 @@ export default function CalendarScreen() {
   const allOut = useMemo(() => (data['BLACKOUT DATES'] || []).filter(b => blackoutPeople(b, idx).length), [data, idx])
 
   const shows = view === 'mine' ? mineShows : allShows
+  const allPractices = useMemo(() => sortedPractices(data), [data])
+  const practices = view === 'mine' ? allPractices.filter(p => isMyPractice(p, me, record)) : allPractices
+  const practiceMap = useMemo(() => practicesByDate(practices), [practices])
   const showsMap = useMemo(() => showsByDate(shows), [shows])
   const outMap = useMemo(() => blackoutsByDate(view === 'mine' ? mineOut : allOut), [view, mineOut, allOut])
 
@@ -157,6 +163,7 @@ export default function CalendarScreen() {
   const step = (n) => { setMonth(new Date(month.getFullYear(), month.getMonth() + n, 1)); setSelected(null) }
   const selShows = selected ? (showsMap[selected] || []) : []
   const selOut = selected ? (outMap[selected] || []) : []
+  const selPractice = selected ? (practiceMap[selected] || []) : []
   const comingUp = upcoming(shows, today)
   const myUpcomingOut = mineOut.filter(b => (b.fields['End Date'] || b.fields['Date']) >= today)
 
@@ -181,7 +188,7 @@ export default function CalendarScreen() {
               <button className="icon-btn" onClick={() => step(1)} aria-label="Next month"><ChevronRight /></button>
             </div>
           </div>
-          <MonthGrid month={month} selected={selected} onSelect={setSelected} showsMap={showsMap} outMap={outMap} />
+          <MonthGrid month={month} selected={selected} onSelect={setSelected} showsMap={showsMap} outMap={outMap} practiceMap={practiceMap} />
           {summary && (
             <div className="cal-summary">
               <span className="pill pill-accent">{summary.booked} booked</span>
@@ -194,8 +201,9 @@ export default function CalendarScreen() {
         {selected && (
           <Panel title={fmtLong(selected)}>
             {selShows.length > 0 && <ul className="agenda">{selShows.map(s => <li key={s.id}><ShowRow show={s} /></li>)}</ul>}
+            {selPractice.length > 0 && <ul className="agenda" style={selShows.length ? { borderTop: '1px solid var(--separator)' } : undefined}>{selPractice.map(p => <li key={p.id}><PracticeRow practice={p} /></li>)}</ul>}
             {selOut.length > 0 && (
-              <ul className="rows" style={selShows.length ? { borderTop: '1px solid var(--separator)' } : undefined}>
+              <ul className="rows" style={selShows.length || selPractice.length ? { borderTop: '1px solid var(--separator)' } : undefined}>
                 {view === 'mine'
                   ? selOut.map(b => (
                     <li key={b.id}>
@@ -217,7 +225,7 @@ export default function CalendarScreen() {
                   )))}
               </ul>
             )}
-            {!selShows.length && !selOut.length && <p className="empty">Nothing on this day.</p>}
+            {!selShows.length && !selOut.length && !selPractice.length && <p className="empty">Nothing on this day.</p>}
             {/* From either view, as long as you aren't already out that day. */}
             {selected >= today && !mineOut.some(b => blackoutCovers(b, selected)) && (
               <div className="panel-body"><button className="button button-tinted button-block" onClick={() => setSheet({ defaultDate: selected })}><CalendarX aria-hidden="true" />Black out this date</button></div>

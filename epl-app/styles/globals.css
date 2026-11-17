@@ -199,7 +199,7 @@ h1, h2, h3 { font-family: var(--ff-display); font-weight: 700; letter-spacing: -
 }
 .dock-inner {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   max-width: 32rem;
   margin-inline: auto;
 }
@@ -574,6 +574,38 @@ button.row:active, a.row:active { background: var(--hover); }
   font-weight: 650;
 }
 .gallery-file { display: grid; place-items: center; padding: 0.5rem; color: var(--accent); font-size: 0.8125rem; font-weight: 650; text-align: center; }
+
+/* --- practice ------------------------------------------------------------- */
+
+/* A called-off practice stays listed, struck through, so nobody shows up. */
+.agenda-row[data-cancelled] .practice-title { text-decoration: line-through; color: var(--muted); }
+.agenda-row[data-cancelled] .date-tile { opacity: 0.6; }
+.practice-section { display: grid; gap: 0.45rem; margin-top: 1.1rem; }
+.practice-facts { border-radius: 0.9rem; background: var(--fill-quiet); }
+.practice-facts .kv { grid-template-columns: 4.5rem minmax(0, 1fr); padding: 0.6rem 0.9rem; }
+.practice-people { list-style: none; display: grid; gap: 0.15rem; }
+.practice-people button {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  padding: 0.4rem 0.2rem;
+  border-radius: 0.6rem;
+  text-align: left;
+}
+.practice-people button:active { background: var(--hover); }
+.practice-notes { padding: 0.75rem 0.9rem; border-radius: 0.9rem; background: var(--fill-quiet); font-size: 0.9375rem; line-height: 1.55; white-space: pre-wrap; }
+
+/* --- who knows a song ----------------------------------------------------- */
+
+.knowledge-line { display: block; margin-top: 0.15rem; font-size: 0.8125rem; font-weight: 600; color: var(--muted); }
+.knowledge-line.tone-good { color: var(--good); }
+.knowledge-line.tone-warn { color: var(--warn); }
+.knowledge-seg button { font-size: 0.8125rem; }
+.knowledge-seg button[aria-pressed="true"][data-status="Know it"] { background: var(--good-soft); color: var(--good); box-shadow: none; }
+.knowledge-seg button[aria-pressed="true"][data-status="Learning"] { background: var(--warn-soft); color: var(--warn); box-shadow: none; }
+.link-list { overflow: hidden; border-radius: 0.9rem; background: var(--fill-quiet); }
 
 /* --- setlist -------------------------------------------------------------- */
 

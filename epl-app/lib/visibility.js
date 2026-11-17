@@ -33,6 +33,11 @@ export const VISIBLE_FIELDS = {
   'BLACKOUT DATES': ['Member', 'Crew', 'Date', 'End Date', 'Reason'],
   SETLISTS: ['Set Name', 'Songs', 'Band', 'Show', 'Duration', 'Notes'],
   SONGS: ['Song Title', 'Artist', 'Duration', 'Guitar Tuning', 'Bass Tuning', 'Key', 'BPM'],
+  // Practices, cancelled ones included so members see a week was called off.
+  PRACTICES: ['Practice', 'Band', 'Date', 'Start Time', 'End Time', 'Location', 'Status', 'Setlist', 'Members Needed', 'Notes'],
+  // Who knows which song (Know it / Learning / To learn), one row per
+  // member per song, written by the members themselves.
+  'SONG KNOWLEDGE': ['Member', 'Song', 'Status'],
 };
 
 // Members see confirmed shows (and past ones, which Airtable marks Completed).

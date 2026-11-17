@@ -1,11 +1,14 @@
 // Setlists: the ones for your upcoming shows first, then every band's.
 // A setlist reads like the stage sheet: songs grouped into tuning blocks.
+// Each song says who knows it, and members mark their own answer.
 import { useEffect, useMemo, useState } from 'react'
 import { ListMusic, ExternalLink } from 'lucide-react'
 import { useApp } from './context'
-import { Panel, PageHead, BandTag, Chevron, Sheet, TopBar } from './ui'
-import { myShows, upcoming, ids, tuningBlocks } from '../lib/derive'
+import { Panel, PageHead, BandTag, Chevron, Modal, PersonAvatar, TopBar } from './ui'
+import { myShows, upcoming, ids, tuningBlocks, knowledgeIndex, bandRoster, knowledgeSummary, KNOWLEDGE, roleInBand } from '../lib/derive'
 import { fmtDate, fmtDur, fmtSetLength, setlistNotes, todayStr, plural } from '../lib/format'
+
+const STATUS_PILL = { 'Know it': 'pill-good', 'Learning': 'pill-warn', 'To learn': '' }
 
 function SetlistRow({ sl, sub }) {
   const { idx, openSetlist } = useApp()
@@ -40,7 +43,7 @@ export default function SetlistsScreen() {
     <>
       <TopBar />
       <main className="content rise">
-        <PageHead title="Setlists" sub="Running orders, grouped by tuning like the stage sheet." />
+        <PageHead title="Setlists" sub="Running orders, grouped by tuning like the stage sheet. Mark the songs you know." />
         <Panel title="For your upcoming shows" count={forMe.length}>
           {forMe.length ? (
             <ul className="rows">{forMe.map(({ sl, show }) => <li key={sl.id}><SetlistRow sl={sl} sub={`Next: ${fmtDate(show.fields['Date'])}`} /></li>)}</ul>
@@ -57,7 +60,8 @@ export default function SetlistsScreen() {
 const GUITAR = ['E', 'A', 'D', 'G', 'B', 'e']
 const BASS = ['E', 'A', 'D', 'G']
 
-function SongSheet({ song, onClose }) {
+export function SongModal({ song, roster, answers, bandName, mine, onAnswer, busy, onClose }) {
+  const { me, openPerson } = useApp()
   const f = song.fields
   const q = encodeURIComponent(`${f['Song Title'] || ''} ${f['Artist'] || ''}`.trim())
   const links = [
@@ -68,24 +72,54 @@ function SongSheet({ song, onClose }) {
   const strings = (val, names) => (val ? String(val).split('.') : []).map((note, i) => ({ note, name: names[i] || '' }))
   const guitar = strings(f['Guitar Tuning'], GUITAR)
   const bass = strings(f['Bass Tuning'], BASS)
+  const summary = knowledgeSummary(answers, roster)
   return (
-    <Sheet onClose={onClose} label={f['Song Title']}>
-      <h2>{f['Song Title']}</h2>
+    <Modal onClose={onClose} label={f['Song Title']}>
+      <h2 style={{ paddingRight: '2rem' }}>{f['Song Title']}</h2>
       <p className="row-sub">{[f['Artist'], fmtDur(f['Duration']), f['Key'] && `Key ${f['Key']}`, f['BPM'] && `${f['BPM']} bpm`].filter(Boolean).join(' · ')}</p>
-      {guitar.length > 0 && (
-        <div className="sheet-section">
-          <span className="label">Guitar, low to high</span>
-          <div className="strings">{guitar.map((s, i) => <div className="string" key={i}><span>{s.name}</span><strong>{s.note}</strong></div>)}</div>
+
+      {me.type === 'member' && (
+        <div className="practice-section">
+          <span className="label">Your answer</span>
+          <div className="seg knowledge-seg" role="group" aria-label="Your answer for this song">
+            {KNOWLEDGE.map(s => (
+              <button key={s} aria-pressed={mine === s} disabled={busy} onClick={() => onAnswer(mine === s ? null : s)} data-status={s}>{s}</button>
+            ))}
+          </div>
+          <p className="row-sub">{mine ? 'Tap it again to clear. Your answer follows you to every band.' : 'Your answer follows you to every band that plays it.'}</p>
         </div>
       )}
-      {bass.length > 0 && (
-        <div className="sheet-section">
-          <span className="label">Bass, low to high</span>
-          <div className="strings">{bass.map((s, i) => <div className="string" key={i}><span>{s.name}</span><strong>{s.note}</strong></div>)}</div>
+
+      {roster.length > 0 && (
+        <div className="practice-section">
+          <span className="label">Who knows it{bandName ? ` in ${bandName}` : ''}</span>
+          {summary && <p className={`knowledge-line tone-${summary.tone}`}>{summary.text}</p>}
+          <ul className="practice-people">
+            {roster.map(m => {
+              const a = answers?.get(m.id)
+              return (
+                <li key={m.id}>
+                  <button onClick={() => openPerson(m, 'member')}>
+                    <PersonAvatar record={m} type="member" size={32} />
+                    <span><span className="row-title">{m.fields['Member Name']}</span><span className="row-sub">{roleInBand(m, bandName)}</span></span>
+                    <span className={`pill ${a ? STATUS_PILL[a] : ''}`}>{a || 'Not said'}</span>
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
         </div>
       )}
-      <div className="sheet-section">
-        <div className="rows panel" style={{ boxShadow: 'none', background: 'var(--fill-quiet)' }}>
+
+      {(guitar.length > 0 || bass.length > 0) && (
+        <div className="practice-section">
+          {guitar.length > 0 && <><span className="label">Guitar, low to high</span><div className="strings">{guitar.map((s, i) => <div className="string" key={i}><span>{s.name}</span><strong>{s.note}</strong></div>)}</div></>}
+          {bass.length > 0 && <><span className="label" style={{ marginTop: guitar.length ? '0.6rem' : 0 }}>Bass, low to high</span><div className="strings">{bass.map((s, i) => <div className="string" key={i}><span>{s.name}</span><strong>{s.note}</strong></div>)}</div></>}
+        </div>
+      )}
+
+      <div className="practice-section">
+        <div className="rows link-list">
           {links.map(([label, href]) => (
             <a key={label} className="row row-plain" href={href} target="_blank" rel="noopener noreferrer">
               <span className="row-title">{label}</span>
@@ -93,23 +127,59 @@ function SongSheet({ song, onClose }) {
             </a>
           ))}
         </div>
-        <button className="button button-tinted button-block" onClick={onClose}>Close</button>
       </div>
-    </Sheet>
+    </Modal>
   )
 }
 
 export function SetlistScreen({ setlistId, onBack }) {
-  const { idx } = useApp()
-  const [song, setSong] = useState(null)
+  const { data, idx, me, api, reload, toast } = useApp()
+  const [songId, setSongId] = useState(null)
+  const [mineOverride, setMineOverride] = useState({}) // songId -> status, shown before the reload lands
+  const [busy, setBusy] = useState(false)
   useEffect(() => { window.scrollTo(0, 0) }, [setlistId])
+  const knowledge = useMemo(() => knowledgeIndex(data), [data])
+
   const sl = idx.get('SETLISTS', setlistId)
   if (!sl) return (<><TopBar title="Setlist" onBack={onBack} /><main className="content"><p className="empty">This setlist isn't available any more.</p></main></>)
   const f = sl.fields
   const songs = idx.all('SONGS', f['Songs'])
   const band = idx.all('BANDS', f['Band'])[0]
+  const bandName = band?.fields['Band Name']
+  const roster = band ? bandRoster(data, band.id) : []
   const notes = setlistNotes(f['Notes'])
   const blocks = tuningBlocks(songs)
+
+  // Your answers, with any you just changed shown straight away.
+  const answersFor = (id) => {
+    const base = knowledge.get(id)
+    if (me.type !== 'member' || !(id in mineOverride)) return base
+    const copy = new Map(base || [])
+    if (mineOverride[id]) copy.set(me.id, mineOverride[id]); else copy.delete(me.id)
+    return copy
+  }
+  const mineFor = (id) => (me.type === 'member' ? answersFor(id)?.get(me.id) || null : null)
+  const counts = me.type === 'member' ? KNOWLEDGE.map(s => [s, songs.filter(s2 => mineFor(s2.id) === s).length]) : []
+  const unmarked = songs.filter(s => !mineFor(s.id)).length
+
+  async function answer(id, status) {
+    setBusy(true)
+    setMineOverride(o => ({ ...o, [id]: status }))
+    try {
+      const res = await api('/api/song-knowledge', { method: 'POST', body: JSON.stringify({ songId: id, status }) })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok || json.error) throw new Error(json.error || 'Could not save')
+      toast(status ? `Marked: ${status}` : 'Answer cleared')
+      reload()
+    } catch (e) {
+      setMineOverride(o => { const n = { ...o }; delete n[id]; return n })
+      toast(e.message)
+    }
+    setBusy(false)
+  }
+
+  const open = songId ? songs.find(s => s.id === songId) : null
+
   return (
     <>
       <TopBar title={f['Set Name'] || 'Setlist'} onBack={onBack} />
@@ -117,29 +187,57 @@ export function SetlistScreen({ setlistId, onBack }) {
         <header className="page-head">
           <p className="eyebrow">{[plural(songs.length, 'song'), fmtSetLength(f['Duration'])].filter(Boolean).join(' · ')}</p>
           <h1>{f['Set Name'] || 'Setlist'}</h1>
-          {band && <div className="tags" style={{ marginTop: '0.5rem' }}><BandTag name={band.fields['Band Name']} /></div>}
+          {band && <div className="tags" style={{ marginTop: '0.5rem' }}><BandTag name={bandName} /></div>}
         </header>
+        {me.type === 'member' && songs.length > 0 && (
+          <section className="panel">
+            <div className="panel-head"><h2 className="panel-title">Your progress</h2></div>
+            <div className="cal-summary">
+              {counts.map(([s, n]) => <span key={s} className={`pill ${STATUS_PILL[s]}`}>{n} {s.toLowerCase()}</span>)}
+              <span className="pill">{unmarked} not marked</span>
+            </div>
+          </section>
+        )}
         {notes && <Panel title="Set notes"><p className="note">{notes}</p></Panel>}
         <section className="panel">
           {blocks.length ? blocks.map((block, bi) => (
             <div key={bi}>
               <div className="tuning-head"><span>Tuning <strong>{block.tuning}</strong></span><span>{plural(block.songs.length, 'song')}</span></div>
               <ul className="rows">
-                {block.songs.map(({ song: s, n }) => (
-                  <li key={s.id + n}>
-                    <button className="row" onClick={() => setSong(s)}>
-                      <span className="song-num">{n}</span>
-                      <span><span className="row-title">{s.fields['Song Title']}</span><span className="row-sub">{[s.fields['Artist'], fmtDur(s.fields['Duration'])].filter(Boolean).join(' · ')}</span></span>
-                      <span className="row-end">{s.fields['Key'] || ''}</span>
-                    </button>
-                  </li>
-                ))}
+                {block.songs.map(({ song: s, n }) => {
+                  const summary = knowledgeSummary(answersFor(s.id), roster)
+                  const mine = mineFor(s.id)
+                  return (
+                    <li key={s.id + n}>
+                      <button className="row" onClick={() => setSongId(s.id)}>
+                        <span className="song-num">{n}</span>
+                        <span>
+                          <span className="row-title">{s.fields['Song Title']}</span>
+                          <span className="row-sub">{[s.fields['Artist'], fmtDur(s.fields['Duration'])].filter(Boolean).join(' · ')}</span>
+                          {summary && <span className={`knowledge-line tone-${summary.tone}`}>{summary.text}</span>}
+                        </span>
+                        <span className="row-end">{mine ? <span className={`pill ${STATUS_PILL[mine]}`}>{mine}</span> : (s.fields['Key'] || '')}</span>
+                      </button>
+                    </li>
+                  )
+                })}
               </ul>
             </div>
           )) : <p className="empty">No songs on this setlist yet.</p>}
         </section>
       </main>
-      {song && <SongSheet song={song} onClose={() => setSong(null)} />}
+      {open && (
+        <SongModal
+          song={open}
+          roster={roster}
+          bandName={bandName}
+          answers={answersFor(open.id)}
+          mine={mineFor(open.id)}
+          busy={busy}
+          onAnswer={(status) => answer(open.id, status)}
+          onClose={() => setSongId(null)}
+        />
+      )}
     </>
   )
 }

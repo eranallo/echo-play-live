@@ -31,11 +31,25 @@ If you rename a field in Airtable that appears in `lib/visibility.js`, update
 the name there too, or that table will fail to load (the app shows a banner
 naming the table).
 
+## Practices and who knows which song
+
+Two tables in Airtable feed the newer features:
+
+- **PRACTICES**: one row per practice (band, date, start/end, location,
+  status, setlist to run, members needed, notes). Add them in Airtable; mark
+  a skipped week **Cancelled** rather than deleting it, and the app shows it
+  as called off. Leave "Members Needed" empty to mean the whole band.
+- **SONG KNOWLEDGE**: one row per member per song (Know it / Learning / To
+  learn). Members set their own answers in the app; the app writes the
+  Entry and Key columns, so leave those alone.
+
 ## What a person can change
 
 - **Blackout dates**: add, edit and delete their own (`pages/api/blackout.js`).
   The server attaches the date to whoever owns the link and checks ownership
   before any edit or delete.
+- **Their own answer for a song** (`pages/api/song-knowledge.js`): Know it,
+  Learning, To learn, or cleared. Members only; always the caller's own row.
 - **Their own profile photo** (`pages/api/upload-photo.js`), stored in Vercel
   Blob and attached to their MEMBERS "Profile Photo" or CREW "Photo" field.
 
@@ -82,13 +96,15 @@ pages/
   api/me.js           everything a signed-in person can see, in one request
   api/blackout.js     create / edit / delete your own blackout dates
   api/upload-photo.js
+  api/song-knowledge.js  your answer for a song
 components/
   EplApp.js           loading, tabs, back stack, profile sheet, theme
   HomeScreen.js       needs you, next show, this week, upcoming
   CalendarScreen.js   month view (Mine / All EPL), coming up, unavailable dates
   ShowScreen.js       call times, directions, lineup, crew, set, notes, weather
-  PeopleScreen.js     everyone in EPL, tap to call or text
-  SetlistsScreen.js   setlists, and one setlist grouped by tuning
+  PracticeScreen.js   practices: coming up, called off, who's needed
+  PeopleScreen.js     everyone in EPL, by band or A–Z
+  SetlistsScreen.js   setlists by tuning; who knows each song
   ui.js               shared pieces: cards, rows, tags, sheets, avatars
   context.js          what every screen can reach (data, api, navigation)
 lib/
