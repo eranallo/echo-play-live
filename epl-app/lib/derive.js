@@ -221,3 +221,50 @@ export function knowledgeSummary(answers, roster) {
   if (knows.length) return { text: `${knows.length} of ${roster.length} know it`, tone: 'quiet' }
   return { text: 'Nobody has said', tone: 'quiet' }
 }
+
+// --- song library ---------------------------------------------------------
+
+// SONGS "Show Status", said for a member: is the band playing it?
+export const SONG_STATUS = {
+  Live: { label: 'Playing it live', short: null, tone: 'good' },
+  Practicing: { label: 'Practicing it', short: 'Practicing', tone: 'warn' },
+  Untouched: { label: 'Not started yet', short: 'Not started', tone: '' },
+  Dead: { label: 'Retired', short: 'Retired', tone: '' },
+}
+
+export const isRetired = (song) => song.fields['Show Status'] === 'Dead'
+
+// songId -> [bandId]: the bands that play a song. "Performed By" first, then
+// the band of any setlist it's on, so a setlist song nobody linked still
+// shows up under its band.
+export function songBandIndex(data) {
+  const map = new Map()
+  const add = (songId, bandId) => {
+    if (!map.has(songId)) map.set(songId, [])
+    if (!map.get(songId).includes(bandId)) map.get(songId).push(bandId)
+  }
+  for (const s of data['SONGS'] || []) for (const b of ids(s.fields['Performed By'])) add(s.id, b)
+  for (const sl of data['SETLISTS'] || []) for (const songId of ids(sl.fields['Songs'])) for (const b of ids(sl.fields['Band'])) add(songId, b)
+  return map
+}
+
+// Songs on the setlists of your upcoming shows.
+export function upcomingSetSongs(data, me, idx, today = todayStr()) {
+  const songs = new Set()
+  for (const show of upcoming(myShows(data, me), today)) {
+    for (const sl of idx.all('SETLISTS', show.fields['SETLISTS'])) for (const id of ids(sl.fields['Songs'])) songs.add(id)
+  }
+  return songs
+}
+
+// The answers to show. /api/me's are complete for the songs it sends and
+// for all of your own; the catalog adds everyone else's on the other songs.
+// Catalog copies of those are skipped because they may be older.
+export function mergedKnowledge(data, catalog, meId) {
+  const base = data['SONG KNOWLEDGE'] || []
+  if (!catalog) return base
+  const sent = new Set((data['SONGS'] || []).map(s => s.id))
+  const extra = (catalog['SONG KNOWLEDGE'] || []).filter(k =>
+    !ids(k.fields['Member']).includes(meId) && !ids(k.fields['Song']).some(id => sent.has(id)))
+  return [...base, ...extra]
+}

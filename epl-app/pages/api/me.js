@@ -30,9 +30,10 @@ export default async function handler(req, res) {
     }
   }));
 
-  // Send only the venues the visible shows play at and the songs on the
-  // setlists. The tables hold hundreds of venues and over a thousand songs;
-  // a phone needs a few dozen of each.
+  // Send only the venues the visible shows play at, and only the bands'
+  // songs plus anything on a setlist. The tables hold hundreds of venues and
+  // over a thousand songs; the rest of the song catalog loads from
+  // /api/songs when someone opens it.
   const linked = (records, field) => new Set((records || []).flatMap(r => r.fields?.[field] || []));
   if (!errors.VENUES && !errors.SHOWS) {
     const used = linked(results.SHOWS, 'Venue');
@@ -40,9 +41,13 @@ export default async function handler(req, res) {
   }
   if (!errors.SONGS && !errors.SETLISTS) {
     const used = linked(results.SETLISTS, 'Songs');
-    results.SONGS = results.SONGS.filter(s => used.has(s.id));
+    results.SONGS = results.SONGS.filter(s => used.has(s.id) || (s.fields?.['Performed By'] || []).length);
+    const kept = new Set(results.SONGS.map(s => s.id));
+    // Everyone's answers for those songs, and all of your own answers, so
+    // "My status" works on catalog songs you've marked too.
     if (!errors['SONG KNOWLEDGE']) {
-      results['SONG KNOWLEDGE'] = results['SONG KNOWLEDGE'].filter(k => (k.fields?.Song || []).some(id => used.has(id)));
+      results['SONG KNOWLEDGE'] = results['SONG KNOWLEDGE'].filter(k =>
+        (k.fields?.Song || []).some(id => kept.has(id)) || (k.fields?.Member || []).includes(person.id));
     }
   }
 

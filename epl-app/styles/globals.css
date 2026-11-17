@@ -626,6 +626,15 @@ button.row:active, a.row:active { background: var(--hover); }
 /* Not uppercased: "Eb" must not read as "EB". */
 .tuning-head strong { color: var(--accent); font-size: 0.875rem; letter-spacing: 0.02em; text-transform: none; }
 .song-num { width: 1.6rem; color: var(--faint); font-size: 0.875rem; font-weight: 700; text-align: right; font-variant-numeric: tabular-nums; }
+/* --- song library --------------------------------------------------------- */
+
+.library-filters { display: grid; gap: 0.6rem; }
+.song-dots { display: inline-flex; gap: 0.2rem; margin-right: 0.45rem; vertical-align: 0.04rem; }
+.song-status { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem 0.85rem; margin-top: 0.6rem; }
+.panel-foot { padding: 0.75rem 1.05rem 0.9rem; border-top: 1px solid var(--separator); text-align: center; }
+.lyrics { padding: 0.75rem 0.9rem; border-radius: 0.9rem; background: var(--fill-quiet); font-size: 0.9375rem; line-height: 1.6; white-space: pre-wrap; }
+.lyrics-clipped { max-height: 15rem; overflow: hidden; -webkit-mask-image: linear-gradient(#000 65%, transparent); mask-image: linear-gradient(#000 65%, transparent); }
+
 .strings { display: grid; grid-auto-columns: 1fr; grid-auto-flow: column; gap: 0.35rem; }
 .string { display: grid; justify-items: center; gap: 0.15rem; padding: 0.5rem 0.2rem; border-radius: 0.6rem; background: var(--fill-quiet); }
 .string span { color: var(--faint); font-size: 0.6875rem; font-weight: 700; }
@@ -714,6 +723,12 @@ button.row:active, a.row:active { background: var(--hover); }
 .chips { display: flex; flex-wrap: wrap; gap: 0.4rem; }
 .chip { padding: 0.45rem 0.8rem; border-radius: 999px; background: var(--fill-quiet); color: var(--muted); font-size: 0.875rem; font-weight: 600; }
 .chip[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent-fill); }
+.chip { display: inline-flex; align-items: center; gap: 0.4rem; flex-shrink: 0; white-space: nowrap; }
+.chip-count { color: var(--faint); font-variant-numeric: tabular-nums; }
+.chip[aria-pressed="true"] .chip-count { color: inherit; opacity: 0.7; }
+/* One row of chips that scrolls sideways, edge to edge on a phone. */
+.chips-scroll { flex-wrap: nowrap; overflow-x: auto; margin-inline: -1rem; padding: 0.1rem 1rem; scrollbar-width: none; overscroll-behavior-x: contain; }
+.chips-scroll::-webkit-scrollbar { display: none; }
 .form-error { color: var(--bad); font-size: 0.875rem; font-weight: 600; }
 
 /* --- status --------------------------------------------------------------- */

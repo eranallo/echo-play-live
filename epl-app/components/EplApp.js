@@ -1,14 +1,16 @@
-// The member app: loads the signed-in person's data, then runs the four tabs
-// (Home, Calendar, People, Setlists) with show and setlist pages pushed on top.
+// The member app: loads the signed-in person's data, then runs the tabs
+// (Home, Calendar, Practice, People, Songs) with show and setlist pages
+// pushed on top.
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import Head from 'next/head'
-import { House, CalendarDays, UsersRound, ListMusic, Camera, Sun, Moon, Drum } from 'lucide-react'
+import { House, CalendarDays, UsersRound, Music, Camera, Sun, Moon, Drum } from 'lucide-react'
 import { AppContext, useApp } from './context'
 import { Seal, Sheet, PersonCard, PersonAvatar, BandRoles, Toast } from './ui'
 import HomeScreen from './HomeScreen'
 import CalendarScreen from './CalendarScreen'
 import PeopleScreen from './PeopleScreen'
-import SetlistsScreen, { SetlistScreen } from './SetlistsScreen'
+import { SetlistScreen } from './SetlistsScreen'
+import SongsScreen from './SongsScreen'
 import ShowScreen from './ShowScreen'
 import PracticeScreen, { PracticeModal } from './PracticeScreen'
 import { indexData, memberBands } from '../lib/derive'
@@ -18,7 +20,7 @@ const TABS = [
   ['calendar', 'Calendar', CalendarDays],
   ['practice', 'Practice', Drum],
   ['people', 'People', UsersRound],
-  ['setlists', 'Setlists', ListMusic],
+  ['songs', 'Songs', Music],
 ]
 
 const PAGE_COLOR = { light: '#f5f0e8', dark: '#11191d' }
@@ -141,6 +143,10 @@ export default function EplApp({ token }) {
   const [profileOpen, setProfileOpen] = useState(false)
   const [toastMsg, setToastMsg] = useState(null)
   const [theme, setThemeState] = useState('light')
+  // Every song in Airtable, fetched the first time someone opens the full
+  // catalog and kept for the session.
+  const [catalog, setCatalog] = useState({ status: 'idle', data: null })
+  const catalogWanted = useRef(false)
 
   // Every API call carries the personal-link token.
   const api = useCallback((path, init = {}) => fetch(path, {
@@ -166,6 +172,20 @@ export default function EplApp({ token }) {
   }, [api])
 
   useEffect(() => { loadData() }, [loadData])
+
+  const loadCatalog = useCallback(async () => {
+    catalogWanted.current = true
+    setCatalog(c => ({ ...c, status: c.data ? 'ready' : 'loading' }))
+    try {
+      const res = await api('/api/songs?scope=catalog')
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok || json.error) throw new Error(json.error || 'Could not load the catalog')
+      setCatalog({ status: 'ready', data: json })
+    } catch (e) {
+      // A failed refresh keeps the catalog already on screen.
+      setCatalog(c => (c.data ? { ...c, status: 'ready' } : { status: 'error', data: null }))
+    }
+  }, [api])
 
   // The theme was applied before first paint by pages/_document.js.
   useEffect(() => { setThemeState(document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light') }, [])
@@ -214,7 +234,7 @@ export default function EplApp({ token }) {
       if (indicator) indicator.classList.remove('visible')
       if (dist > 80 && !refreshing) {
         refreshing = true
-        loadData().finally(() => { refreshing = false })
+        Promise.all([loadData(), catalogWanted.current ? loadCatalog() : null]).finally(() => { refreshing = false })
       }
       pulling = false
     }
@@ -227,7 +247,7 @@ export default function EplApp({ token }) {
       document.removeEventListener('touchend', onTouchEnd)
       if (indicator?.parentNode) indicator.parentNode.removeChild(indicator)
     }
-  }, [loadData])
+  }, [loadData, loadCatalog])
 
   const idx = useMemo(() => (data ? indexData(data) : null), [data])
   const me = data?.me
@@ -240,12 +260,13 @@ export default function EplApp({ token }) {
   const ctx = useMemo(() => ({
     data, idx, me, record, api, toast, setTab,
     reload: loadData,
+    catalog, loadCatalog,
     openShow: (id) => push({ type: 'show', id }),
     openSetlist: (id) => push({ type: 'setlist', id }),
     openPerson: (rec, type) => setPerson({ record: rec, type }),
     openPractice: (id) => setPracticeId(id),
     openProfile: () => setProfileOpen(true),
-  }), [data, idx, me, record, api, toast, setTab, loadData, push])
+  }), [data, idx, me, record, api, toast, setTab, loadData, catalog, loadCatalog, push])
 
   if (linkProblem) return (
     <CenteredMessage title="This link isn't working">
@@ -281,7 +302,7 @@ export default function EplApp({ token }) {
   else if (tab === 'calendar') screen = <CalendarScreen />
   else if (tab === 'practice') screen = <PracticeScreen />
   else if (tab === 'people') screen = <PeopleScreen />
-  else if (tab === 'setlists') screen = <SetlistsScreen />
+  else if (tab === 'songs') screen = <SongsScreen />
   else screen = <HomeScreen />
 
   const name = me.type === 'member' ? record.fields['Member Name'] : record.fields['Name']

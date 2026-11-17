@@ -1,7 +1,8 @@
 # Echo Play Live — member app
 
 A phone web app for Echo Play Live's band members and crew: upcoming shows,
-show details, setlists, the availability calendar and blackout dates. All data
+show details, the song library and setlists, the availability calendar and
+blackout dates. All data
 lives in the Echo Play Live Airtable base; the app reads it live, so what
 members see is what Airtable says.
 
@@ -42,6 +43,21 @@ Two tables in Airtable feed the newer features:
 - **SONG KNOWLEDGE**: one row per member per song (Know it / Learning / To
   learn). Members set their own answers in the app; the app writes the
   Entry and Key columns, so leave those alone.
+
+## The Songs tab
+
+A Library / Setlists switch. The library is built from SONGS:
+
+- A band's songs are the ones whose **Performed By** links to it, plus any
+  song on one of that band's setlists. Songs with **Show Status** "Dead" are
+  left out of the band lists and show as Retired in the full catalog.
+- **Full catalog** is every song in SONGS (about 1,200). It loads from
+  `/api/songs?scope=catalog` only when someone opens it, so the first load
+  stays small.
+- Filters: band, your own answer (with counts), and songs on your upcoming
+  shows' setlists.
+- A song's page adds band status, album / year / time signature / shorthand,
+  and **Lyrics**, fetched one song at a time from `/api/songs?id=`.
 
 ## What a person can change
 
@@ -97,14 +113,16 @@ pages/
   api/blackout.js     create / edit / delete your own blackout dates
   api/upload-photo.js
   api/song-knowledge.js  your answer for a song
+  api/songs.js        the full song catalog, and one song's lyrics
 components/
   EplApp.js           loading, tabs, back stack, profile sheet, theme
   HomeScreen.js       needs you, next show, this week, upcoming
-  CalendarScreen.js   month view (Mine / All EPL), coming up, unavailable dates
+  CalendarScreen.js   month view (Personal / Echo Play Live), coming up, blackouts
   ShowScreen.js       call times, directions, lineup, crew, set, notes, weather
   PracticeScreen.js   practices: coming up, called off, who's needed
   PeopleScreen.js     everyone in EPL, by band or A–Z
-  SetlistsScreen.js   setlists by tuning; who knows each song
+  SongsScreen.js      the Songs tab: library (filters, catalog) / setlists
+  SetlistsScreen.js   setlists by tuning; the song page; who knows each song
   ui.js               shared pieces: cards, rows, tags, sheets, avatars
   context.js          what every screen can reach (data, api, navigation)
 lib/

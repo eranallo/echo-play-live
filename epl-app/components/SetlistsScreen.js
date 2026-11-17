@@ -1,14 +1,14 @@
-// Setlists: the ones for your upcoming shows first, then every band's.
+// Setlists and the song page they share with the Songs tab.
 // A setlist reads like the stage sheet: songs grouped into tuning blocks.
 // Each song says who knows it, and members mark their own answer.
 import { useEffect, useMemo, useState } from 'react'
 import { ListMusic, ExternalLink } from 'lucide-react'
 import { useApp } from './context'
-import { Panel, PageHead, BandTag, Chevron, Modal, PersonAvatar, TopBar } from './ui'
-import { myShows, upcoming, ids, tuningBlocks, knowledgeIndex, bandRoster, knowledgeSummary, KNOWLEDGE, roleInBand } from '../lib/derive'
-import { fmtDate, fmtDur, fmtSetLength, setlistNotes, todayStr, plural } from '../lib/format'
+import { Panel, BandTag, Chevron, Modal, PersonAvatar, TopBar } from './ui'
+import { myShows, upcoming, ids, tuningBlocks, knowledgeIndex, bandRoster, knowledgeSummary, KNOWLEDGE, roleInBand, SONG_STATUS } from '../lib/derive'
+import { fmtDate, fmtDur, fmtSetLength, setlistNotes, todayStr, plural, firstName } from '../lib/format'
 
-const STATUS_PILL = { 'Know it': 'pill-good', 'Learning': 'pill-warn', 'To learn': '' }
+export const STATUS_PILL = { 'Know it': 'pill-good', 'Learning': 'pill-warn', 'To learn': '' }
 
 function SetlistRow({ sl, sub }) {
   const { idx, openSetlist } = useApp()
@@ -26,7 +26,9 @@ function SetlistRow({ sl, sub }) {
   )
 }
 
-export default function SetlistsScreen() {
+// The Setlists side of the Songs tab: the ones for your upcoming shows
+// first, then every band's.
+export function SetlistsList() {
   const { data, me, idx } = useApp()
   const today = todayStr()
   // Setlists attached to your next shows, each with the date it's for.
@@ -41,28 +43,101 @@ export default function SetlistsScreen() {
 
   return (
     <>
-      <TopBar />
-      <main className="content rise">
-        <PageHead title="Setlists" sub="Running orders, grouped by tuning like the stage sheet. Mark the songs you know." />
-        <Panel title="For your upcoming shows" count={forMe.length}>
-          {forMe.length ? (
-            <ul className="rows">{forMe.map(({ sl, show }) => <li key={sl.id}><SetlistRow sl={sl} sub={`Next: ${fmtDate(show.fields['Date'])}`} /></li>)}</ul>
-          ) : <p className="empty">None of your upcoming shows has a setlist yet.</p>}
-        </Panel>
-        <Panel title="All setlists" count={all.length}>
-          {all.length ? <ul className="rows">{all.map(sl => <li key={sl.id}><SetlistRow sl={sl} /></li>)}</ul> : <p className="empty">No setlists yet.</p>}
-        </Panel>
-      </main>
+      <Panel title="For your upcoming shows" count={forMe.length}>
+        {forMe.length ? (
+          <ul className="rows">{forMe.map(({ sl, show }) => <li key={sl.id}><SetlistRow sl={sl} sub={`Next: ${fmtDate(show.fields['Date'])}`} /></li>)}</ul>
+        ) : <p className="empty">None of your upcoming shows has a setlist yet.</p>}
+      </Panel>
+      <Panel title="All setlists" count={all.length}>
+        {all.length ? <ul className="rows">{all.map(sl => <li key={sl.id}><SetlistRow sl={sl} /></li>)}</ul> : <p className="empty">No setlists yet.</p>}
+      </Panel>
     </>
   )
+}
+
+// Your answers, with any you just changed shown straight away, and the save.
+// Shared by a setlist and the song library.
+export function useSongAnswers(knowledge) {
+  const { me, api, reload, toast } = useApp()
+  const [override, setOverride] = useState({}) // songId -> status, shown before the reload lands
+  const [busy, setBusy] = useState(false)
+
+  const answersFor = (id) => {
+    const base = knowledge.get(id)
+    if (me.type !== 'member' || !(id in override)) return base
+    const copy = new Map(base || [])
+    if (override[id]) copy.set(me.id, override[id]); else copy.delete(me.id)
+    return copy
+  }
+  const mineFor = (id) => (me.type === 'member' ? answersFor(id)?.get(me.id) || null : null)
+
+  async function answer(id, status) {
+    setBusy(true)
+    setOverride(o => ({ ...o, [id]: status }))
+    try {
+      const res = await api('/api/song-knowledge', { method: 'POST', body: JSON.stringify({ songId: id, status }) })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok || json.error) throw new Error(json.error || 'Could not save')
+      toast(status ? `Marked: ${status}` : 'Answer cleared')
+      reload()
+    } catch (e) {
+      setOverride(o => { const n = { ...o }; delete n[id]; return n })
+      toast(e.message)
+    }
+    setBusy(false)
+  }
+
+  return { answersFor, mineFor, answer, busy }
+}
+
+// Lyrics come one song at a time from /api/songs, kept for the session.
+const lyricsCache = new Map()
+function useLyrics(songId) {
+  const { api } = useApp()
+  const [text, setText] = useState(() => lyricsCache.get(songId) ?? null)
+  useEffect(() => {
+    if (lyricsCache.has(songId)) { setText(lyricsCache.get(songId)); return }
+    let cancelled = false
+    api(`/api/songs?id=${encodeURIComponent(songId)}`)
+      .then(r => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+      .then(j => {
+        const t = (j?.fields?.Lyrics || '').trim()
+        lyricsCache.set(songId, t)
+        if (!cancelled) setText(t)
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [songId, api])
+  return text
+}
+
+// "Who knows it" across EPL, for a song no band plays yet: only people who
+// have answered are listed, so nobody is counted as not knowing it.
+function everyoneSummary(answers, roster) {
+  const knows = roster.filter(m => answers?.get(m.id) === 'Know it')
+  const working = roster.filter(m => ['Learning', 'To learn'].includes(answers?.get(m.id)))
+  if (knows.length) return { text: knows.length === 1 ? `${firstName(knows[0].fields['Member Name'])} knows it` : `${knows.length} people know it`, tone: 'good' }
+  if (working.length) return { text: `${working.map(m => firstName(m.fields['Member Name'])).join(', ')} still on it`, tone: 'warn' }
+  return null
 }
 
 const GUITAR = ['E', 'A', 'D', 'G', 'B', 'e']
 const BASS = ['E', 'A', 'D', 'G']
 
-export function SongModal({ song, roster, answers, bandName, mine, onAnswer, busy, onClose }) {
-  const { me, openPerson } = useApp()
+export function SongModal({ song, roster, answers, bandName, everyone = false, mine, onAnswer, busy, onClose }) {
+  const { me, idx, openPerson } = useApp()
   const f = song.fields
+  const lyrics = useLyrics(song.id)
+  const [allLyrics, setAllLyrics] = useState(false)
+  const longLyrics = !!lyrics && (lyrics.split('\n').length > 14 || lyrics.length > 700)
+  const bands = idx.all('BANDS', f['Performed By'])
+  const status = SONG_STATUS[f['Show Status']]
+  const facts = [
+    ['Album', f['Album']],
+    ['Year', f['Year']],
+    ['Time signature', f['Time Signature']],
+    ['Shorthand', f['Abbreviation']],
+  ].filter(([, v]) => v)
   const q = encodeURIComponent(`${f['Song Title'] || ''} ${f['Artist'] || ''}`.trim())
   const links = [
     ['Spotify', `https://open.spotify.com/search/${q}`],
@@ -72,11 +147,17 @@ export function SongModal({ song, roster, answers, bandName, mine, onAnswer, bus
   const strings = (val, names) => (val ? String(val).split('.') : []).map((note, i) => ({ note, name: names[i] || '' }))
   const guitar = strings(f['Guitar Tuning'], GUITAR)
   const bass = strings(f['Bass Tuning'], BASS)
-  const summary = knowledgeSummary(answers, roster)
+  const summary = everyone ? everyoneSummary(answers, roster) : knowledgeSummary(answers, roster)
   return (
     <Modal onClose={onClose} label={f['Song Title']}>
       <h2 style={{ paddingRight: '2rem' }}>{f['Song Title']}</h2>
       <p className="row-sub">{[f['Artist'], fmtDur(f['Duration']), f['Key'] && `Key ${f['Key']}`, f['BPM'] && `${f['BPM']} bpm`].filter(Boolean).join(' · ')}</p>
+      {(bands.length > 0 || status) && (
+        <div className="song-status">
+          {bands.map(b => <BandTag key={b.id} name={b.fields['Band Name']} />)}
+          {status && <span className={`pill ${status.tone ? `pill-${status.tone}` : ''}`}>{status.label}</span>}
+        </div>
+      )}
 
       {me.type === 'member' && (
         <div className="practice-section">
@@ -92,7 +173,7 @@ export function SongModal({ song, roster, answers, bandName, mine, onAnswer, bus
 
       {roster.length > 0 && (
         <div className="practice-section">
-          <span className="label">Who knows it{bandName ? ` in ${bandName}` : ''}</span>
+          <span className="label">{everyone ? 'Who knows it in Echo Play Live' : `Who knows it${bandName ? ` in ${bandName}` : ''}`}</span>
           {summary && <p className={`knowledge-line tone-${summary.tone}`}>{summary.text}</p>}
           <ul className="practice-people">
             {roster.map(m => {
@@ -118,6 +199,23 @@ export function SongModal({ song, roster, answers, bandName, mine, onAnswer, bus
         </div>
       )}
 
+      {facts.length > 0 && (
+        <div className="practice-section">
+          <span className="label">About the song</span>
+          <dl className="rows link-list">
+            {facts.map(([label, value]) => <div className="kv" key={label}><dt>{label}</dt><dd>{value}</dd></div>)}
+          </dl>
+        </div>
+      )}
+
+      {lyrics && (
+        <div className="practice-section">
+          <span className="label">Lyrics</span>
+          <div className={`lyrics ${longLyrics && !allLyrics ? 'lyrics-clipped' : ''}`}>{lyrics}</div>
+          {longLyrics && !allLyrics && <button className="text-link" onClick={() => setAllLyrics(true)}>Show all lyrics</button>}
+        </div>
+      )}
+
       <div className="practice-section">
         <div className="rows link-list">
           {links.map(([label, href]) => (
@@ -133,12 +231,11 @@ export function SongModal({ song, roster, answers, bandName, mine, onAnswer, bus
 }
 
 export function SetlistScreen({ setlistId, onBack }) {
-  const { data, idx, me, api, reload, toast } = useApp()
+  const { data, idx, me } = useApp()
   const [songId, setSongId] = useState(null)
-  const [mineOverride, setMineOverride] = useState({}) // songId -> status, shown before the reload lands
-  const [busy, setBusy] = useState(false)
   useEffect(() => { window.scrollTo(0, 0) }, [setlistId])
   const knowledge = useMemo(() => knowledgeIndex(data), [data])
+  const { answersFor, mineFor, answer, busy } = useSongAnswers(knowledge)
 
   const sl = idx.get('SETLISTS', setlistId)
   if (!sl) return (<><TopBar title="Setlist" onBack={onBack} /><main className="content"><p className="empty">This setlist isn't available any more.</p></main></>)
@@ -150,33 +247,8 @@ export function SetlistScreen({ setlistId, onBack }) {
   const notes = setlistNotes(f['Notes'])
   const blocks = tuningBlocks(songs)
 
-  // Your answers, with any you just changed shown straight away.
-  const answersFor = (id) => {
-    const base = knowledge.get(id)
-    if (me.type !== 'member' || !(id in mineOverride)) return base
-    const copy = new Map(base || [])
-    if (mineOverride[id]) copy.set(me.id, mineOverride[id]); else copy.delete(me.id)
-    return copy
-  }
-  const mineFor = (id) => (me.type === 'member' ? answersFor(id)?.get(me.id) || null : null)
   const counts = me.type === 'member' ? KNOWLEDGE.map(s => [s, songs.filter(s2 => mineFor(s2.id) === s).length]) : []
   const unmarked = songs.filter(s => !mineFor(s.id)).length
-
-  async function answer(id, status) {
-    setBusy(true)
-    setMineOverride(o => ({ ...o, [id]: status }))
-    try {
-      const res = await api('/api/song-knowledge', { method: 'POST', body: JSON.stringify({ songId: id, status }) })
-      const json = await res.json().catch(() => ({}))
-      if (!res.ok || json.error) throw new Error(json.error || 'Could not save')
-      toast(status ? `Marked: ${status}` : 'Answer cleared')
-      reload()
-    } catch (e) {
-      setMineOverride(o => { const n = { ...o }; delete n[id]; return n })
-      toast(e.message)
-    }
-    setBusy(false)
-  }
 
   const open = songId ? songs.find(s => s.id === songId) : null
 

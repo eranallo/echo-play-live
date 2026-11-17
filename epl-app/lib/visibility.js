@@ -32,13 +32,23 @@ export const VISIBLE_FIELDS = {
   ],
   'BLACKOUT DATES': ['Member', 'Crew', 'Date', 'End Date', 'Reason'],
   SETLISTS: ['Set Name', 'Songs', 'Band', 'Show', 'Duration', 'Notes'],
-  SONGS: ['Song Title', 'Artist', 'Duration', 'Guitar Tuning', 'Bass Tuning', 'Key', 'BPM'],
+  // The library list and song page. "Show Status" is whether the band plays
+  // it (Live, Practicing, Untouched, Dead) and "Performed By" is which band.
+  // Production and pipeline fields stay in Airtable. Lyrics are sent one
+  // song at a time (SONG_DETAIL_FIELDS) so they never ride on every load.
+  SONGS: [
+    'Song Title', 'Artist', 'Duration', 'Guitar Tuning', 'Bass Tuning', 'Key', 'BPM',
+    'Show Status', 'Performed By', 'Album', 'Year', 'Time Signature', 'Abbreviation',
+  ],
   // Practices, cancelled ones included so members see a week was called off.
   PRACTICES: ['Practice', 'Band', 'Date', 'Start Time', 'End Time', 'Location', 'Status', 'Setlist', 'Members Needed', 'Notes'],
   // Who knows which song (Know it / Learning / To learn), one row per
   // member per song, written by the members themselves.
   'SONG KNOWLEDGE': ['Member', 'Song', 'Status'],
 };
+
+// Fetched by /api/songs?id= when a song's page opens.
+export const SONG_DETAIL_FIELDS = ['Lyrics'];
 
 // Members see confirmed shows (and past ones, which Airtable marks Completed).
 // Inquiries, holds and cancelled shows stay in Airtable.
