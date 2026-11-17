@@ -1,14 +1,48 @@
-// Setlists and the song page they share with the Songs tab.
+// Setlists, the song row and the song page they share with the Songs tab.
 // A setlist reads like the stage sheet: songs grouped into tuning blocks.
-// Each song says who knows it, and members mark their own answer.
+// Members mark their own answer for each song; who else knows it is at the
+// bottom of the song page.
 import { useEffect, useMemo, useState } from 'react'
 import { ListMusic, ExternalLink } from 'lucide-react'
 import { useApp } from './context'
 import { Panel, BandTag, Chevron, Modal, PersonAvatar, TopBar } from './ui'
-import { myShows, upcoming, ids, tuningBlocks, knowledgeIndex, bandRoster, knowledgeSummary, KNOWLEDGE, roleInBand, SONG_STATUS } from '../lib/derive'
-import { fmtDate, fmtDur, fmtSetLength, setlistNotes, todayStr, plural, firstName } from '../lib/format'
+import { myShows, upcoming, ids, tuningBlocks, tuningName, knowledgeIndex, bandRoster, KNOWLEDGE, roleInBand, SONG_STATUS } from '../lib/derive'
+import { fmtDate, fmtDur, fmtSetLength, setlistNotes, todayStr, plural } from '../lib/format'
 
 export const STATUS_PILL = { 'Know it': 'pill-good', 'Learning': 'pill-warn', 'To learn': '' }
+const MARK = { 'Know it': 'know', 'Learning': 'learning', 'To learn': 'to-learn' }
+const COL_LABEL = { tuning: 'Tuning', key: 'Key', bpm: 'BPM' }
+
+// One song as a row: your mark (a dot), title and artist, then tuning, key
+// and BPM in fixed columns, so they line up down the list and your mark
+// never covers them.
+export function SongRow({ song, n, mine, sub, cols = ['tuning', 'key', 'bpm'], onOpen }) {
+  const f = song.fields
+  const values = { tuning: tuningName(f['Guitar Tuning'], { short: true }), key: f['Key'], bpm: f['BPM'] }
+  return (
+    <button className={`song-row cols-${cols.length}${n != null ? ' numbered' : ''}`} onClick={onOpen}>
+      {n != null && <span className="song-num">{n}</span>}
+      <span className={`song-mark${mine ? ` mark-${MARK[mine]}` : ''}`}>{mine && <span className="sr-only">{mine}</span>}</span>
+      <span className="song-main">
+        <span className="row-title">{f['Song Title']}</span>
+        {sub && <span className="row-sub">{sub}</span>}
+      </span>
+      {cols.map(c => <span key={c} className={`song-col${values[c] ? '' : ' song-col-empty'}`}>{values[c] || '–'}</span>)}
+    </button>
+  )
+}
+
+// The labels over SongRow's columns.
+export function SongColsHead({ title, cols = ['tuning', 'key', 'bpm'], numbered = false }) {
+  return (
+    <div className={`song-row song-cols-head cols-${cols.length}${numbered ? ' numbered' : ''}`} aria-hidden="true">
+      {numbered && <span />}
+      <span />
+      <span className="song-main">{title}</span>
+      {cols.map(c => <span key={c} className="song-col">{COL_LABEL[c]}</span>)}
+    </div>
+  )
+}
 
 function SetlistRow({ sl, sub }) {
   const { idx, openSetlist } = useApp()
@@ -111,16 +145,6 @@ function useLyrics(songId) {
   return text
 }
 
-// "Who knows it" across EPL, for a song no band plays yet: only people who
-// have answered are listed, so nobody is counted as not knowing it.
-function everyoneSummary(answers, roster) {
-  const knows = roster.filter(m => answers?.get(m.id) === 'Know it')
-  const working = roster.filter(m => ['Learning', 'To learn'].includes(answers?.get(m.id)))
-  if (knows.length) return { text: knows.length === 1 ? `${firstName(knows[0].fields['Member Name'])} knows it` : `${knows.length} people know it`, tone: 'good' }
-  if (working.length) return { text: `${working.map(m => firstName(m.fields['Member Name'])).join(', ')} still on it`, tone: 'warn' }
-  return null
-}
-
 const GUITAR = ['E', 'A', 'D', 'G', 'B', 'e']
 const BASS = ['E', 'A', 'D', 'G']
 
@@ -147,7 +171,6 @@ export function SongModal({ song, roster, answers, bandName, everyone = false, m
   const strings = (val, names) => (val ? String(val).split('.') : []).map((note, i) => ({ note, name: names[i] || '' }))
   const guitar = strings(f['Guitar Tuning'], GUITAR)
   const bass = strings(f['Bass Tuning'], BASS)
-  const summary = everyone ? everyoneSummary(answers, roster) : knowledgeSummary(answers, roster)
   return (
     <Modal onClose={onClose} label={f['Song Title']}>
       <h2 style={{ paddingRight: '2rem' }}>{f['Song Title']}</h2>
@@ -171,31 +194,10 @@ export function SongModal({ song, roster, answers, bandName, everyone = false, m
         </div>
       )}
 
-      {roster.length > 0 && (
-        <div className="practice-section">
-          <span className="label">{everyone ? 'Who knows it in Echo Play Live' : `Who knows it${bandName ? ` in ${bandName}` : ''}`}</span>
-          {summary && <p className={`knowledge-line tone-${summary.tone}`}>{summary.text}</p>}
-          <ul className="practice-people">
-            {roster.map(m => {
-              const a = answers?.get(m.id)
-              return (
-                <li key={m.id}>
-                  <button onClick={() => openPerson(m, 'member')}>
-                    <PersonAvatar record={m} type="member" size={32} />
-                    <span><span className="row-title">{m.fields['Member Name']}</span><span className="row-sub">{roleInBand(m, bandName)}</span></span>
-                    <span className={`pill ${a ? STATUS_PILL[a] : ''}`}>{a || 'Not said'}</span>
-                  </button>
-                </li>
-              )
-            })}
-          </ul>
-        </div>
-      )}
-
       {(guitar.length > 0 || bass.length > 0) && (
         <div className="practice-section">
-          {guitar.length > 0 && <><span className="label">Guitar, low to high</span><div className="strings">{guitar.map((s, i) => <div className="string" key={i}><span>{s.name}</span><strong>{s.note}</strong></div>)}</div></>}
-          {bass.length > 0 && <><span className="label" style={{ marginTop: guitar.length ? '0.6rem' : 0 }}>Bass, low to high</span><div className="strings">{bass.map((s, i) => <div className="string" key={i}><span>{s.name}</span><strong>{s.note}</strong></div>)}</div></>}
+          {guitar.length > 0 && <><span className="label">Guitar · <strong>{tuningName(f['Guitar Tuning'])}</strong>, low to high</span><div className="strings">{guitar.map((s, i) => <div className="string" key={i}><span>{s.name}</span><strong>{s.note}</strong></div>)}</div></>}
+          {bass.length > 0 && <><span className="label" style={{ marginTop: guitar.length ? '0.6rem' : 0 }}>Bass · <strong>{tuningName(f['Bass Tuning'])}</strong>, low to high</span><div className="strings">{bass.map((s, i) => <div className="string" key={i}><span>{s.name}</span><strong>{s.note}</strong></div>)}</div></>}
         </div>
       )}
 
@@ -226,6 +228,26 @@ export function SongModal({ song, roster, answers, bandName, everyone = false, m
           ))}
         </div>
       </div>
+
+      {roster.length > 0 && (
+        <div className="practice-section">
+          <span className="label">{everyone ? 'Who knows it in Echo Play Live' : `Who knows it${bandName ? ` in ${bandName}` : ''}`}</span>
+          <ul className="practice-people">
+            {roster.map(m => {
+              const a = answers?.get(m.id)
+              return (
+                <li key={m.id}>
+                  <button onClick={() => openPerson(m, 'member')}>
+                    <PersonAvatar record={m} type="member" size={32} />
+                    <span><span className="row-title">{m.fields['Member Name']}</span><span className="row-sub">{roleInBand(m, bandName)}</span></span>
+                    <span className={`pill ${a ? STATUS_PILL[a] : ''}`}>{a || 'Not said'}</span>
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
+        </div>
+      )}
     </Modal>
   )
 }
@@ -272,30 +294,30 @@ export function SetlistScreen({ setlistId, onBack }) {
         )}
         {notes && <Panel title="Set notes"><p className="note">{notes}</p></Panel>}
         <section className="panel">
-          {blocks.length ? blocks.map((block, bi) => (
-            <div key={bi}>
-              <div className="tuning-head"><span>Tuning <strong>{block.tuning}</strong></span><span>{plural(block.songs.length, 'song')}</span></div>
-              <ul className="rows">
-                {block.songs.map(({ song: s, n }) => {
-                  const summary = knowledgeSummary(answersFor(s.id), roster)
-                  const mine = mineFor(s.id)
-                  return (
-                    <li key={s.id + n}>
-                      <button className="row" onClick={() => setSongId(s.id)}>
-                        <span className="song-num">{n}</span>
-                        <span>
-                          <span className="row-title">{s.fields['Song Title']}</span>
-                          <span className="row-sub">{[s.fields['Artist'], fmtDur(s.fields['Duration'])].filter(Boolean).join(' · ')}</span>
-                          {summary && <span className={`knowledge-line tone-${summary.tone}`}>{summary.text}</span>}
-                        </span>
-                        <span className="row-end">{mine ? <span className={`pill ${STATUS_PILL[mine]}`}>{mine}</span> : (s.fields['Key'] || '')}</span>
-                      </button>
-                    </li>
-                  )
-                })}
-              </ul>
-            </div>
-          )) : <p className="empty">No songs on this setlist yet.</p>}
+          {blocks.length ? (
+            <>
+              <SongColsHead title="Songs" cols={['key', 'bpm']} numbered />
+              {blocks.map((block, bi) => (
+                <div key={bi}>
+                  <div className="tuning-head"><span>Tuning <strong>{block.tuning}</strong></span><span>{plural(block.songs.length, 'song')}</span></div>
+                  <ul className="rows">
+                    {block.songs.map(({ song: s, n }) => (
+                      <li key={s.id + n}>
+                        <SongRow
+                          song={s}
+                          n={n}
+                          mine={mineFor(s.id)}
+                          sub={[s.fields['Artist'], fmtDur(s.fields['Duration'])].filter(Boolean).join(' · ')}
+                          cols={['key', 'bpm']}
+                          onOpen={() => setSongId(s.id)}
+                        />
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </>
+          ) : <p className="empty">No songs on this setlist yet.</p>}
         </section>
       </main>
       {open && (

@@ -145,15 +145,42 @@ export function setlistsForShow(show, idx) {
   return idx.all('SETLISTS', show.fields['SETLISTS'])
 }
 
+// Tunings are stored as their string notes, low to high ("D.A.D.G.B.E").
+// These turn them into the names players use: Standard, Eb standard,
+// Drop D. Anything else is shown as its notes.
+const SEMITONE = { C: 0, 'C#': 1, Db: 1, D: 2, 'D#': 3, Eb: 3, E: 4, F: 5, 'F#': 6, Gb: 6, G: 7, 'G#': 8, Ab: 8, A: 9, 'A#': 10, Bb: 10, B: 11 }
+const STANDARD_STEPS = [5, 5, 5, 4, 5] // semitones between strings, low to high
+const DROP_STEPS = [7, 5, 5, 4, 5]
+
+export function tuningName(value, { short = false } = {}) {
+  if (!value) return null
+  const notes = String(value).split('.').map(n => n.trim()).filter(Boolean)
+  const semis = notes.map(n => SEMITONE[n])
+  if (notes.length < 2 || semis.some(n => n == null)) return notes.join(' ') || null
+  const steps = semis.slice(1).map((n, i) => (n - semis[i] + 12) % 12)
+  const fits = (pattern) => steps.every((n, i) => n === pattern[i])
+  const low = notes[0]
+  if (fits(STANDARD_STEPS)) return low === 'E' ? (short ? 'Std' : 'Standard') : `${low} ${short ? 'std' : 'standard'}`
+  if (fits(DROP_STEPS)) return `Drop ${low}`
+  return notes.join(' ')
+}
+
+// Order tunings from E standard down, standard before drop on the same note.
+export function compareTunings(a, b) {
+  const depth = (v) => { const n = SEMITONE[String(v || '').split('.')[0]]; return n == null ? -99 : n <= 4 ? n : n - 12 }
+  const drop = (v) => (/^Drop /.test(tuningName(v) || '') ? 1 : 0)
+  return depth(b) - depth(a) || drop(a) - drop(b) || String(a).localeCompare(String(b))
+}
+
 // Group a setlist's songs into runs of the same guitar tuning, the way the
 // printed stage sheet draws them.
 export function tuningBlocks(songs) {
   const blocks = []
   songs.forEach((song, i) => {
-    const tuning = (song.fields['Guitar Tuning'] || '').split('.')[0] || '—'
+    const value = song.fields['Guitar Tuning'] || ''
     const last = blocks[blocks.length - 1]
-    if (last && last.tuning === tuning) last.songs.push({ song, n: i + 1 })
-    else blocks.push({ tuning, songs: [{ song, n: i + 1 }] })
+    if (last && last.value === value) last.songs.push({ song, n: i + 1 })
+    else blocks.push({ value, tuning: tuningName(value) || 'Not set', songs: [{ song, n: i + 1 }] })
   })
   return blocks
 }

@@ -54,8 +54,15 @@ A Library / Setlists switch. The library is built from SONGS:
 - **Full catalog** is every song in SONGS (about 1,200). It loads from
   `/api/songs?scope=catalog` only when someone opens it, so the first load
   stays small.
-- Filters: band, your own answer (with counts), and songs on your upcoming
-  shows' setlists.
+- Two filter buttons, **Band** and **Status**, each open a sheet of choices
+  with song counts. Band includes "My upcoming sets" (songs on your next
+  shows' setlists) and Full catalog.
+- The list groups to suit the band choice: one band by tuning, several
+  bands by band, the full catalog A–Z. Each row shows your mark (a dot),
+  then tuning, key and BPM in columns. Tunings are named from their notes
+  (`D.A.D.G.B.E` → Drop D) in `lib/derive.js`.
+- Who knows a song is listed only at the bottom of its page; setlists and
+  song lists don't show it.
 - A song's page adds band status, album / year / time signature / shorthand,
   and **Lyrics**, fetched one song at a time from `/api/songs?id=`.
 

@@ -629,9 +629,86 @@ button.row:active, a.row:active { background: var(--hover); }
 /* --- song library --------------------------------------------------------- */
 
 .library-filters { display: grid; gap: 0.6rem; }
-.song-dots { display: inline-flex; gap: 0.2rem; margin-right: 0.45rem; vertical-align: 0.04rem; }
+
+/* Band / Status: two buttons that open a sheet of choices. */
+.filter-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; }
+.filter-buttons.single { grid-template-columns: 1fr; }
+.filter-button {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: "kicker chev" "value chev";
+  align-items: center;
+  column-gap: 0.4rem;
+  min-height: 3.1rem;
+  padding: 0.5rem 0.75rem 0.55rem 0.9rem;
+  border-radius: var(--radius-control);
+  background: var(--card);
+  box-shadow: var(--shadow-card);
+  text-align: left;
+}
+.filter-kicker { grid-area: kicker; color: var(--muted); font-size: 0.6875rem; font-weight: 750; letter-spacing: 0.08em; text-transform: uppercase; }
+.filter-value { grid-area: value; display: flex; align-items: center; gap: 0.4rem; min-width: 0; font-size: 0.9375rem; font-weight: 650; }
+.filter-value > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.filter-button > svg { grid-area: chev; width: 1.05rem; height: 1.05rem; color: var(--faint); }
+.filter-button.active { box-shadow: inset 0 0 0 1px var(--accent-fill), var(--shadow-card); }
+.filter-button.active .filter-value { color: var(--accent); }
+
+/* A choice in a filter sheet. */
+.choice-title { display: flex; align-items: center; gap: 0.5rem; }
+.choice-end { display: inline-flex; align-items: center; gap: 0.6rem; font-variant-numeric: tabular-nums; }
+.choice-end svg { width: 1.1rem; height: 1.1rem; color: var(--accent); }
+.choice-gap { display: inline-block; width: 1.1rem; }
+.choice[aria-pressed="true"] .choice-title { color: var(--accent); }
+
+/* Song rows: mark, title and artist, then fixed columns that line up. */
+.song-list { display: grid; gap: 0.75rem; }
+.song-row {
+  display: grid;
+  grid-template-columns: 0.5rem minmax(0, 1fr) 3.6rem 2.3rem 1.9rem;
+  align-items: center;
+  column-gap: 0.6rem;
+  width: 100%;
+  min-height: 3.25rem;
+  padding: 0.65rem 1.05rem;
+  text-align: left;
+}
+.song-row.cols-2 { grid-template-columns: 0.5rem minmax(0, 1fr) 2.3rem 1.9rem; }
+.song-row.numbered.cols-3 { grid-template-columns: 1.2rem 0.5rem minmax(0, 1fr) 3.6rem 2.3rem 1.9rem; }
+.song-row.numbered.cols-2 { grid-template-columns: 1.2rem 0.5rem minmax(0, 1fr) 2.3rem 1.9rem; }
+button.song-row { transition: background 150ms var(--ease); }
+button.song-row:active { background: var(--hover); }
+.song-row .song-num { width: auto; }
+.song-main { min-width: 0; }
+.song-col { text-align: right; font-size: 0.8125rem; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.song-col-empty { color: var(--faint); font-weight: 500; }
+.song-cols-head { min-height: 0; padding-block: 0 0.1rem; color: var(--muted); font-size: 0.6875rem; font-weight: 750; letter-spacing: 0.08em; text-transform: uppercase; }
+.song-cols-head .song-col { font-size: 0.625rem; font-weight: 750; }
+.panel > .song-cols-head { padding-top: 0.8rem; }
+.song-cols-head .song-main { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Your mark: green know it, amber learning, an open ring to learn. */
+.song-mark { display: inline-block; flex-shrink: 0; width: 0.5rem; height: 0.5rem; border-radius: 999px; }
+.mark-know { background: var(--good); }
+.mark-learning { background: var(--warn); }
+.mark-to-learn { box-shadow: inset 0 0 0 1.5px var(--muted); }
+.song-legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.4rem 1rem; color: var(--muted); font-size: 0.75rem; }
+.song-legend > span { display: inline-flex; align-items: center; gap: 0.35rem; }
+
+.song-group-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.6rem 1.05rem;
+  background: var(--fill-quiet);
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 650;
+}
+.song-group-head > span:first-child { display: inline-flex; align-items: center; gap: 0.45rem; }
+.song-group-head strong { color: var(--text); font-size: 0.9375rem; font-weight: 750; }
+.song-group-eyebrow { font-size: 0.6875rem; font-weight: 750; letter-spacing: 0.08em; text-transform: uppercase; }
 .song-status { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem 0.85rem; margin-top: 0.6rem; }
-.panel-foot { padding: 0.75rem 1.05rem 0.9rem; border-top: 1px solid var(--separator); text-align: center; }
 .lyrics { padding: 0.75rem 0.9rem; border-radius: 0.9rem; background: var(--fill-quiet); font-size: 0.9375rem; line-height: 1.6; white-space: pre-wrap; }
 .lyrics-clipped { max-height: 15rem; overflow: hidden; -webkit-mask-image: linear-gradient(#000 65%, transparent); mask-image: linear-gradient(#000 65%, transparent); }
 
@@ -723,12 +800,6 @@ button.row:active, a.row:active { background: var(--hover); }
 .chips { display: flex; flex-wrap: wrap; gap: 0.4rem; }
 .chip { padding: 0.45rem 0.8rem; border-radius: 999px; background: var(--fill-quiet); color: var(--muted); font-size: 0.875rem; font-weight: 600; }
 .chip[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent-fill); }
-.chip { display: inline-flex; align-items: center; gap: 0.4rem; flex-shrink: 0; white-space: nowrap; }
-.chip-count { color: var(--faint); font-variant-numeric: tabular-nums; }
-.chip[aria-pressed="true"] .chip-count { color: inherit; opacity: 0.7; }
-/* One row of chips that scrolls sideways, edge to edge on a phone. */
-.chips-scroll { flex-wrap: nowrap; overflow-x: auto; margin-inline: -1rem; padding: 0.1rem 1rem; scrollbar-width: none; overscroll-behavior-x: contain; }
-.chips-scroll::-webkit-scrollbar { display: none; }
 .form-error { color: var(--bad); font-size: 0.875rem; font-weight: 600; }
 
 /* --- status --------------------------------------------------------------- */
