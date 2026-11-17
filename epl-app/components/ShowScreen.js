@@ -1,7 +1,7 @@
 // One show, read the way you'd use it on the day: when to be there, where,
 // who's playing and crewing, the set, and the notes.
 import { useEffect, useState } from 'react'
-import { Navigation, Ticket, ListMusic, Sun, CloudSun, Cloud, CloudFog, CloudDrizzle, CloudRain, CloudSnow, CloudLightning, Thermometer, Home, Trees } from 'lucide-react'
+import { Navigation, Ticket, ListMusic, Sun, CloudSun, Cloud, CloudFog, CloudDrizzle, CloudRain, CloudSnow, CloudLightning, Thermometer, House, Trees, TentTree } from 'lucide-react'
 import { useApp } from './context'
 import { Panel, TopBar, BandTag, PersonAvatar, Chevron, Lightbox } from './ui'
 import { setlistsForShow, ids, roleInBand } from '../lib/derive'
@@ -43,6 +43,13 @@ function useForecast(show, venue) {
     return () => { cancelled = true }
   }, [ds, venue?.id]) // eslint-disable-line react-hooks/exhaustive-deps
   return wx
+}
+
+// SHOWS "Indoor / Outdoor" is a single select: Indoor, Outdoor or Both.
+const SETTING = {
+  Indoor: { label: 'Indoor show', Icon: House, tone: '' },
+  Outdoor: { label: 'Outdoor show', Icon: Trees, tone: 'pill-good' },
+  Both: { label: 'Indoor & outdoor', Icon: TentTree, tone: 'pill-good' },
 }
 
 const isImage = (a) => !a.type || a.type.startsWith('image/')
@@ -139,7 +146,7 @@ export default function ShowScreen({ showId, onBack }) {
   })
   const sets = setlistsForShow(show, idx)
   const notes = [['Show notes', f['Show Notes']], ['Production notes', f['Production Notes']], ['Sound notes', f['Sound Notes']], ['Merch notes', f['Merch Notes']]].filter(([, v]) => v)
-  const env = f['Indoor / Outdoor']
+  const setting = SETTING[f['Indoor / Outdoor']]
   const hero = (vf['Photo'] || []).find(isImage)
 
   return (
@@ -162,7 +169,7 @@ export default function ShowScreen({ showId, onBack }) {
           {vf['Venue Name'] && <p className="show-sub">{[vf['Venue Name'], vf['City']].filter(Boolean).join(' · ')}</p>}
           <div className="show-badges">
             <span className={`pill ${past ? '' : 'pill-accent'}`}>{past ? 'Played' : countdown(f['Date'])}</span>
-            {env && <span className="pill">{env === 'Outdoor' ? <Trees aria-hidden="true" /> : <Home aria-hidden="true" />}{env}</span>}
+            {setting && <span className={`pill ${setting.tone}`}><setting.Icon aria-hidden="true" />{setting.label}</span>}
             {wx && <span className={`pill ${wx.rain > 50 ? 'pill-warn' : ''}`}><wx.Icon aria-hidden="true" />{wx.hi}°/{wx.lo}° · {wx.rain}% rain</span>}
           </div>
         </header>
