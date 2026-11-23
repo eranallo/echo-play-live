@@ -32,6 +32,10 @@ export const VISIBLE_FIELDS = {
   ],
   'BLACKOUT DATES': ['Member', 'Crew', 'Date', 'End Date', 'Reason'],
   SETLISTS: ['Set Name', 'Songs', 'Band', 'Show', 'Duration', 'Notes'],
+  // The running order built in the setlist editor: one row per song, cue
+  // (Break, Transition, Announcement) or Set Break, placed by Set Number and
+  // Position. Duration is the editor's formula (override or song length).
+  'SETLIST ITEMS': ['Item', 'Song', 'Item Type', 'Cue Text', 'Cue Duration', 'Setlist', 'Position', 'Set Number', 'Duration'],
   // The library list and song page. "Show Status" is whether the band plays
   // it (Live, Practicing, Untouched, Dead) and "Performed By" is which band.
   // Production and pipeline fields stay in Airtable. Lyrics are sent one

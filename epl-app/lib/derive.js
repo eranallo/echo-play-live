@@ -147,22 +147,34 @@ export function setlistsForShow(show, idx) {
 
 // Tunings are stored as their string notes, low to high ("D.A.D.G.B.E").
 // These turn them into the names players use: Standard, Eb standard,
-// Drop D. Anything else is shown as its notes.
+// Drop D, and for 7- and 8-string guitars "Drop E · 8-string". Anything
+// else is shown as its notes.
 const SEMITONE = { C: 0, 'C#': 1, Db: 1, D: 2, 'D#': 3, Eb: 3, E: 4, F: 5, 'F#': 6, Gb: 6, G: 7, 'G#': 8, Ab: 8, A: 9, 'A#': 10, Bb: 10, B: 11 }
-const STANDARD_STEPS = [5, 5, 5, 4, 5] // semitones between strings, low to high
-const DROP_STEPS = [7, 5, 5, 4, 5]
 
-export function tuningName(value, { short = false } = {}) {
-  if (!value) return null
-  const notes = String(value).split('.').map(n => n.trim()).filter(Boolean)
+// Semitones between neighbouring strings in standard tuning: fourths, plus
+// the major third between the G and B strings on a guitar (6+ strings).
+// Basses (4-5 strings) are all fourths. Drop: the lowest string a whole
+// step further down.
+const standardSteps = (strings) => Array.from({ length: strings - 1 }, (_, i) => (strings >= 6 && i === strings - 3 ? 4 : 5))
+
+function readTuning(value) {
+  const notes = String(value || '').split('.').map(n => n.trim()).filter(Boolean)
   const semis = notes.map(n => SEMITONE[n])
-  if (notes.length < 2 || semis.some(n => n == null)) return notes.join(' ') || null
+  if (notes.length < 2 || semis.some(n => n == null)) return { notes, kind: null }
   const steps = semis.slice(1).map((n, i) => (n - semis[i] + 12) % 12)
-  const fits = (pattern) => steps.every((n, i) => n === pattern[i])
+  const std = standardSteps(notes.length)
+  const same = (pattern) => steps.every((n, i) => n === pattern[i])
+  const kind = same(std) ? 'standard' : same([7, ...std.slice(1)]) ? 'drop' : null
+  return { notes, kind }
+}
+
+export function tuningName(value) {
+  if (!value) return null
+  const { notes, kind } = readTuning(value)
+  if (!kind) return notes.join(' ') || null
   const low = notes[0]
-  if (fits(STANDARD_STEPS)) return low === 'E' ? (short ? 'Std' : 'Standard') : `${low} ${short ? 'std' : 'standard'}`
-  if (fits(DROP_STEPS)) return `Drop ${low}`
-  return notes.join(' ')
+  const base = kind === 'drop' ? `Drop ${low}` : low === 'E' ? 'Standard' : `${low} standard`
+  return notes.length > 6 ? `${base} · ${notes.length}-string` : base
 }
 
 // A colour per tuning so they stand out in lists: standard tunings in cool
@@ -170,27 +182,93 @@ export function tuningName(value, { short = false } = {}) {
 const TUNING_COLOR = {
   'Standard': 'blue', 'Eb standard': 'violet', 'D standard': 'teal', 'C standard': 'slate',
   'Drop D': 'orange', 'Drop Db': 'red', 'Drop C': 'magenta', 'Drop B': 'brown',
+  'Drop F# · 7-string': 'gold', 'Drop E · 8-string': 'wine',
 }
 export const tuningColor = (value) => TUNING_COLOR[tuningName(value)] || 'gray'
 
 // Order tunings from E standard down, standard before drop on the same note.
 export function compareTunings(a, b) {
-  const depth = (v) => { const n = SEMITONE[String(v || '').split('.')[0]]; return n == null ? -99 : n <= 4 ? n : n - 12 }
-  const drop = (v) => (/^Drop /.test(tuningName(v) || '') ? 1 : 0)
+  const depth = (v) => {
+    const { notes } = readTuning(v)
+    const n = SEMITONE[notes[0]]
+    if (n == null) return -99
+    const d = n <= 4 ? n : n - 12 // E2 and below
+    return notes.length >= 8 && d > -6 ? d - 12 : d // 8-strings sit an octave lower
+  }
+  const drop = (v) => (readTuning(v).kind === 'drop' ? 1 : 0)
   return depth(b) - depth(a) || drop(a) - drop(b) || String(a).localeCompare(String(b))
 }
 
-// Group a setlist's songs into runs of the same guitar tuning, the way the
-// printed stage sheet draws them.
-export function tuningBlocks(songs) {
-  const blocks = []
-  songs.forEach((song, i) => {
-    const value = song.fields['Guitar Tuning'] || ''
-    const last = blocks[blocks.length - 1]
-    if (last && last.value === value) last.songs.push({ song, n: i + 1 })
-    else blocks.push({ value, tuning: tuningName(value) || 'Not set', songs: [{ song, n: i + 1 }] })
-  })
-  return blocks
+// A setlist in the running order built in Airtable's setlist editor:
+// SETLIST ITEMS sorted by Set Number, then Position. Break, Transition and
+// Announcement cues stay where they were placed, and a Set Break starts the
+// next set. Only songs still linked in SETLISTS "Songs" are shown (the
+// editor keeps a song's row when it's unlinked); linked songs with no row
+// yet are returned as `unplaced`. A setlist never arranged in the editor
+// runs in the order of its Songs field.
+//
+// Returns { sets: [{ number, songs, seconds, entries }], unplaced, songs,
+// seconds }. Entries are { kind: 'tuning', value, count } whenever the
+// guitar tuning changes, { kind: 'song', song, n, seconds } and
+// { kind: 'cue', type, label, seconds }.
+export function setlistLayout(sl, data, idx) {
+  const linked = ids(sl.fields['Songs'])
+  const linkedSet = new Set(linked)
+  const typeOf = (it) => it.fields['Item Type'] || (ids(it.fields['Song']).length ? 'Song' : 'Break')
+  const order = (it) => (it.fields['Position'] == null ? Infinity : Number(it.fields['Position']))
+  const items = (data['SETLIST ITEMS'] || [])
+    .filter(it => ids(it.fields['Setlist']).includes(sl.id))
+    .filter(it => typeOf(it) !== 'Song' || ids(it.fields['Song']).some(id => linkedSet.has(id)))
+    .sort((a, b) => (a.fields['Set Number'] || 1) - (b.fields['Set Number'] || 1) || order(a) - order(b))
+  const arranged = items.some(it => typeOf(it) === 'Song')
+
+  const sets = []
+  let set = null
+  let block = null
+  const startSet = (number) => { set = { number, songs: 0, seconds: 0, entries: [] }; sets.push(set); block = null }
+  const addSong = (song, seconds, key) => {
+    const tuning = song.fields['Guitar Tuning'] || ''
+    if (!block || block.value !== tuning) { block = { kind: 'tuning', value: tuning, count: 0, key: 't-' + key }; set.entries.push(block) }
+    block.count++
+    set.songs++
+    set.seconds += Number(seconds) || 0
+    set.entries.push({ kind: 'song', song, n: set.songs, seconds, key })
+  }
+
+  const placed = new Set()
+  if (arranged) {
+    let breakPending = false
+    for (const it of items) {
+      const type = typeOf(it)
+      const number = it.fields['Set Number'] || 1
+      if (type === 'Set Break') { if (set) breakPending = true; continue }
+      if (!set) startSet(number)
+      else if (breakPending || number !== set.number) startSet(Math.max(number, breakPending ? set.number + 1 : number))
+      breakPending = false
+      if (type === 'Song') {
+        const songId = ids(it.fields['Song']).find(id => linkedSet.has(id))
+        const song = idx.get('SONGS', songId)
+        if (!song) continue
+        placed.add(songId)
+        addSong(song, it.fields['Duration'] ?? song.fields['Duration'], it.id)
+      } else {
+        const seconds = it.fields['Cue Duration'] ?? it.fields['Duration']
+        set.entries.push({ kind: 'cue', type, label: it.fields['Cue Text'] || it.fields['Item'] || type, seconds, key: it.id })
+        set.seconds += Number(seconds) || 0
+      }
+    }
+  } else if (linked.length) {
+    startSet(1)
+    linked.forEach((id, i) => { const song = idx.get('SONGS', id); if (song) { placed.add(id); addSong(song, song.fields['Duration'], id + i) } })
+  }
+
+  const unplaced = linked.filter(id => !placed.has(id)).map(id => idx.get('SONGS', id)).filter(Boolean)
+  return {
+    sets,
+    unplaced,
+    songs: sets.reduce((n, s) => n + s.songs, 0) + unplaced.length,
+    seconds: sets.reduce((n, s) => n + s.seconds, 0) + unplaced.reduce((n, s) => n + (Number(s.fields['Duration']) || 0), 0),
+  }
 }
 
 // --- practices ------------------------------------------------------------

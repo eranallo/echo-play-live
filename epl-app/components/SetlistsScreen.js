@@ -3,10 +3,10 @@
 // Members mark their own answer for each song; who else knows it is at the
 // bottom of the song page.
 import { useEffect, useMemo, useState } from 'react'
-import { ListMusic, ExternalLink } from 'lucide-react'
+import { ListMusic, ExternalLink, ArrowLeftRight, Megaphone, Pause } from 'lucide-react'
 import { useApp } from './context'
 import { Panel, BandTag, Chevron, Modal, PersonAvatar, TopBar } from './ui'
-import { myShows, upcoming, ids, tuningBlocks, tuningName, tuningColor, knowledgeIndex, bandRoster, KNOWLEDGE, roleInBand, SONG_STATUS } from '../lib/derive'
+import { myShows, upcoming, ids, setlistLayout, tuningName, tuningColor, knowledgeIndex, bandRoster, KNOWLEDGE, roleInBand, SONG_STATUS } from '../lib/derive'
 import { fmtDate, fmtDur, fmtSetLength, setlistNotes, todayStr, plural } from '../lib/format'
 
 export const STATUS_PILL = { 'Know it': 'pill-good', 'Learning': 'pill-warn', 'To learn': '' }
@@ -245,6 +245,22 @@ export function SongModal({ song, roster, answers, bandName, everyone = false, m
   )
 }
 
+// A cue in the running order: a transition, a break or an announcement.
+function CueRow({ entry }) {
+  const transition = /transition/i.test(entry.label)
+  const Icon = entry.type === 'Announcement' ? Megaphone : transition ? ArrowLeftRight : Pause
+  return (
+    <div className={`cue-row cue-${entry.type === 'Announcement' ? 'announce' : transition ? 'transition' : 'break'}`}>
+      <Icon aria-hidden="true" />
+      <span>{entry.label}</span>
+      {fmtDur(entry.seconds) && <span className="cue-time">{fmtDur(entry.seconds)}</span>}
+    </div>
+  )
+}
+
+// A setlist in the order it was built in Airtable's setlist editor: each
+// set with its songs, the tuning wherever it changes, and the transitions
+// and breaks in between.
 export function SetlistScreen({ setlistId, onBack }) {
   const { data, idx, me } = useApp()
   const [songId, setSongId] = useState(null)
@@ -253,26 +269,41 @@ export function SetlistScreen({ setlistId, onBack }) {
   const { answersFor, mineFor, answer, busy } = useSongAnswers(knowledge)
 
   const sl = idx.get('SETLISTS', setlistId)
+  const layout = useMemo(() => (sl ? setlistLayout(sl, data, idx) : null), [sl, data, idx])
   if (!sl) return (<><TopBar title="Setlist" onBack={onBack} /><main className="content"><p className="empty">This setlist isn't available any more.</p></main></>)
   const f = sl.fields
-  const songs = idx.all('SONGS', f['Songs'])
   const band = idx.all('BANDS', f['Band'])[0]
   const bandName = band?.fields['Band Name']
   const roster = band ? bandRoster(data, band.id) : []
   const notes = setlistNotes(f['Notes'])
-  const blocks = tuningBlocks(songs)
 
+  // Every song once, for your progress and the song page.
+  const songs = [...new Map([
+    ...layout.sets.flatMap(st => st.entries.filter(e => e.kind === 'song').map(e => e.song)),
+    ...layout.unplaced,
+  ].map(s => [s.id, s])).values()]
   const counts = me.type === 'member' ? KNOWLEDGE.map(s => [s, songs.filter(s2 => mineFor(s2.id) === s).length]) : []
   const unmarked = songs.filter(s => !mineFor(s.id)).length
-
   const open = songId ? songs.find(s => s.id === songId) : null
+  const songRow = (s, n, seconds, showTuning) => (
+    <SongRow
+      key={s.id + '-' + n}
+      song={s}
+      n={n}
+      mine={mineFor(s.id)}
+      sub={[s.fields['Artist'], fmtDur(seconds)].filter(Boolean).join(' · ')}
+      showTuning={showTuning}
+      onOpen={() => setSongId(s.id)}
+    />
+  )
+  const many = layout.sets.length > 1
 
   return (
     <>
       <TopBar title={f['Set Name'] || 'Setlist'} onBack={onBack} />
       <main className="content rise">
         <header className="page-head">
-          <p className="eyebrow">{[plural(songs.length, 'song'), fmtSetLength(f['Duration'])].filter(Boolean).join(' · ')}</p>
+          <p className="eyebrow">{[plural(layout.songs, 'song'), many && plural(layout.sets.length, 'set'), fmtSetLength(layout.seconds || f['Duration'])].filter(Boolean).join(' · ')}</p>
           <h1>{f['Set Name'] || 'Setlist'}</h1>
           {band && <div className="tags" style={{ marginTop: '0.5rem' }}><BandTag name={bandName} /></div>}
         </header>
@@ -286,31 +317,31 @@ export function SetlistScreen({ setlistId, onBack }) {
           </section>
         )}
         {notes && <Panel title="Set notes"><p className="note">{notes}</p></Panel>}
-        <section className="panel">
-          {blocks.length ? (
-            <>
-              {blocks.map((block, bi) => (
-                <div key={bi}>
-                  <div className="tuning-head"><span>Tuning <TuningBadge value={block.value} /></span><span>{plural(block.songs.length, 'song')}</span></div>
-                  <ul className="rows">
-                    {block.songs.map(({ song: s, n }) => (
-                      <li key={s.id + n}>
-                        <SongRow
-                          song={s}
-                          n={n}
-                          mine={mineFor(s.id)}
-                          sub={[s.fields['Artist'], fmtDur(s.fields['Duration'])].filter(Boolean).join(' · ')}
-                          showTuning={false}
-                          onOpen={() => setSongId(s.id)}
-                        />
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
-            </>
-          ) : <p className="empty">No songs on this setlist yet.</p>}
-        </section>
+
+        {layout.sets.map(st => (
+          <section className="panel" key={'set' + st.number}>
+            {many && (
+              <div className="set-head">
+                <strong>Set {st.number}</strong>
+                <span>{[plural(st.songs, 'song'), fmtSetLength(st.seconds)].filter(Boolean).join(' · ')}</span>
+              </div>
+            )}
+            <div className="rows">
+              {st.entries.map(e => e.kind === 'tuning' ? (
+                <div className="tuning-head" key={e.key}><span>Tuning <TuningBadge value={e.value} /></span><span>{plural(e.count, 'song')}</span></div>
+              ) : e.kind === 'cue' ? (
+                <CueRow key={e.key} entry={e} />
+              ) : songRow(e.song, e.n, e.seconds, false))}
+            </div>
+          </section>
+        ))}
+
+        {layout.unplaced.length > 0 && (
+          <Panel title={layout.sets.length ? 'Not in the running order yet' : 'Songs'} count={layout.unplaced.length}>
+            <div className="rows">{layout.unplaced.map((s, i) => songRow(s, null, s.fields['Duration'], true))}</div>
+          </Panel>
+        )}
+        {!layout.sets.length && !layout.unplaced.length && <section className="panel"><p className="empty">No songs on this setlist yet.</p></section>}
       </main>
       {open && (
         <SongModal

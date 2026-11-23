@@ -68,6 +68,21 @@ A Library / Setlists switch. The library is built from SONGS:
 - A song's page adds band status, album / year / time signature / shorthand,
   and **Lyrics**, fetched one song at a time from `/api/songs?id=`.
 
+## Setlists: the running order
+
+A setlist page follows the order built in Airtable's setlist editor
+(`setlistLayout` in `lib/derive.js`):
+
+- Rows come from **SETLIST ITEMS**, sorted by **Set Number**, then
+  **Position** (saved by *Refresh Setlist*). Break, Transition and
+  Announcement cues show where they were placed; a **Set Break** starts the
+  next set, each with its song count and length.
+- Only songs still linked in the setlist's **Songs** field are shown (the
+  editor keeps a song's row after it's unlinked). Linked songs with no row
+  yet are listed under "Not in the running order yet".
+- The guitar tuning shows as a colour-coded heading wherever it changes.
+- A setlist never arranged in the editor runs in the order of its Songs field.
+
 ## What a person can change
 
 - **Blackout dates**: add, edit and delete their own (`pages/api/blackout.js`).
@@ -131,7 +146,7 @@ components/
   PracticeScreen.js   practices: coming up, called off, who's needed
   PeopleScreen.js     everyone in EPL, by band or A–Z
   SongsScreen.js      the Songs tab: library (filters, catalog) / setlists
-  SetlistsScreen.js   setlists by tuning; the song page; who knows each song
+  SetlistsScreen.js   setlists in running order; the song page; who knows it
   ui.js               shared pieces: cards, rows, tags, sheets, avatars
   context.js          what every screen can reach (data, api, navigation)
 lib/

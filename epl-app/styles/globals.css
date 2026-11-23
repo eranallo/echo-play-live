@@ -707,6 +707,8 @@ button.song-row:active { background: var(--hover); }
 .tune-red     { --tune: #c0262e; }
 .tune-magenta { --tune: #9e2391; }
 .tune-brown   { --tune: #85561f; }
+.tune-gold    { --tune: #8a6a00; }
+.tune-wine    { --tune: #8e1f3f; }
 .tune-gray    { --tune: var(--muted); }
 :root[data-theme="dark"] .tune-blue    { --tune: #86b4ff; }
 :root[data-theme="dark"] .tune-violet  { --tune: #bda3ff; }
@@ -716,10 +718,41 @@ button.song-row:active { background: var(--hover); }
 :root[data-theme="dark"] .tune-red     { --tune: #ff8186; }
 :root[data-theme="dark"] .tune-magenta { --tune: #f28be8; }
 :root[data-theme="dark"] .tune-brown   { --tune: #e3b57f; }
+:root[data-theme="dark"] .tune-gold    { --tune: #f0c75e; }
+:root[data-theme="dark"] .tune-wine    { --tune: #f08aa5; }
 :root[data-theme="dark"] .tuning-badge { color: #11191d; }
 :root[data-theme="dark"] .tuning-none { color: var(--faint); }
 .tuning-head .tuning-badge { margin-left: 0.35rem; }
 .strings-label { display: flex; align-items: center; gap: 0.4rem; }
+
+/* The running order: a heading per set, and cue rows for transitions,
+   breaks and announcements between the songs. */
+.set-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.85rem 1.05rem 0.75rem;
+  border-bottom: 1px solid var(--separator);
+}
+.set-head strong { font-family: var(--ff-display); font-size: 1.15rem; font-weight: 800; letter-spacing: -0.01em; }
+.set-head span { color: var(--muted); font-size: 0.8125rem; font-weight: 650; font-variant-numeric: tabular-nums; }
+.cue-row {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.5rem 1.05rem 0.5rem 2.95rem;
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.cue-row svg { width: 0.95rem; height: 0.95rem; flex-shrink: 0; }
+.cue-row .cue-time { margin-left: auto; font-weight: 650; letter-spacing: 0; font-variant-numeric: tabular-nums; }
+.cue-transition { color: var(--accent); }
+.cue-break { color: var(--text); }
+.cue-break svg { color: var(--warn); }
 
 /* Your mark: green know it, amber learning, an open ring to learn. */
 .song-mark { display: inline-block; flex-shrink: 0; width: 0.5rem; height: 0.5rem; border-radius: 999px; }
