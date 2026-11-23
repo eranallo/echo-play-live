@@ -54,6 +54,14 @@ export const VISIBLE_FIELDS = {
 // Fetched by /api/songs?id= when a song's page opens.
 export const SONG_DETAIL_FIELDS = ['Lyrics'];
 
+// Speed only, not privacy: rows the app would drop anyway (the ~1,000-song
+// catalog with no band or setlist; venues that never had a show). If
+// Airtable ever rejects one of these, lib/data.js reads the table in full.
+export const TABLE_NARROWING = {
+  SONGS: "OR(NOT({Performed By} = ''), NOT({Setlists} = ''))",
+  VENUES: "NOT({Shows} = '')",
+};
+
 // Members see confirmed shows (and past ones, which Airtable marks Completed).
 // Inquiries, holds and cancelled shows stay in Airtable.
 export const TABLE_FILTERS = {

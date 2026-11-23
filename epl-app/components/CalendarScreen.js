@@ -5,7 +5,7 @@
 import { useMemo, useState } from 'react'
 import { ChevronLeft, ChevronRight, CalendarX, Plus } from 'lucide-react'
 import { useApp } from './context'
-import { Panel, PageHead, ShowList, ShowRow, Sheet, Chevron, PersonAvatar, TopBar } from './ui'
+import { Panel, PageHead, ShowList, ShowRow, Sheet, Chevron, PersonAvatar, TopBar, CalendarSubscribe } from './ui'
 import { sortedShows, myShows, upcoming, myBlackouts, blackoutsByDate, showsByDate, blackoutPeople, blackoutCovers, sortedPractices, isMyPractice, isCancelled, practicesByDate } from '../lib/derive'
 import { PracticeRow } from './PracticeScreen'
 import { MONTH_NAMES, todayStr, toDateStr, parseDate, fmtLong, fmtDate, plural } from '../lib/format'
@@ -263,6 +263,9 @@ export default function CalendarScreen() {
             ) : <p className="empty">None coming up. Add any dates you can't play so Evan knows before booking.</p>}
           </Panel>
         )}
+        <Panel title="In your phone's calendar">
+          <div className="panel-body"><CalendarSubscribe /></div>
+        </Panel>
       </main>
       {sheet && <BlackoutSheet existing={sheet.existing} defaultDate={sheet.defaultDate} onClose={() => setSheet(null)} />}
     </>

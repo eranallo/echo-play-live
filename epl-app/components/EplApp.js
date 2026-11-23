@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import Head from 'next/head'
 import { House, CalendarDays, UsersRound, Music, Camera, Sun, Moon, Drum } from 'lucide-react'
 import { AppContext, useApp } from './context'
-import { Seal, Sheet, PersonCard, PersonAvatar, BandRoles, Toast } from './ui'
+import { Seal, Sheet, PersonCard, PersonAvatar, BandRoles, Toast, CalendarSubscribe } from './ui'
 import HomeScreen from './HomeScreen'
 import CalendarScreen from './CalendarScreen'
 import PeopleScreen from './PeopleScreen'
@@ -24,6 +24,21 @@ const TABS = [
 ]
 
 const PAGE_COLOR = { light: '#f5f0e8', dark: '#11191d' }
+
+// The last schedule this phone loaded, kept so the app opens straight away
+// and still works with no signal (load-in in a basement). Keyed by link, so
+// two people sharing a phone don't see each other's copy.
+const savedKey = (token) => `epl-data:${token}`
+function readSaved(token) {
+  try { const v = JSON.parse(localStorage.getItem(savedKey(token)) || 'null'); return v?.data?.me ? v : null } catch { return null }
+}
+function writeSaved(token, data) {
+  try { localStorage.setItem(savedKey(token), JSON.stringify({ at: Date.now(), data })) } catch {}
+}
+function forgetSaved(token) {
+  try { localStorage.removeItem(savedKey(token)) } catch {}
+}
+const fmtSavedAt = (ms) => new Date(ms).toLocaleString(undefined, { weekday: 'short', hour: 'numeric', minute: '2-digit' })
 
 // Shrink a phone photo before upload: 800px on the long side, JPEG.
 async function compressImage(file, maxDim = 800, quality = 0.85) {
@@ -106,6 +121,10 @@ function ProfileSheet({ onClose, theme, setTheme }) {
           <button aria-pressed={theme === 'dark'} onClick={() => setTheme('dark')}><Moon size={15} aria-hidden="true" style={{ verticalAlign: '-2px', marginRight: 6 }} />Dark</button>
         </div>
       </div>
+      <div className="sheet-section">
+        <span className="label">Your calendar</span>
+        <CalendarSubscribe />
+      </div>
       {!standalone && (
         <div className="sheet-section">
           <p className="row-sub">Keep this one tap away: in Safari, tap Share, then <strong>Add to Home Screen</strong>.</p>
@@ -143,6 +162,7 @@ export default function EplApp({ token }) {
   const [profileOpen, setProfileOpen] = useState(false)
   const [toastMsg, setToastMsg] = useState(null)
   const [theme, setThemeState] = useState('light')
+  const [savedAt, setSavedAt] = useState(null) // set when showing the saved copy because loading failed
   // Every song in Airtable, fetched the first time someone opens the full
   // catalog and kept for the session.
   const [catalog, setCatalog] = useState({ status: 'idle', data: null })
@@ -154,24 +174,35 @@ export default function EplApp({ token }) {
     headers: { 'Content-Type': 'application/json', ...(init.headers || {}), 'x-epl-token': token },
   }), [token])
 
-  const loadData = useCallback(async () => {
+  // fresh: skip the server's few-second cache, after a change or a pull to
+  // refresh, so the person sees what they just did.
+  const loadData = useCallback(async (fresh = false) => {
     try {
-      const res = await api('/api/me')
-      if (res.status === 401) { setLinkProblem(true); return }
+      const res = await api(fresh ? '/api/me?fresh=1' : '/api/me')
+      if (res.status === 401) { forgetSaved(token); setLinkProblem(true); return }
       const json = await res.json()
       if (!res.ok || json.error) throw new Error(json.error || 'Could not load your schedule')
       // Per-table failures become a banner; the rest of the app still loads.
-      if (json.errors) { setPartialErrors(json.errors); delete json.errors } else setPartialErrors(null)
+      if (json.errors) { setPartialErrors(json.errors); delete json.errors } else { setPartialErrors(null); writeSaved(token, json) }
       setData(json)
       setError(null)
+      setSavedAt(null)
     } catch (e) {
-      setError(e.message)
+      // No signal (or the server is down): fall back to the copy on this phone.
+      const saved = readSaved(token)
+      if (saved) { setData(d => d || saved.data); setSavedAt(saved.at); setError(null) }
+      else setError(e.message)
     } finally {
       setLoading(false)
     }
-  }, [api])
+  }, [api, token])
 
-  useEffect(() => { loadData() }, [loadData])
+  // Open straight onto the saved copy, if there is one, while the latest loads.
+  useEffect(() => {
+    const saved = readSaved(token)
+    if (saved) { setData(saved.data); setLoading(false) }
+    loadData()
+  }, [loadData, token])
 
   const loadCatalog = useCallback(async () => {
     catalogWanted.current = true
@@ -234,7 +265,7 @@ export default function EplApp({ token }) {
       if (indicator) indicator.classList.remove('visible')
       if (dist > 80 && !refreshing) {
         refreshing = true
-        Promise.all([loadData(), catalogWanted.current ? loadCatalog() : null]).finally(() => { refreshing = false })
+        Promise.all([loadData(true), catalogWanted.current ? loadCatalog() : null]).finally(() => { refreshing = false })
       }
       pulling = false
     }
@@ -258,15 +289,15 @@ export default function EplApp({ token }) {
   const pop = useCallback(() => { setStack(s => s.slice(0, -1)); window.scrollTo(0, 0) }, [])
 
   const ctx = useMemo(() => ({
-    data, idx, me, record, api, toast, setTab,
-    reload: loadData,
+    data, idx, me, record, api, toast, setTab, token,
+    reload: () => loadData(true),
     catalog, loadCatalog,
     openShow: (id) => push({ type: 'show', id }),
     openSetlist: (id) => push({ type: 'setlist', id }),
     openPerson: (rec, type) => setPerson({ record: rec, type }),
     openPractice: (id) => setPracticeId(id),
     openProfile: () => setProfileOpen(true),
-  }), [data, idx, me, record, api, toast, setTab, loadData, catalog, loadCatalog, push])
+  }), [data, idx, me, record, api, toast, setTab, token, loadData, catalog, loadCatalog, push])
 
   if (linkProblem) return (
     <CenteredMessage title="This link isn't working">
@@ -286,7 +317,7 @@ export default function EplApp({ token }) {
       <Seal />
       <h1>Couldn't load your schedule</h1>
       <p>{error || 'Nothing came back.'} Check your signal and try again.</p>
-      <button className="button button-filled" onClick={() => { setError(null); setLoading(true); loadData() }}>Try again</button>
+      <button className="button button-filled" onClick={() => { setError(null); setLoading(true); loadData(true) }}>Try again</button>
     </main>
   )
   if (!record) return (
@@ -310,6 +341,12 @@ export default function EplApp({ token }) {
   return (
     <AppContext.Provider value={ctx}>
       <Head><title>{`Echo Play Live — ${name}`}</title></Head>
+      {savedAt && (
+        <div className="banner banner-offline" role="status">
+          <span>{typeof navigator !== 'undefined' && navigator.onLine === false ? "You're offline." : "Couldn't reach Echo Play Live."} Showing your schedule from <strong>{fmtSavedAt(savedAt)}</strong>.</span>
+          <button className="text-link" onClick={() => loadData(true)}>Try again</button>
+        </div>
+      )}
       {partialErrors && (
         <div className="banner" role="status">
           <span>Couldn't load: <strong>{Object.keys(partialErrors).join(', ')}</strong>. Some screens may look empty.</span>

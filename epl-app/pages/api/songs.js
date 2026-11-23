@@ -9,6 +9,7 @@
 //                                 every load.
 
 import { fetchTable, methodGuard } from '../../lib/airtable';
+import { cached } from '../../lib/cache';
 import { requirePerson } from '../../lib/identity';
 import { VISIBLE_FIELDS, SONG_DETAIL_FIELDS } from '../../lib/visibility';
 
@@ -33,8 +34,9 @@ export default async function handler(req, res) {
     }
 
     if (scope === 'catalog') {
+      // The whole catalog is the same for everyone; keep it for a minute.
       const [songs, knowledge] = await Promise.all([
-        fetchTable('SONGS', { fields: VISIBLE_FIELDS.SONGS }),
+        cached('catalog:songs', 60 * 1000, () => fetchTable('SONGS', { fields: VISIBLE_FIELDS.SONGS })),
         fetchTable('SONG KNOWLEDGE', { fields: VISIBLE_FIELDS['SONG KNOWLEDGE'] }),
       ]);
       return res.status(200).json({ SONGS: songs, 'SONG KNOWLEDGE': knowledge });

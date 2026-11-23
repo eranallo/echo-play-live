@@ -18,12 +18,27 @@ export function readToken(req) {
   return typeof t === 'string' && TOKEN_RE.test(t) ? t : null;
 }
 
+// Who a token belongs to, remembered for a minute so every API call doesn't
+// cost two Airtable lookups. Only found people are kept, so a new token
+// works at once; a cleared token stops working within a minute.
+const PERSON_TTL_MS = 60 * 1000;
+const people = new Map();
+
 /**
  * Find the member or crew record a token belongs to.
  * Returns { type: 'member' | 'crew', id, name } or null.
  */
 export async function findPersonByToken(token) {
   if (!token || !TOKEN_RE.test(token)) return null;
+  const hit = people.get(token);
+  if (hit && hit.expires > Date.now()) return hit.person;
+  const person = await lookUpToken(token);
+  if (person) people.set(token, { person, expires: Date.now() + PERSON_TTL_MS });
+  else people.delete(token);
+  return person;
+}
+
+async function lookUpToken(token) {
   const formula = `{${TOKEN_FIELD}} = '${token}'`;
   const [members, crew] = await Promise.all([
     fetchTable('MEMBERS', { fields: [TOKEN_FIELD, 'Member Name'], filterByFormula: formula }),

@@ -1,7 +1,29 @@
 import '../styles/globals.css'
+import { useEffect } from 'react'
 import Head from 'next/head'
 
+const SHELL_CACHE = 'epl-shell-v1' // the same name as in public/sw.js
+
+// Install the service worker (public/sw.js) so the app opens with no signal,
+// then save the files this visit already loaded, so the very next offline
+// open works too.
+function useOfflineShell() {
+  useEffect(() => {
+    if (process.env.NODE_ENV !== 'production' || !('serviceWorker' in navigator)) return
+    navigator.serviceWorker.register('/sw.js')
+      .then(() => navigator.serviceWorker.ready)
+      .then(() => {
+        if (!window.caches) return
+        const mine = (u) => { try { const x = new URL(u, location.href); return x.origin === location.origin && /^\/(_next\/static|fonts|brand)\//.test(x.pathname) } catch { return false } }
+        const files = performance.getEntriesByType('resource').map(e => e.name).filter(mine)
+        return caches.open(SHELL_CACHE).then(c => c.addAll([...new Set([location.pathname, ...files])]))
+      })
+      .catch(() => {})
+  }, [])
+}
+
 export default function App({ Component, pageProps }) {
+  useOfflineShell()
   return (
     <>
       <Head>

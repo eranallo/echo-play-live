@@ -83,6 +83,31 @@ A setlist page follows the order built in Airtable's setlist editor
 - The guitar tuning shows as a colour-coded heading wherever it changes.
 - A setlist never arranged in the editor runs in the order of its Songs field.
 
+## Speed, offline and the calendar feed
+
+- **Loading:** `lib/data.js` reads each table with only the visible
+  fields, and keeps the result for 30 seconds (`lib/cache.js`) so people
+  opening the app together share one set of Airtable reads. SONGS and
+  VENUES are narrowed by formula (`TABLE_NARROWING` in `lib/visibility.js`)
+  to band/setlist songs and venues with shows; if Airtable rejects or
+  empties one of those, the table is read in full. After a change and on
+  pull-to-refresh the app asks for `/api/me?fresh=1`, which skips the cache.
+  Who a token belongs to is remembered for a minute.
+- **Offline:** the app saves the last schedule it loaded on the phone
+  (`localStorage`, per link) and opens straight onto it, then refreshes. With
+  no signal, or if Airtable is down (`/api/me` answers 503 when shows or
+  people can't load), it keeps showing the saved copy with a note.
+  `public/sw.js` keeps the app's own files so it opens with no signal; it
+  never stores `/api/` answers.
+- **Calendar feed:** `/api/calendar/<token>.ics` is a subscribable calendar
+  of the person's shows (first call time to end, call times and address in
+  the notes) and practices (called-off ones marked cancelled). The token is
+  in the address, like the personal link. If a table fails the feed answers
+  503, so calendar apps keep their last copy instead of deleting events.
+- **Show day:** on the day of a show, Home leads with a show-day card: the
+  countdown to the next call, the day's times, who's playing, directions and
+  the setlist.
+
 ## What a person can change
 
 - **Blackout dates**: add, edit and delete their own (`pages/api/blackout.js`).
@@ -138,6 +163,7 @@ pages/
   api/upload-photo.js
   api/song-knowledge.js  your answer for a song
   api/songs.js        the full song catalog, and one song's lyrics
+  api/calendar/[token].js  the person's calendar feed (.ics)
 components/
   EplApp.js           loading, tabs, back stack, profile sheet, theme
   HomeScreen.js       needs you, next show, this week, upcoming
@@ -152,6 +178,8 @@ components/
 lib/
   airtable.js         the one place that talks to Airtable
   identity.js         personal-link token → member or crew record
+  data.js, cache.js   reading tables, with a short shared cache
+  ical.js             building the calendar feed
   visibility.js       which fields and shows a person may receive
   derive.js           whose show is this, who is out, what needs you
   format.js           dates, times, durations

@@ -1,6 +1,6 @@
 // Shared building blocks, in StageKin's shapes with EPL's brand.
 import { useEffect, useState } from 'react'
-import { ChevronLeft, ChevronRight, MapPin, Phone, MessageSquare, X, CalendarDays } from 'lucide-react'
+import { ChevronLeft, ChevronRight, MapPin, Phone, MessageSquare, X, CalendarDays, CalendarPlus, Link as LinkIcon } from 'lucide-react'
 import { useApp } from './context'
 import { initials, fmtTime, fmtDate, daysUntil, attachmentUrl, memberPhoto, telHref, smsHref, parseDate } from '../lib/format'
 import { memberBands, nextShowFor } from '../lib/derive'
@@ -17,6 +17,31 @@ const BAND_PALETTE = {
 const bandStyle = (name) => {
   const c = BAND_PALETTE[name]
   return c ? { '--band-l': c[0], '--band-d': c[1] } : undefined
+}
+
+// Your shows and practices in your phone's calendar: one tap subscribes,
+// and the calendar app re-reads the feed on its own (/api/calendar).
+export function CalendarSubscribe() {
+  const { token, toast } = useApp()
+  const [host, setHost] = useState(null)
+  useEffect(() => { setHost(window.location.host) }, [])
+  if (!token || !host) return null
+  const path = `/api/calendar/${token}.ics`
+  const webcal = `webcal://${host}${path}`
+  const copy = async () => {
+    try { await navigator.clipboard.writeText(`https://${host}${path}`); toast('Calendar link copied') } catch { toast("Couldn't copy the link") }
+  }
+  return (
+    <div className="calendar-subscribe">
+      <p className="row-sub">Your shows and practices in your phone's calendar, with call times and the address. It keeps itself up to date.</p>
+      <div className="button-row">
+        <a className="button button-filled" href={webcal} aria-label="Add to Apple Calendar"><CalendarPlus aria-hidden="true" />Apple</a>
+        <a className="button button-tinted" href={`https://calendar.google.com/calendar/r?cid=${encodeURIComponent(webcal)}`} target="_blank" rel="noopener noreferrer" aria-label="Add to Google Calendar"><CalendarPlus aria-hidden="true" />Google</a>
+      </div>
+      <button className="text-link" onClick={copy}><LinkIcon size={15} aria-hidden="true" />Copy link for another calendar</button>
+      <p className="row-sub fine-print">Like your app link, this calendar link is just for you. Google can take a few hours to pick up changes.</p>
+    </div>
+  )
 }
 
 // A band named with its colour as a dot, rather than a filled chip.

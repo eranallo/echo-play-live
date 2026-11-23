@@ -1,12 +1,85 @@
 // Home: what needs you, your next show, this week, and what's coming up.
-// Same order as StageKin's My Stage on a phone.
-import { useMemo, useState } from 'react'
-import { AlertTriangle, Camera } from 'lucide-react'
+// Same order as StageKin's My Stage on a phone. On a show day, a show-day
+// card leads: the countdown to the next call, the day's times, and one tap
+// to directions and the setlist.
+import { useEffect, useMemo, useState } from 'react'
+import { AlertTriangle, Camera, Navigation, ListMusic, Check } from 'lucide-react'
 import { useApp } from './context'
-import { Panel, PageHead, ShowList, Chevron, BandTag, TopBar } from './ui'
-import { myShows, upcoming, myBlackouts, blackoutCovers, needsYou, roleOnShow, sortedPractices, isMyPractice, isCancelled } from '../lib/derive'
+import { Panel, PageHead, ShowList, Chevron, BandTag, TopBar, PersonAvatar } from './ui'
+import { myShows, upcoming, myBlackouts, blackoutCovers, needsYou, roleOnShow, sortedPractices, isMyPractice, isCancelled, setlistsForShow } from '../lib/derive'
 import { PracticeRow } from './PracticeScreen'
-import { todayStr, addDays, parseDate, fmtLong, fmtTime, fmtDate, countdown, firstName, plural } from '../lib/format'
+import { todayStr, addDays, parseDate, fmtLong, fmtTime, fmtDate, countdown, firstName, plural, mapsHref } from '../lib/format'
+
+// The time now, ticking every 30 seconds while the screen is open.
+function useNow() {
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 30 * 1000)
+    return () => clearInterval(t)
+  }, [])
+  return now
+}
+
+const inHm = (ms) => {
+  const mins = Math.max(1, Math.round(ms / 60000))
+  return mins >= 60 ? `${Math.floor(mins / 60)}h ${mins % 60}m` : `${mins} min`
+}
+
+// Today's show: what's next and when, every call time, and the way there.
+function ShowDay({ show }) {
+  const { idx, me, record, openShow, openSetlist } = useApp()
+  const now = useNow()
+  const f = show.fields
+  const band = idx.all('BANDS', f['Band'])[0]
+  const venue = idx.all('VENUES', f['Venue'])[0]?.fields || {}
+  const address = venue['Address']
+  const times = [
+    ['Trailer load-in', f['Trailer Load-In Time']], ['Load in', f['Load-In Time']],
+    ['Soundcheck', f['Sound Check Time']], ['Doors', f['Doors Time']],
+    ['On stage', f['Start Time']], ['End', f['End Time']],
+  ].filter(([, t]) => t && !Number.isNaN(new Date(t).getTime())).map(([label, t]) => ({ label, t, at: new Date(t).getTime() }))
+  const next = times.find(x => x.at > now)
+  const onStage = f['Start Time'] && now >= new Date(f['Start Time']).getTime() && (!f['End Time'] || now < new Date(f['End Time']).getTime())
+  const status = !times.length ? "Times aren't set yet"
+    : onStage ? 'On stage now'
+    : next ? (next.label === 'End' ? 'Playing until ' + fmtTime(next.t) : `${next.label} in ${inHm(next.at - now)}`)
+    : "That's a wrap. Nice work."
+  const role = roleOnShow(show, me, record, idx)
+  const sets = setlistsForShow(show, idx)
+  const lineup = idx.all('MEMBERS', f['Members Playing']).filter(m => m.id !== me.id)
+
+  return (
+    <section className="next-card showday">
+      <p className="eyebrow next-eyebrow"><span>Show day</span><span>{status}</span></p>
+      <h2>{band?.fields['Band Name'] || f['Show Name']}</h2>
+      <p>{[venue['Venue Name'], venue['City']].filter(Boolean).join(' · ')}{role && <><br />{role}</>}</p>
+      {times.length > 0 && (
+        <ol className="showday-times">
+          {times.map(x => {
+            const state = x.at <= now ? 'done' : x === next ? 'next' : ''
+            return (
+              <li key={x.label} data-state={state || undefined}>
+                <span>{state === 'done' ? <Check aria-hidden="true" /> : null}{x.label}</span>
+                <strong>{fmtTime(x.t)}</strong>
+              </li>
+            )
+          })}
+        </ol>
+      )}
+      {lineup.length > 0 && (
+        <div className="showday-lineup" aria-label={`Playing with ${lineup.map(m => firstName(m.fields['Member Name'])).join(', ')}`}>
+          {lineup.slice(0, 6).map(m => <PersonAvatar key={m.id} record={m} type="member" size={30} />)}
+          <span>with {lineup.slice(0, 3).map(m => firstName(m.fields['Member Name'])).join(', ')}{lineup.length > 3 ? ` +${lineup.length - 3}` : ''}</span>
+        </div>
+      )}
+      <div className="showday-actions">
+        {address && <a className="button button-filled" href={mapsHref(address)} target="_blank" rel="noopener noreferrer"><Navigation aria-hidden="true" />Directions</a>}
+        {sets[0] && <button className="button button-tinted" onClick={() => openSetlist(sets[0].id)}><ListMusic aria-hidden="true" />Setlist</button>}
+        <button className="button button-tinted" onClick={() => openShow(show.id)}>Show details</button>
+      </div>
+    </section>
+  )
+}
 
 function NeedsYou({ items }) {
   const { idx, openShow, openProfile } = useApp()
@@ -149,13 +222,15 @@ export default function HomeScreen() {
   const name = me.type === 'member' ? record.fields['Member Name'] : record.fields['Name']
   // Crew see which job they're booked for on each show.
   const roleFor = (s) => roleOnShow(s, me, record, idx)
+  const todays = mine.find(s => s.fields['Date'] === today)
   return (
     <>
       <TopBar />
       <main className="content rise">
         <PageHead eyebrow={fmtLong(today)} title={`Hi, ${firstName(name)}`} />
+        {todays && <ShowDay show={todays} />}
         <NeedsYou items={items} />
-        <NextShow show={mine[0]} />
+        {!todays && <NextShow show={mine[0]} />}
         {nextPractice && (
           <Panel title="Next practice">
             <ul className="agenda"><li><PracticeRow practice={nextPractice} /></li></ul>

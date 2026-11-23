@@ -451,6 +451,25 @@ button.row:active, a.row:active { background: var(--hover); }
 .next-card p { color: var(--muted); font-size: 0.9375rem; line-height: 1.55; }
 .next-foot { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; margin-top: 0.3rem; }
 
+/* Show day: the day's call times, the next one lit, the past ones ticked. */
+.showday { border-color: var(--accent-fill); }
+.showday .next-eyebrow span:last-child { color: var(--text); letter-spacing: 0.02em; text-transform: none; font-size: 0.8125rem; }
+.showday-times { list-style: none; display: grid; margin: 0.2rem 0; border-radius: 0.9rem; background: var(--card); overflow: hidden; }
+.showday-times li { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; padding: 0.55rem 0.9rem; font-size: 0.9375rem; }
+.showday-times li + li { border-top: 1px solid var(--separator); }
+.showday-times li span { display: inline-flex; align-items: center; gap: 0.4rem; }
+.showday-times li svg { width: 0.9rem; height: 0.9rem; color: var(--good); }
+.showday-times li strong { font-variant-numeric: tabular-nums; }
+.showday-times li[data-state="done"] { color: var(--muted); }
+.showday-times li[data-state="done"] strong { font-weight: 600; }
+.showday-times li[data-state="next"] { background: var(--accent-soft); color: var(--accent); font-weight: 750; }
+.showday-lineup { display: flex; align-items: center; gap: 0.3rem; color: var(--muted); font-size: 0.8125rem; }
+.showday-lineup .avatar + .avatar { margin-left: -0.55rem; box-shadow: 0 0 0 2px var(--card); }
+.showday-lineup span:last-child { margin-left: 0.4rem; }
+.showday-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.2rem; }
+.showday-actions .button { flex: 1 1 auto; }
+.showday-actions .button svg { width: 1.05rem; height: 1.05rem; }
+
 .week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 0.2rem; padding: 0.1rem 0.6rem 0.8rem; }
 .week-day {
   display: grid;
@@ -724,6 +743,14 @@ button.song-row:active { background: var(--hover); }
 :root[data-theme="dark"] .tuning-none { color: var(--faint); }
 .tuning-head .tuning-badge { margin-left: 0.35rem; }
 .strings-label { display: flex; align-items: center; gap: 0.4rem; }
+
+/* Calendar subscribe and the offline note. */
+.calendar-subscribe { display: grid; gap: 0.65rem; }
+.calendar-subscribe .row-sub { margin-top: 0; }
+.calendar-subscribe .button svg { width: 1.05rem; height: 1.05rem; }
+.calendar-subscribe .text-link { justify-self: start; }
+.fine-print { font-size: 0.75rem; }
+.banner-offline { background: var(--warn-soft); }
 
 /* The running order: a heading per set, and cue rows for transitions,
    breaks and announcements between the songs. */
